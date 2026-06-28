@@ -2314,6 +2314,19 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "promotion_replay_candidate_policy,trading_economics_calendar_web,2025-12,available\n",
                 encoding="utf-8",
             )
+            stale_run = replay_root / "replay_execution_runs" / "model_group_replay_20260611T154500Z"
+            stale_run.mkdir(parents=True, exist_ok=True)
+            (stale_run / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "replay_execution_receipt",
+                        "replay_execution_run_id": stale_run.name,
+                        "started_at_utc": "2026-06-11T15:45:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
 
             tasks = _model_group_replay_timeline_tasks(
                 storage_root=tmp / "storage" / "02_control_plane",
@@ -2330,6 +2343,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["task_state"], "future")
         self.assertEqual(replay_task["status"], "blocked")
         self.assertEqual(replay_task["detail"]["blockers"], ["fold_models_01_05_model_generation_complete"])
+        self.assertIsNone(replay_task.get("started_at_utc"))
         self.assertNotIn("replay_month_operation", replay_task["detail"])
         self.assertNotIn("Replay month 2025-12 is incomplete", replay_task["reason"])
         self.assertIn("Waiting for pre-replay M01-M05 model generation", replay_task["reason"])
@@ -2492,16 +2506,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
-            (replay_root / "replay_progress.jsonl").write_text(
-                "\n".join(
-                    [
-                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "fixture", "month": "2021-01", "status": "completed"}),
-                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": "fixture", "month": "2021-02", "status": "completed"}),
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
-            )
             replay_run = replay_root / "replay_execution_runs" / "fixture"
             replay_run.mkdir(parents=True)
             decision_rows_path = replay_run / "decision_rows.jsonl"
@@ -2534,8 +2538,16 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
-                        "candidate_handoff_source": "model_02_target_candidate_handoff",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "portfolio_replay_policy": {
+                            "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                            "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                            "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                            "max_positions": 5,
+                            "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                        },
                         "replay_completion_scope": "full_candidate_universe",
+                        "completed_replay_month_count": 2,
                         "max_decision_rows": None,
                         "validation_status": "passed",
                         "generated_at_utc": "2026-05-22T12:30:00Z",

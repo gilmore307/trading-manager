@@ -4262,6 +4262,18 @@ def _replay_execution_has_started(dataset_root: Path) -> bool:
 
 
 def _replay_ready_months(dataset_root: Path, replay_run_ids: set[str] | None = None) -> set[str]:
+    expected = _replay_window_month_count(dataset_root)
+    receipt = _latest_replay_execution_receipt(dataset_root)
+    if (
+        receipt is not None
+        and expected > 0
+        and _int_field(receipt, "completed_replay_month_count") >= expected
+        and _replay_receipt_is_dashboard_compatible(receipt)
+    ):
+        months = _unique_csv_values(dataset_root / "feed_acquisition_plan.csv", "month")
+        if months:
+            return months
+        return {f"completed_replay_month_{index}" for index in range(1, expected + 1)}
     ready: set[str] = set()
     for path in sorted((dataset_root / "replay_runs").glob("*.jsonl")) + [dataset_root / "replay_progress.jsonl"]:
         if not path.exists():
@@ -5130,7 +5142,7 @@ def _model_group_replay_timeline_tasks(
         ),
         ready_months=replay_ready_months,
     )
-    replay_started_at = _replay_execution_started_at(dataset_root)
+    replay_started_at = _replay_execution_started_at(dataset_root) if lifecycle_artifacts_allowed else None
     replay_started = bool(replay_ready_months) or bool(replay_started_at) or (
         lifecycle_artifacts_allowed and _replay_execution_has_started(dataset_root)
     )
