@@ -29,6 +29,7 @@ from .provider_dispatch import (
     select_provider_worker_count,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT, storage_uri_to_local_path
+from .storage_paths import data_storage_root
 
 FEED_MODULE_BY_ID = {
     "03_feed_alpaca_news": "data_feed.03_feed_alpaca_news",
@@ -193,8 +194,26 @@ def _command(feed_id: str, task_key_path: Path, request_id: str, *, attempt: int
     return [sys.executable, "-m", module, str(task_key_path), "--run-id", _run_id(request_id, attempt=attempt)]
 
 
+def _data_feed_storage_root(trading_data_root: Path) -> Path:
+    """Mirror trading-data's storage root for source-feed outputs."""
+
+    configured = os.environ.get("TRADING_DATA_STORAGE_ROOT", "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    if trading_data_root.resolve(strict=False) != DEFAULT_TRADING_DATA_ROOT.resolve(strict=False):
+        return trading_data_root / "storage"
+    return data_storage_root()
+
+
 def _receipt_path(trading_data_root: Path, task_key: Mapping[str, Any]) -> Path:
-    return (trading_data_root / str(task_key.get("output_root") or "storage") / "completion_receipt.json").resolve()
+    output_root = Path(str(task_key.get("output_root") or "storage"))
+    if output_root.is_absolute():
+        root = output_root
+    elif output_root.parts and output_root.parts[0] == "storage":
+        root = _data_feed_storage_root(trading_data_root).joinpath(*output_root.parts[1:])
+    else:
+        root = _data_feed_storage_root(trading_data_root) / output_root
+    return (root / "completion_receipt.json").resolve()
 
 
 def _request_already_succeeded(receipt_path: Path, request_id: str) -> bool:

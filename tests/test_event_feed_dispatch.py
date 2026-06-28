@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from trading_manager_tasks.event_feed_backfill import prepare_event_feed_backfill
-from trading_manager_tasks.event_feed_dispatch import dispatch_event_feed_backfill
+from trading_manager_tasks.event_feed_dispatch import DEFAULT_TRADING_DATA_ROOT, dispatch_event_feed_backfill
 
 
 class EventFeedDispatchTests(unittest.TestCase):
@@ -140,6 +140,50 @@ class EventFeedDispatchTests(unittest.TestCase):
         self.assertEqual(summary.items[0].status, "already_succeeded")
         self.assertEqual(summary.provider_calls, 1)
         self.assertEqual(captured_payloads[0]["feed"], "05_feed_gdelt_news")
+
+    def test_default_dispatch_receipts_resolve_to_source_data_storage_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source_storage_root = root / "trading-storage" / "storage" / "01_source_data"
+            prepare_event_feed_backfill(
+                start_month="2016-01",
+                end_month="2016-01",
+                target_symbol="AAPL",
+                storage_root=root,
+                write_files=True,
+            )
+            receipt = source_storage_root / "monthly_backfill" / "alpaca_news" / "2016-01" / "completion_receipt.json"
+            receipt.parent.mkdir(parents=True, exist_ok=True)
+            receipt.write_text(
+                json.dumps(
+                    {
+                        "runs": [
+                            {
+                                "run_id": "mgrreq_event_backfill_alpaca_news_aapl_2016_01_event_feed_20160101T000000Z",
+                                "status": "succeeded",
+                                "row_counts": {"equity_news": 1},
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("trading_manager_tasks.event_feed_dispatch.data_storage_root", return_value=source_storage_root):
+                summary = dispatch_event_feed_backfill(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    target_symbol="AAPL",
+                    storage_root=root,
+                    trading_data_root=DEFAULT_TRADING_DATA_ROOT,
+                    feed_ids=["03_feed_alpaca_news"],
+                    execute_provider_calls=True,
+                    dynamic_workers=False,
+                )
+
+        self.assertEqual(summary.provider_calls, 0)
+        self.assertEqual(summary.items[0].status, "already_succeeded")
+        self.assertEqual(Path(summary.items[0].receipt_path), receipt.resolve())
 
     def test_trading_economics_feed_is_not_dispatchable(self):
         with tempfile.TemporaryDirectory() as td:
