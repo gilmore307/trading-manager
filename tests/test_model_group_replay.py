@@ -1260,6 +1260,69 @@ class ModelGroupReplayTests(unittest.TestCase):
 
             self.assertIsNone(decision)
 
+    def test_skips_replay_when_progress_covers_month_without_decisions(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+
+            run_id = "complete_with_empty_month"
+            receipt_root = dataset_root / "replay_execution_runs" / run_id
+            receipt_root.mkdir(parents=True, exist_ok=True)
+            decision_rows_path = receipt_root / "decision_rows.jsonl"
+            decision_rows_path.write_text(
+                json.dumps({"decision_id": "decision_2021_01", "timestamp": "2021-01-05T16:00:00-05:00"})
+                + "\n",
+                encoding="utf-8",
+            )
+            progress_path = dataset_root / "replay_progress.jsonl"
+            progress_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-01", "status": "completed", "decision_row_count": 1}),
+                        json.dumps({"stage_id": "model_group.replay", "replay_execution_run_id": run_id, "month": "2021-02", "status": "completed", "decision_row_count": 0}),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (receipt_root / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": run_id,
+                        "decision_rows_ref": str(decision_rows_path),
+                        "progress_ref": str(progress_path),
+                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "candidate_handoff_symbols": ["AAPL"],
+                        "portfolio_replay_policy": {
+                            "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                            "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                            "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                            "max_positions": 5,
+                            "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                            "switch_threshold_policy": "score_scale_aware_absolute_rank_delta",
+                        },
+                        "max_decision_rows": None,
+                        "replay_completion_scope": "full_candidate_universe",
+                        "replay_continuity_policy": "continuous_cross_month_portfolio_path",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(storage_root=storage_root, runner_path=tmp / "missing.py")
+
+            self.assertIsNone(decision)
+
 
 if __name__ == "__main__":
     unittest.main()

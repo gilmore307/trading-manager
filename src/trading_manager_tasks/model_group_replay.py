@@ -1331,6 +1331,17 @@ def _replay_receipt_selected_option_path_missing_count(replay_receipt: Mapping[s
 
 def _replay_receipt_valid_months(replay_receipt: Mapping[str, Any]) -> set[str]:
     receipt_month = str(replay_receipt.get("replay_month") or "").strip()
+    if receipt_month:
+        return set()
+    run_id = str(replay_receipt.get("replay_execution_run_id") or "").strip()
+    progress_ref = str(replay_receipt.get("progress_ref") or "").strip()
+    if progress_ref:
+        try:
+            progress_months = _progress_row_months(Path(progress_ref), run_id=run_id)
+        except (OSError, ValueError, json.JSONDecodeError):
+            progress_months = set()
+        if progress_months:
+            return progress_months
     decision_rows_ref = str(replay_receipt.get("decision_rows_ref") or "").strip()
     if not decision_rows_ref:
         return set()
@@ -1338,9 +1349,28 @@ def _replay_receipt_valid_months(replay_receipt: Mapping[str, Any]) -> set[str]:
         decision_months = _decision_row_months(Path(decision_rows_ref))
     except (OSError, ValueError, json.JSONDecodeError):
         return set()
-    if receipt_month:
-        return set()
     return decision_months
+
+
+def _progress_row_months(path: Path, *, run_id: str) -> set[str]:
+    months: set[str] = set()
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if not isinstance(row, Mapping):
+                continue
+            row_run_id = str(row.get("replay_execution_run_id") or "").strip()
+            if run_id and row_run_id and row_run_id != run_id:
+                continue
+            status = str(row.get("status") or row.get("replay_status") or "").strip().lower()
+            if status not in {"succeeded", "completed", "complete"}:
+                continue
+            month = str(row.get("month") or row.get("replay_month") or "").strip()
+            if len(month) == 7 and month[4] == "-":
+                months.add(month)
+    return months
 
 
 def _decision_row_months(path: Path) -> set[str]:
