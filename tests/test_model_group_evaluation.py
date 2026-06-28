@@ -108,6 +108,52 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _write_pre_replay_complete_fold_with_pending_m06_generation(self, storage_root: Path) -> None:
+        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+        state_path.parent.mkdir(parents=True)
+        stages = []
+        for layer in range(1, 6):
+            for split_name in ("train", "validation", "test"):
+                stages.append(
+                    {
+                        "stage_id": f"layer_{layer:02d}_fixture.model_generation.{split_name}",
+                        "stage_type": "model_generation",
+                        "layer": layer,
+                        "layer_key": f"layer_{layer:02d}_fixture",
+                        "status": "succeeded",
+                        "dataset_split": {
+                            "split_name": split_name,
+                            "split_policy": "chronological_rolling_fold_4_1_1",
+                        },
+                    }
+                )
+        for split_name, status in (("train", "ready"), ("validation", "blocked"), ("test", "blocked")):
+            stages.append(
+                {
+                    "stage_id": f"layer_06_fixture.model_generation.{split_name}",
+                    "stage_type": "model_generation",
+                    "layer": 6,
+                    "layer_key": "layer_06_fixture",
+                    "status": status,
+                    "dataset_split": {
+                        "split_name": split_name,
+                        "split_policy": "chronological_rolling_fold_4_1_1",
+                    },
+                }
+            )
+        state_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "manager_model_training_workflow_state",
+                    "start_month": "2016-01",
+                    "end_month": "2016-06",
+                    "stages": stages,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
     def test_temporal_stability_publishes_monthly_return_path_ohlc(self):
         diagnostics = _temporal_stability_diagnostics(
             [
@@ -439,6 +485,24 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             assert refreshed is not None
             self.assertEqual(refreshed.reason_code, "model_group_evaluation_executed")
             self.assertEqual(len(list((dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json"))), 3)
+
+    def test_evaluates_pre_replay_complete_fold_with_pending_m06_generation_stages(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_ready_replay_and_attribution(storage_root)
+            self._write_pre_replay_complete_fold_with_pending_m06_generation(storage_root)
+
+            decision = run_model_group_evaluation_if_ready(
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                call_agent_review=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.reason_code, "model_group_evaluation_executed")
 
     def test_local_fallback_review_writes_terminal_deferred_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

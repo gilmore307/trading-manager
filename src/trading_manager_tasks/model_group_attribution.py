@@ -50,6 +50,11 @@ def run_model_group_replay_review_if_ready(
     replay_receipt = _latest_replay_execution_receipt(dataset_root, replay_execution_run_id=replay_execution_run_id)
     if replay_receipt is None:
         return None
+    decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
+    if not decision_rows_path.exists():
+        return None
+    if not force and _latest_complete_replay_review_receipt(dataset_root, decision_rows_ref=str(decision_rows_path)) is not None:
+        return None
     expected_months = _expected_replay_months(dataset_root)
     replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "")
     ready_months = _ready_replay_months(dataset_root, replay_run_id=replay_run_id)
@@ -65,11 +70,6 @@ def run_model_group_replay_review_if_ready(
         if not force:
             return None
     if expected_months > 0 and len(ready_months) < expected_months and not allow_partial_replay:
-        return None
-    decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
-    if not decision_rows_path.exists():
-        return None
-    if not force and _latest_complete_replay_review_receipt(dataset_root, decision_rows_ref=str(decision_rows_path)) is not None:
         return None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)

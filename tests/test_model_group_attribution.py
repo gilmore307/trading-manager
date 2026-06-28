@@ -6,7 +6,9 @@ import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
+import trading_manager_tasks.model_group_attribution as model_group_attribution
 from trading_manager_tasks.model_group_attribution import run_model_group_replay_review_if_ready
 from trading_manager_tasks.model_group_residual_event_governance import _event_effect_profile, run_model_group_residual_event_governance_if_ready
 
@@ -322,6 +324,21 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(rows[2]["path_conditioning_policy"], "upstream_selected_path_only")
             self.assertEqual(rows[2]["miss_review_scope"], "path_conditioned_current_scope")
             self.assertEqual(rows[2]["candidate_set_scope"], "selected_path_current_decision_set")
+
+    def test_completed_replay_review_skips_replay_progress_scan(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_replay_dataset(storage_root)
+            first = run_model_group_replay_review_if_ready(storage_root=storage_root)
+            self.assertIsNotNone(first)
+
+            with patch.object(model_group_attribution, "_ready_replay_months") as ready_months:
+                second = run_model_group_replay_review_if_ready(storage_root=storage_root)
+
+            self.assertIsNone(second)
+            ready_months.assert_not_called()
 
     def test_ready_without_execute_does_not_write_receipt(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

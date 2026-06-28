@@ -2319,9 +2319,6 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
         stages = payload.get("stages")
         if not isinstance(stages, list) or not base_stack_model_generation_splits_complete(stages):
             continue
-        statuses = [stage.get("status") for stage in stages if isinstance(stage, Mapping)]
-        if not statuses or any(status not in {"succeeded", "not_applicable"} for status in statuses):
-            continue
         start_month = str(payload.get("start_month") or "")
         end_month = str(payload.get("end_month") or "")
         if not start_month or not end_month:
