@@ -98,6 +98,10 @@ def run_model_group_replay_if_ready(
 
     compatible_run_months = _compatible_replay_run_months(dataset_root=dataset_root, training_fold=training_fold)
     expected_months = _expected_replay_months(dataset_root)
+    plan_months = set(_replay_plan_months(dataset_root))
+    compatible_months = set().union(*compatible_run_months.values()) if compatible_run_months else set()
+    if expected_months > 0 and plan_months and len(compatible_months) >= expected_months and plan_months <= compatible_months:
+        return None
     ready_months = _ready_replay_months(dataset_root, replay_run_months=compatible_run_months) if compatible_run_months else set()
     if expected_months > 0 and len(ready_months) >= expected_months:
         return None
@@ -1221,6 +1225,13 @@ def _string_set(value: Any) -> set[str]:
     return set()
 
 
+def _as_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _fold_label(start_month: str, end_month: str) -> str:
     try:
         start_year, start_month_number = (int(part) for part in start_month.split("-", 1))
@@ -1268,7 +1279,8 @@ def _compatible_replay_run_months(*, dataset_root: Path, training_fold: Mapping[
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
         return run_months
-    for receipt_path in sorted(replay_root.glob("*/replay_execution_receipt.json")):
+    plan_months = set(_replay_plan_months(dataset_root))
+    for receipt_path in sorted(replay_root.glob("*/replay_execution_receipt.json"), reverse=True):
         try:
             receipt = _load_json_object(receipt_path)
         except (OSError, ValueError, json.JSONDecodeError):
@@ -1281,12 +1293,18 @@ def _compatible_replay_run_months(*, dataset_root: Path, training_fold: Mapping[
             continue
         if _replay_receipt_selected_option_path_missing_count(receipt) > 0:
             continue
-        months = _replay_receipt_valid_months(receipt)
+        completed_month_count = _as_int(receipt.get("completed_replay_month_count"))
+        if plan_months and completed_month_count >= len(plan_months):
+            months = plan_months
+        else:
+            months = _replay_receipt_valid_months(receipt)
         if not months:
             continue
         run_id = str(receipt.get("replay_execution_run_id") or receipt_path.parent.name).strip()
         if run_id:
             run_months[run_id] = months
+        if plan_months and plan_months <= set().union(*run_months.values()):
+            return run_months
     return run_months
 
 

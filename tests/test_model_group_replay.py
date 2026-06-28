@@ -8,7 +8,9 @@ import textwrap
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
+import trading_manager_tasks.model_group_replay as model_group_replay
 from trading_manager_tasks.model_group_replay import run_model_group_replay_if_ready
 
 
@@ -345,6 +347,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "switch_threshold_policy": "score_scale_aware_absolute_rank_delta",
                     },
                     "max_decision_rows": None,
+                    "completed_replay_month_count": 2,
                     "replay_completion_scope": "full_candidate_universe",
                     "replay_continuity_policy": "continuous_cross_month_portfolio_path",
                 }
@@ -1259,6 +1262,21 @@ class ModelGroupReplayTests(unittest.TestCase):
             decision = run_model_group_replay_if_ready(storage_root=storage_root, runner_path=tmp / "missing.py")
 
             self.assertIsNone(decision)
+
+    def test_full_replay_receipt_skips_progress_scan_when_plan_is_complete(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            self._write_completed_continuous_replay(dataset_root)
+
+            with patch.object(model_group_replay, "_ready_replay_months") as ready_months:
+                decision = run_model_group_replay_if_ready(storage_root=storage_root, runner_path=tmp / "missing.py")
+
+            self.assertIsNone(decision)
+            ready_months.assert_not_called()
 
     def test_skips_replay_when_progress_covers_month_without_decisions(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
