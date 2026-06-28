@@ -404,6 +404,34 @@ def _early_close_name(day: date) -> str:
     return ""
 
 
+def _third_friday(year: int, month: int) -> date:
+    day = date(year, month, 1)
+    while day.weekday() != 4:
+        day += timedelta(days=1)
+    return day + timedelta(days=14)
+
+
+def _last_regular_trading_day(year: int, month: int) -> date:
+    day = _next_month_date(date(year, month, 1)) - timedelta(days=1)
+    while not is_regular_us_equity_trading_day(day):
+        day -= timedelta(days=1)
+    return day
+
+
+def _previous_regular_trading_day(day: date) -> date:
+    candidate = day - timedelta(days=1)
+    while not is_regular_us_equity_trading_day(candidate):
+        candidate -= timedelta(days=1)
+    return candidate
+
+
+def _monthly_option_expiration_day(year: int, month: int) -> date:
+    third_friday = _third_friday(year, month)
+    if is_regular_us_equity_trading_day(third_friday):
+        return third_friday
+    return _previous_regular_trading_day(third_friday)
+
+
 def _next_regular_market_open(day: date) -> str:
     candidate = day + timedelta(days=1)
     while not is_regular_us_equity_trading_day(candidate):
@@ -419,49 +447,118 @@ def _market_session_calendar_events(*, start_month: str, end_month: str) -> tupl
     day = start
     while day < end:
         month = f"{day.year:04d}-{day.month:02d}"
-        title = ""
-        summary_bits: list[str] = []
-        event_time = datetime(day.year, day.month, day.day, 0, 0, tzinfo=ET).isoformat()
+        entries: list[tuple[str, str, list[str], datetime]] = []
         if day.weekday() >= 5:
-            title = "US equity weekend market closure"
-            summary_bits = ["market_structure_type=weekend_closure", "session_status=closed"]
+            entries.append(
+                (
+                    "weekend_closure",
+                    "US equity weekend market closure",
+                    ["market_structure_type=weekend_closure", "session_status=closed"],
+                    datetime(day.year, day.month, day.day, 0, 0, tzinfo=ET),
+                )
+            )
         elif not is_regular_us_equity_trading_day(day):
             holiday_name = _market_holiday_name(day)
-            title = f"US equity market holiday: {holiday_name}"
-            summary_bits = [
-                "market_structure_type=market_holiday",
-                "session_status=closed",
-                f"holiday_name={holiday_name}",
-            ]
+            entries.append(
+                (
+                    "market_holiday",
+                    f"US equity market holiday: {holiday_name}",
+                    [
+                        "market_structure_type=market_holiday",
+                        "session_status=closed",
+                        f"holiday_name={holiday_name}",
+                    ],
+                    datetime(day.year, day.month, day.day, 0, 0, tzinfo=ET),
+                )
+            )
         else:
             early_close = _early_close_name(day)
             if early_close:
-                title = f"US equity early close: {early_close}"
-                event_time = datetime(day.year, day.month, day.day, 13, 0, tzinfo=ET).isoformat()
-                summary_bits = [
-                    "market_structure_type=early_close",
-                    "session_status=early_close",
-                    f"holiday_name={early_close}",
-                ]
-        if title:
+                entries.append(
+                    (
+                        "early_close",
+                        f"US equity early close: {early_close}",
+                        [
+                            "market_structure_type=early_close",
+                            "session_status=early_close",
+                            f"holiday_name={early_close}",
+                        ],
+                        datetime(day.year, day.month, day.day, 13, 0, tzinfo=ET),
+                    )
+                )
+            if day == _monthly_option_expiration_day(day.year, day.month):
+                entries.append(
+                    (
+                        "monthly_option_expiration",
+                        "US equity monthly options expiration",
+                        [
+                            "market_structure_type=monthly_option_expiration",
+                            "session_status=regular",
+                            "event_family=monthly_option_expiration",
+                        ],
+                        datetime(day.year, day.month, day.day, 16, 0, tzinfo=ET),
+                    )
+                )
+                if day.month in {3, 6, 9, 12}:
+                    entries.append(
+                        (
+                            "triple_witching_calendar",
+                            "US equity triple-witching calendar window",
+                            [
+                                "market_structure_type=triple_witching",
+                                "session_status=regular",
+                                "event_family=triple_witching_calendar",
+                            ],
+                            datetime(day.year, day.month, day.day, 16, 0, tzinfo=ET),
+                        )
+                    )
+                    entries.append(
+                        (
+                            "quarterly_etf_index_rebalance_window",
+                            "US ETF/index quarterly rebalance window",
+                            [
+                                "market_structure_type=quarterly_etf_index_rebalance_window",
+                                "session_status=regular",
+                                "event_family=index_rebalance_expiry_flow",
+                                "result_fields=scheduled_window_only",
+                            ],
+                            datetime(day.year, day.month, day.day, 16, 0, tzinfo=ET),
+                        )
+                    )
+            if day == _last_regular_trading_day(day.year, day.month):
+                entries.append(
+                    (
+                        "month_end_rebalance_window",
+                        "US equity month-end rebalance window",
+                        [
+                            "market_structure_type=month_end_rebalance_window",
+                            "session_status=regular",
+                            "event_family=index_rebalance_expiry_flow",
+                            "result_fields=scheduled_window_only",
+                        ],
+                        datetime(day.year, day.month, day.day, 16, 0, tzinfo=ET),
+                    )
+                )
+        for event_kind, title, summary_bits, event_time in entries:
             summary_bits.extend(
                 [
                     "event_phase=calendar_state",
                     "lifecycle_class=scheduled_periodic_calendar",
+                    "source_certainty=deterministic_rule",
                     f"calendar_date={day.isoformat()}",
                     f"next_regular_open={_next_regular_market_open(day)}",
                 ]
             )
             events.append(
                 {
-                    "event_id": f"market_session_{day.isoformat()}_{summary_bits[0].split('=', 1)[1]}",
-                    "canonical_event_id": f"market_session_{day.isoformat()}",
+                    "event_id": f"market_session_{day.isoformat()}_{event_kind}",
+                    "canonical_event_id": f"market_session_{day.isoformat()}_{event_kind}",
                     "dedup_status": "canonical",
                     "source_priority": "approved_calendar",
                     "coverage_reason": "generated_market_session_calendar_for_m06_market_structure_context",
                     "fold_month": month,
-                    "event_time": event_time,
-                    "available_time": event_time,
+                    "event_time": event_time.isoformat(),
+                    "available_time": event_time.isoformat(),
                     "information_role_type": "prior_signal",
                     "event_category_type": "market_structure",
                     "scope_type": "macro",
@@ -470,7 +567,7 @@ def _market_session_calendar_events(*, start_month: str, end_month: str) -> tupl
                     "summary": "; ".join(summary_bits),
                     "source_name": MARKET_SESSION_SOURCE,
                     "reference_type": "source_reference",
-                    "reference": f"generated_us_equity_market_session:{day.isoformat()}",
+                    "reference": f"generated_us_equity_market_session:{day.isoformat()}:{event_kind}",
                     "source_artifact_path": "generated://manager/market_session_calendar",
                 }
             )

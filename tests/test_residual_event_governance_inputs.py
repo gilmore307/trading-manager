@@ -94,6 +94,34 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             self.assertEqual(summary.detector_event_count, 0)
             self.assertEqual(summary.provider_calls, 0)
 
+    def test_market_session_calendar_includes_expiry_and_rebalance_windows(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            trading_data_root = tmp / "trading-data"
+            storage_root = trading_data_root / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
+            _write_layer_two_bar_receipt(storage_root, "XLF", "2021-03")
+
+            summary = materialize_residual_event_governance_inputs_inputs(
+                start_month="2021-03",
+                end_month="2021-03",
+                manager_storage_root=tmp / "manager-storage",
+                trading_data_root=trading_data_root,
+                trading_storage_root=storage_root,
+                universe_path=universe_path,
+                write=False,
+            )
+            task_key = json.loads(Path(summary.source_task_key_path).read_text(encoding="utf-8"))
+            market_events = [event for event in task_key["params"]["events"] if event["event_category_type"] == "market_structure"]
+            summaries = "\n".join(event["summary"] for event in market_events)
+
+            self.assertIn("market_structure_type=monthly_option_expiration", summaries)
+            self.assertIn("market_structure_type=triple_witching", summaries)
+            self.assertIn("market_structure_type=quarterly_etf_index_rebalance_window", summaries)
+            self.assertIn("market_structure_type=month_end_rebalance_window", summaries)
+            self.assertEqual(summary.event_feed_coverage["market_session_calendar"], 1)
+
     def test_fold_materialization_prepares_detector_per_symbol_month(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
