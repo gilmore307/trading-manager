@@ -213,6 +213,10 @@ def _read_receipt(path: Path) -> Mapping[str, Any]:
     return receipt
 
 
+def _is_success_status(run: Mapping[str, Any]) -> bool:
+    return _status(run.get("status") or "failed") in {"succeeded", "success", "completed", "complete", "ready"}
+
+
 def normalize_stage_receipts(refs: Sequence[StageReceiptRef]) -> CompletionReceiptRows:
     """Normalize discovered receipt files into manager control-plane rows."""
 
@@ -268,6 +272,8 @@ def propose_failure_register_rows(
     for ref in refs:
         receipt = _read_receipt(ref.receipt_path)
         runs = _receipt_runs(receipt)
+        if any(_is_success_status(run) for run in runs):
+            continue
         latest_run = runs[-1]
         status = _status(latest_run.get("status") or "failed")
         if status in {"succeeded", "success", "completed", "complete", "ready"}:
@@ -301,15 +307,13 @@ def propose_failure_register_rows(
 
 
 def latest_successful_receipt_refs(refs: Sequence[StageReceiptRef]) -> dict[str, str]:
-    """Map request ids to latest successful receipt refs for failure-register correction."""
+    """Map request ids to receipt refs that contain successful terminal evidence."""
 
     corrected: dict[str, str] = {}
     for ref in refs:
         receipt = _read_receipt(ref.receipt_path)
         runs = _receipt_runs(receipt)
-        latest_run = runs[-1]
-        status = _status(latest_run.get("status") or "failed")
-        if status in {"succeeded", "success", "completed", "complete", "ready"}:
+        if any(_is_success_status(run) for run in runs):
             corrected[ref.request_id] = ref.receipt_uri
     return corrected
 

@@ -176,6 +176,56 @@ class OptionChainSourceAcquisitionTests(unittest.TestCase):
         self.assertEqual(run_mock.call_count, 4)
         self.assertEqual({item.worker_slot for item in dispatch.items}, {1, 2, 3, 4})
 
+    def test_execute_dispatch_skips_provider_when_cache_receipt_already_succeeded(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "storage"
+            task_root = storage_root / "runtime" / "model_05_option_expression" / "option_chain_state_source" / "2021-03"
+            request_id = "mgrreq_option_chain_window_aapl_2021_03_2021_03_11_0930"
+            task_path = task_root / request_id / "task_key.json"
+            output_root = Path(raw_tmp) / "data" / request_id
+            task_path.parent.mkdir(parents=True, exist_ok=True)
+            output_root.mkdir(parents=True, exist_ok=True)
+            task_path.write_text(
+                json.dumps({"output_root": str(output_root), "params": {}}),
+                encoding="utf-8",
+            )
+            (output_root / "completion_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "runs": [
+                            {
+                                "run_id": "existing_success",
+                                "status": "succeeded",
+                                "outputs": ["trading_data.option_chain_state_source"],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rows = [
+                {
+                    "request_id": request_id,
+                    "parameter_ref": "storage://trading-manager/" + str(task_path.relative_to(storage_root)),
+                }
+            ]
+
+            with (
+                patch("trading_manager_tasks.option_chain_source_acquisition.request_rows", return_value=rows),
+                patch("trading_manager_tasks.option_chain_source_acquisition.subprocess.run") as run_mock,
+            ):
+                dispatch = dispatch_option_chain_source_acquisition(
+                    start_month="2021-03",
+                    end_month="2021-03",
+                    storage_root=storage_root,
+                    trading_data_root=Path(raw_tmp),
+                    execute_provider_calls=True,
+                )
+
+        self.assertEqual(dispatch.items[0].status, "already_succeeded")
+        self.assertEqual(dispatch.dispatch_count, 0)
+        run_mock.assert_not_called()
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

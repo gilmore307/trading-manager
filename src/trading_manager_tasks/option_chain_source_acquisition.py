@@ -487,6 +487,26 @@ def _provider_python_executable() -> str:
     return str(DEFAULT_PYTHON_EXECUTABLE if DEFAULT_PYTHON_EXECUTABLE.exists() else Path(sys.executable))
 
 
+def _receipt_has_successful_output(receipt_path: Path) -> bool:
+    if not receipt_path.exists():
+        return False
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    runs = receipt.get("runs")
+    if not isinstance(runs, list):
+        runs = [receipt] if isinstance(receipt, Mapping) else []
+    for run in runs:
+        if not isinstance(run, Mapping):
+            continue
+        status = str(run.get("status") or "").strip().lower()
+        outputs = {str(output) for output in run.get("outputs") or run.get("output_refs") or []}
+        if status in {"succeeded", "success", "completed", "complete", "ready"} and "trading_data.option_chain_state_source" in outputs:
+            return True
+    return False
+
+
 def dispatch_option_chain_source_acquisition(
     *,
     start_month: str,
@@ -522,6 +542,27 @@ def dispatch_option_chain_source_acquisition(
         runtime_task_key = storage_root / "runtime" / "provider_task_keys" / request_id / "task_key.json"
         command_path = source_path
         runtime_retained = False
+        receipt_path = str(Path(str(task_key.get("output_root") or "")) / "completion_receipt.json")
+        if execute_provider_calls and _receipt_has_successful_output(Path(receipt_path)):
+            command = [
+                _provider_python_executable(),
+                "-m",
+                "data_source.option_chain_state_source",
+                str(command_path),
+                "--run-id",
+                _run_id(request_id),
+            ]
+            return ProviderDispatchItem(
+                request_id=request_id,
+                task_key_path=str(source_path),
+                runtime_task_key_path=None,
+                runtime_task_key_retained=False,
+                command=command,
+                receipt_path=receipt_path,
+                status="already_succeeded",
+                worker_id=f"provider-worker-{worker_slot}",
+                worker_slot=worker_slot,
+            )
         if execute_provider_calls:
             runtime_task_key.parent.mkdir(parents=True, exist_ok=True)
             runtime_task_key.write_text(json.dumps(_runtime_task_key(task_key), indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -535,7 +576,6 @@ def dispatch_option_chain_source_acquisition(
             "--run-id",
             _run_id(request_id),
         ]
-        receipt_path = str(Path(str(task_key.get("output_root") or "")) / "completion_receipt.json")
         if not execute_provider_calls:
             return ProviderDispatchItem(
                 request_id=request_id,
