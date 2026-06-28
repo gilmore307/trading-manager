@@ -740,6 +740,19 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
+            receipt = runtime / "model_training_stage_receipts" / "model_02_target_state__data_acquisition" / "completion_receipt.json"
+            receipt.parent.mkdir(parents=True, exist_ok=True)
+            receipt.write_text(
+                json.dumps(
+                    {
+                        "started_at_utc": "2026-06-28T06:14:07Z",
+                        "ended_at_utc": "2026-06-28T06:14:12Z",
+                        "status": "succeeded",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
                 json.dumps(
                     {
@@ -755,6 +768,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "ended_at_utc": "2026-06-28T06:14:12Z",
+                                "receipt_refs": [str(receipt)],
                             },
                             {
                                 "stage_id": "model_02_target_state.feature_generation",
@@ -824,6 +838,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.feature_generation")
         self.assertEqual(task["started_at_utc"], "2026-06-28T06:14:12Z")
+        self.assertIsNone(task["ended_at_utc"])
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
         self.assertEqual(progress["unit_label"], "task units")
