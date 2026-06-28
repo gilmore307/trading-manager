@@ -732,6 +732,87 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["detail"]["progress"]["pending_count"], 1)
         self.assertEqual(task["detail"]["progress"]["unit_label"], "option source")
 
+    def test_model_task_aggregate_shows_started_internal_stage_as_running(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "target_symbol": "AAPL",
+                        "stages": [
+                            {
+                                "stage_id": "model_02_target_state.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "succeeded",
+                                "ended_at_utc": "2026-06-28T06:14:12Z",
+                            },
+                            {
+                                "stage_id": "model_02_target_state.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "ready",
+                                "started_at_utc": "2026-06-28T06:14:12Z",
+                                "last_reason": "stage execution started by manager stage executor",
+                            },
+                            {
+                                "stage_id": "model_02_target_state.model_generation.train",
+                                "stage_type": "model_generation",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "ready",
+                                "dataset_split": {"split_name": "train"},
+                            },
+                            {
+                                "stage_id": "model_02_target_state.model_generation.validation",
+                                "stage_type": "model_generation",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "blocked",
+                                "dataset_split": {"split_name": "validation"},
+                                "last_reason": "waiting for model_02_target_state.model_generation.train_complete",
+                            },
+                            {
+                                "stage_id": "model_02_target_state.model_generation.test",
+                                "stage_type": "model_generation",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "blocked",
+                                "dataset_split": {"split_name": "test"},
+                                "last_reason": "waiting for model_02_target_state.model_generation.validation_complete",
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-28T06:15:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
+        self.assertEqual(task["status"], "running")
+        self.assertEqual(task["task_state"], "current")
+        self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.feature_generation")
+        self.assertEqual(task["started_at_utc"], "2026-06-28T06:14:12Z")
+
     def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

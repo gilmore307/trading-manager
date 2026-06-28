@@ -2750,16 +2750,28 @@ def _is_layer_local_post_generation_stage(raw_stage: Mapping[str, Any]) -> bool:
 def _aggregate_status(stages: list[Mapping[str, Any]]) -> tuple[str, Mapping[str, Any] | None]:
     terminal_statuses = {"succeeded", "not_applicable"}
     for stage in stages:
-        status = str(stage.get("status") or "")
+        status = _raw_stage_status_for_aggregation(stage)
         if status == "failed":
             return "failed", stage
     for stage in stages:
-        status = str(stage.get("status") or "")
+        status = _raw_stage_status_for_aggregation(stage)
         if status not in terminal_statuses:
             return status or "unknown", stage
     if any(str(stage.get("status") or "") == "succeeded" for stage in stages):
         return "succeeded", stages[-1] if stages else None
     return "not_applicable", stages[-1] if stages else None
+
+
+def _raw_stage_status_for_aggregation(stage: Mapping[str, Any]) -> str:
+    status = str(stage.get("status") or "")
+    if (
+        status == "ready"
+        and _stage_started_reason(stage)
+        and (stage.get("started_at_utc") or stage.get("started_at"))
+        and not (stage.get("ended_at_utc") or stage.get("completed_at_utc") or stage.get("completed_at") or stage.get("ended_at"))
+    ):
+        return "running"
+    return status
 
 
 def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status: str) -> dict[str, Any]:
