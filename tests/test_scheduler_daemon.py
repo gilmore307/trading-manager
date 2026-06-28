@@ -402,7 +402,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         for reason_code in (
             "model_group_m06_event_evidence_missing",
             "model_group_residual_event_evidence_missing",
-            "model_group_m06_event_evidence_missing",
+            "model_group_m06_event_feed_backfill_running",
         ):
             with self.subTest(reason_code=reason_code):
                 state = SchedulerDaemonState(
@@ -668,6 +668,47 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(summary["event_feed_backfill_preparations"][0]["task_key_count"], 3)
         task_key_sample = summary["event_feed_backfill_preparations"][0]["task_keys"]
         self.assertFalse(any(item["feed_id"] == "12_feed_official_calendar_discovery" for item in task_key_sample))
+
+    def test_m06_event_input_running_state_continues_handoff(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            review_rows = root / "review_rows.jsonl"
+            review_rows.write_text(
+                json.dumps({"target_symbol": "AAPL", "review_status": "needs_event_attribution"}) + "\n",
+                encoding="utf-8",
+            )
+            residual_decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-06-18T00:00:00+00:00",
+                now_et="2026-06-17T20:00:00-04:00",
+                decision_status="backoff",
+                reason_code="model_group_m06_event_feed_backfill_running",
+                reason="M06 event feed backfill is running",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work="model_group.m06_event_inputs",
+                command=[],
+                next_internal_stage="model_group.m06_event_inputs",
+                execution_summary={
+                    "review_rows_ref": str(review_rows),
+                    "start_month": "2016-01",
+                    "end_month": "2016-01",
+                },
+            )
+
+            decision = _run_m06_event_input_requirement_handoff(
+                residual_decision,
+                storage_root=root / "storage" / "02_control_plane",
+                execute=True,
+                execute_provider_acquisition=False,
+                limit=5,
+                provider_max_workers=1,
+            )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.reason_code, "model_group_m06_event_feed_provider_required")
+        self.assertEqual((decision.execution_summary or {})["start_month"], "2016-01")
 
     def test_replay_contract_path_requirement_routes_selected_contract_paths(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

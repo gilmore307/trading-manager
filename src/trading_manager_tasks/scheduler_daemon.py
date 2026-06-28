@@ -85,6 +85,7 @@ REPLAY_OPTION_FEATURE_FAILURE_AGENT_REASONS = {
 M06_EVENT_INPUT_MISSING_REASONS = {
     "model_group_m06_event_evidence_missing",
     "model_group_residual_event_evidence_missing",
+    "model_group_m06_event_feed_backfill_running",
 }
 
 
@@ -1459,6 +1460,7 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
         "model_group_evaluation_executed",
         "model_group_m06_event_evidence_missing",
         "model_group_residual_event_evidence_missing",
+        "model_group_m06_event_feed_backfill_running",
         "model_group_m06_event_feed_provider_required",
         "model_group_m06_event_feed_backfill_failed",
         "model_group_m06_event_inputs_incomplete",
@@ -1725,6 +1727,7 @@ def _m06_event_input_start_decision(
             "target_symbols": list(target_symbols),
             "target_symbol_count": len(target_symbols),
             "review_rows_ref": review_rows_ref,
+            "fold_scope": {"start_month": start_month, "end_month": end_month},
             "required_event_inputs": ["alpaca_news", "gdelt_news", "sec_company_financials"],
             "optional_event_inputs": ["release_calendar", "macro_release_calendar"],
             "required_next_step": "prepare and dispatch bounded M06 event-feed backfill before attribution",
@@ -1746,8 +1749,8 @@ def _run_m06_event_input_requirement_handoff(
         return None
     summary = residual_event_decision.execution_summary or {}
     fold_scope = summary.get("fold_scope") if isinstance(summary.get("fold_scope"), dict) else {}
-    start_month = str(fold_scope.get("start_month") or "").strip()
-    end_month = str(fold_scope.get("end_month") or "").strip()
+    start_month = str(fold_scope.get("start_month") or summary.get("start_month") or "").strip()
+    end_month = str(fold_scope.get("end_month") or summary.get("end_month") or "").strip()
     if not start_month or not end_month:
         return None
     review_rows_ref = str(summary.get("review_rows_ref") or "").strip()
