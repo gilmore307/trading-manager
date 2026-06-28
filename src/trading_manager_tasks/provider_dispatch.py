@@ -306,7 +306,7 @@ def dispatch_layer_provider_acquisition(
             end_month=end_month,
             target_symbols=selected_targets,
             storage_root=storage_root,
-            write=False,
+            write=execute_provider_calls,
             persist_sql=False,
             validate_handoff=False,
         )
@@ -316,7 +316,7 @@ def dispatch_layer_provider_acquisition(
             start_month=start_month,
             end_month=end_month,
             storage_root=storage_root,
-            write=False,
+            write=execute_provider_calls,
             persist_sql=False,
             validate_handoff=False,
         )
@@ -501,7 +501,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-path", type=Path, help="Optional dispatch summary output path.")
     args = parser.parse_args(argv)
     summary = dispatch_layer_provider_acquisition(
-        model_layer=args.model_layer,
+        model_layer=args.model,
         start_month=args.start_month,
         end_month=args.end_month,
         storage_root=args.storage_root,

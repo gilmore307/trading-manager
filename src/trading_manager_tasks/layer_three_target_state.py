@@ -419,7 +419,8 @@ def materialize_layer_three_target_state_inputs(
         manager_storage_root = Path.cwd() / manager_storage_root
     fold_key = _fold_key(start_month, end_month)
     output_base = output_root if output_root.is_absolute() else manager_storage_root / output_root
-    output_dir = output_base / fold_key
+    target_scope = f"target_{target_symbol.strip().upper().lower()}" if selected_symbols and target_symbol else None
+    output_dir = output_base / fold_key / target_scope if target_scope else output_base / fold_key
     trading_data_output_root = output_dir / "trading_data_outputs" / SOURCE
     run_id = run_id or f"model_02_target_state_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     _task_key, task_key_path, candidate_path, bar_sources_path, _bar_count = build_source_task_key(
