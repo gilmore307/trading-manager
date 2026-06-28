@@ -300,6 +300,11 @@ def _ready_started_at(stage: StageProgress, ready_reason: str | None) -> str | N
     return None
 
 
+def _is_blocked_by_stage_coverage(stage: StageProgress) -> bool:
+    reason = (stage.last_reason or "").lower()
+    return stage.status == "blocked" and "option source sql row coverage missing" in reason
+
+
 def _blocker_reason(stage: StageProgress, stages: Mapping[str, StageProgress]) -> str | None:
     missing = []
     for blocker in stage.blockers:
@@ -332,6 +337,10 @@ def refresh_workflow_state(state: WorkflowState, *, plan: ModelTrainingWorkflowP
             approval_gate_required=plan_stage.approval_gate_required,
         )
         if stage.status in {"succeeded", "failed", "not_applicable"}:
+            refreshed.append(stage)
+            working[stage.stage_id] = stage
+            continue
+        if _is_blocked_by_stage_coverage(stage):
             refreshed.append(stage)
             working[stage.stage_id] = stage
             continue
@@ -528,6 +537,37 @@ def mark_stage_failed(
                 last_reason=reason or "stage execution failed",
                 started_at_utc=stage.started_at_utc,
                 ended_at_utc=ended_at_utc,
+                now=now,
+            )
+        )
+    if not found:
+        raise ValueError(f"unknown workflow stage: {stage_id}")
+    return replace(state, stages=tuple(changed), updated_utc=now)
+
+
+def mark_stage_blocked_from_coverage(
+    state: WorkflowState,
+    *,
+    stage_id: str,
+    reason: str,
+) -> WorkflowState:
+    """Demote a provider/source stage when its latest coverage no longer unlocks downstream."""
+
+    now = utc_now_iso()
+    changed = []
+    found = False
+    for stage in state.stages:
+        if stage.stage_id != stage_id:
+            changed.append(stage)
+            continue
+        found = True
+        changed.append(
+            _stage_with_update(
+                stage,
+                status="blocked",
+                last_reason=reason,
+                started_at_utc=None,
+                ended_at_utc=None,
                 now=now,
             )
         )
@@ -747,6 +787,12 @@ def ingest_stage_coverage_reports(state: WorkflowState, coverage_report_paths: I
                 updated,
                 stage_id=stage_id,
                 receipt_ref=str(path),
+                reason=reason,
+            )
+        elif report.get("can_unlock_downstream") is False:
+            updated = mark_stage_blocked_from_coverage(
+                updated,
+                stage_id=stage_id,
                 reason=reason,
             )
     return updated

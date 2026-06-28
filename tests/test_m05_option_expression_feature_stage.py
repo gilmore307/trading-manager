@@ -55,6 +55,31 @@ class M05OptionExpressionFeatureStageTests(unittest.TestCase):
             self.assertIn("AAPL", summary.command)
             self.assertTrue(run.called)
 
+    def test_zero_row_source_receipts_write_source_unavailable_sentinels(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.m05_option_expression_feature_stage.option_source_row_count", return_value=0
+        ), patch(
+            "trading_manager_tasks.m05_option_expression_feature_stage._successful_zero_row_signal_times",
+            return_value=("2016-02-01T09:30:00-05:00", "2016-02-02T09:30:00-05:00"),
+        ), patch(
+            "trading_manager_tasks.m05_option_expression_feature_stage.source_unavailable_marker_count", return_value=0
+        ), patch(
+            "trading_manager_tasks.m05_option_expression_feature_stage.persist_source_unavailable_markers", return_value=2
+        ) as persist:
+            tmp = Path(raw_tmp)
+            summary = execute_m05_option_expression_feature_stage(
+                start_month="2016-02",
+                end_month="2016-02",
+                target_symbol="AAPL",
+                output_root=tmp,
+                trading_data_root=tmp / "trading-data",
+            )
+
+            self.assertEqual(summary.status, "succeeded")
+            self.assertEqual(summary.mode, "source_unavailable_sentinels_written")
+            self.assertEqual(summary.provider_calls, 0)
+            self.assertTrue(persist.called)
+
     def test_existing_feature_coverage_is_reused_without_regeneration(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.m05_option_expression_feature_stage.option_source_row_count", return_value=2), patch(
             "trading_manager_tasks.m05_option_expression_feature_stage.feature_row_count", return_value=2

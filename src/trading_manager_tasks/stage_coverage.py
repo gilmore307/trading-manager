@@ -161,6 +161,22 @@ def _gate_option_source_sql_coverage(report: StageCoverageReport, *, source_row_
         return replace(report, source_row_count=source_row_count)
     if source_row_count > 0:
         return replace(report, source_row_count=source_row_count)
+    from .m05_option_expression_feature_stage import _successful_zero_row_signal_times
+
+    zero_row_signal_times = _successful_zero_row_signal_times(
+        start_month=report.start_month,
+        end_month=report.end_month,
+        target_symbol=target_symbol,
+    )
+    if len(zero_row_signal_times) >= report.ready_count:
+        return replace(
+            report,
+            source_row_count=source_row_count,
+            reason=(
+                f"option source provider completed with zero source rows for {target_symbol}; "
+                f"{len(zero_row_signal_times)}/{report.expected_count} source-unavailable signals may unlock downstream sentinel generation"
+            ),
+        )
     target_text = target_symbol.strip().upper() if target_symbol and target_symbol.strip() else "selected target"
     return replace(
         report,

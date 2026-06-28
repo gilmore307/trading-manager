@@ -179,6 +179,59 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             self.assertIn("storage://bars/0.csv", acquisition.artifact_refs)
             self.assertEqual(stage_by_id["model_01_background_context.feature_generation"].status, "ready")
 
+    def test_blocked_stage_coverage_demotes_previous_downstream_unlock(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state_path = tmp / "workflow_state.json"
+            completed = [
+                f"model_{layer:02d}_{slug}.model_generation.{split}"
+                for layer, slug in ((1, "background_context"), (2, "target_state"), (3, "event_state"), (4, "unified_decision"))
+                for split in ("train", "validation", "test")
+            ]
+            completed.append("model_05_option_expression.option_chain_data_acquisition")
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=tmp,
+                state_path=state_path,
+                completed_stage_ids=completed,
+                selected_target_symbol="AAOI",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+            stage_by_id = {stage.stage_id: stage for stage in state.stages}
+            self.assertEqual(stage_by_id["model_05_option_expression.option_chain_data_acquisition"].status, "succeeded")
+
+            coverage = tmp / "blocked_coverage.json"
+            coverage.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_stage_coverage",
+                        "stage_id": "model_05_option_expression.option_chain_data_acquisition",
+                        "status": "blocked",
+                        "can_unlock_downstream": False,
+                        "reason": "option source SQL row coverage missing for AAOI",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state = advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=tmp,
+                state_path=state_path,
+                stage_coverage_reports=[coverage],
+                selected_target_symbol="AAOI",
+                foundation_catch_up_only=False,
+                write=False,
+            )
+
+            stage_by_id = {stage.stage_id: stage for stage in state.stages}
+            acquisition = stage_by_id["model_05_option_expression.option_chain_data_acquisition"]
+            self.assertEqual(acquisition.status, "blocked")
+            self.assertIn("option source SQL row coverage missing for AAOI", acquisition.last_reason or "")
+
     def test_lifecycle_timestamps_are_recorded_on_creation_start_and_terminal_transition(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

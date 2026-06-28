@@ -363,6 +363,9 @@ class StageCoverageTests(unittest.TestCase):
         with patch("trading_manager_tasks.stage_coverage.fetch_task_summary", return_value=rows), patch(
             "trading_manager_tasks.stage_coverage.accepted_failure_request_ids_from_register",
             return_value=((), ()),
+        ), patch(
+            "trading_manager_tasks.m05_option_expression_feature_stage._successful_zero_row_signal_times",
+            return_value=(),
         ), patch("trading_manager_tasks.m05_option_expression_feature_stage.option_source_row_count", return_value=0):
             report = collect_stage_coverage(
                 stage_id="model_05_option_expression.option_chain_data_acquisition",
@@ -378,6 +381,27 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.source_row_count, 0)
         self.assertFalse(report.can_unlock_downstream)
         self.assertIn("option source SQL row coverage missing for AAOI", report.reason)
+
+    def test_option_chain_zero_row_source_evidence_unlocks_sentinel_generation(self):
+        request_id = "mgrreq_option_chain_window_aaoi_2016_01_2016_01_05_0930"
+        rows = [_option_chain_summary_row(request_id, ready=True)]
+
+        with patch("trading_manager_tasks.m05_option_expression_feature_stage._successful_zero_row_signal_times", return_value=("2016-01-05T09:30:00-05:00",)):
+            report = summarize_stage_coverage_from_rows(
+                rows,
+                stage_id="model_05_option_expression.option_chain_data_acquisition",
+                start_month="2016-01",
+                end_month="2016-06",
+                target_symbol="AAOI",
+                expected_count=1,
+                source_row_count=0,
+            )
+
+        self.assertEqual(report.status, "ready")
+        self.assertEqual(report.ready_count, 1)
+        self.assertEqual(report.source_row_count, 0)
+        self.assertTrue(report.can_unlock_downstream)
+        self.assertIn("source-unavailable signals may unlock downstream sentinel generation", report.reason)
 
     def test_partial_coverage_report_does_not_complete_workflow_stage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
