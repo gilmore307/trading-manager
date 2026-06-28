@@ -60,7 +60,9 @@ coverage remains child partition evidence under that one task.
 1. Foundation substrate. Build reusable M01 background-context source/feature
    evidence and fold-scoped M03 event-state observation inputs. M03 event
    substrate is collected per fold because M06-governed event-family attributes
-   and accepted event-observation pools can change across folds.
+   and accepted event-observation pools can change across folds. Event-feed
+   coverage checks are shared source plumbing only; feed rows are not M03
+   event-state evidence until accepted event-family evidence exists.
 2. Target substrate. Ordinary replay materializes M02 target-state source and
    feature evidence from the fixed `historical_candidate_universe.csv` candidate
    pool. If a requested diagnostic target lacks reviewed target-local bar
@@ -88,7 +90,9 @@ coverage remains child partition evidence under that one task.
    overblock/underblock, missed-event, and underlying-vs-option failure
    attribution after M04/M05 thesis formation. Its event-family attributes are
    applied by M03 and passed through to M04/M05 as state, but M06 itself is not a
-   pre-replay provider data-acquisition lane.
+   pre-replay provider data-acquisition lane. When M06 needs local event inputs,
+   scheduler may backfill bounded event feeds only after replay review exposes
+   the post-replay attribution requirement.
 7. Evaluation. Evaluation consumes replay traces, replay-review rows, and attribution packets to
    score the candidate component bundle against baselines, calibration,
    stability, leakage, portfolio behavior, and failure explanations.

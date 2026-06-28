@@ -589,20 +589,20 @@ def _upstream_model_ready_blockers(depends_on_layers: tuple[int, ...], *, founda
 
 
 def _event_feed_coverage_blockers(*, start_month: str, end_month: str, trading_storage_root: Path) -> tuple[str, ...]:
-    from .residual_event_governance_inputs import (
-        _discover_event_feed_artifacts,
-        _event_feed_row_coverage,
-        _missing_event_feed_artifacts,
-        _missing_event_feed_rows,
+    from .event_feed_coverage import (
+        discover_event_feed_artifacts,
+        event_feed_row_coverage,
+        missing_event_feed_artifacts,
+        missing_event_feed_rows,
     )
 
-    event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(
+    event_artifact_paths, event_feed_coverage = discover_event_feed_artifacts(
         trading_storage_root=trading_storage_root,
         start_month=start_month,
         end_month=end_month,
     )
-    event_feed_row_coverage = _event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
-    if _missing_event_feed_artifacts(event_feed_coverage) or _missing_event_feed_rows(event_feed_row_coverage):
+    row_coverage = event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
+    if missing_event_feed_artifacts(event_feed_coverage) or missing_event_feed_rows(row_coverage):
         return (MODEL_SIX_EVENT_FEED_COVERAGE_BLOCKER,)
     return ()
 

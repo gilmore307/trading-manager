@@ -7,11 +7,11 @@ import argparse
 import json
 from pathlib import Path
 
-from trading_manager_tasks.residual_event_governance_inputs import (
-    _discover_event_feed_artifacts,
-    _event_feed_row_coverage,
-    _missing_event_feed_artifacts,
-    _missing_event_feed_rows,
+from trading_manager_tasks.event_feed_coverage import (
+    discover_event_feed_artifacts,
+    event_feed_row_coverage as compute_event_feed_row_coverage,
+    missing_event_feed_artifacts,
+    missing_event_feed_rows,
 )
 from trading_manager_tasks.registry_values import registry_payload
 from trading_manager_tasks.request_payloads import DEFAULT_STORAGE_ROOT
@@ -30,18 +30,18 @@ def main() -> int:
     args = parser.parse_args()
 
     storage_root = args.trading_storage_root or data_storage_root()
-    event_artifact_paths, event_feed_coverage = _discover_event_feed_artifacts(
+    event_artifact_paths, event_feed_coverage = discover_event_feed_artifacts(
         trading_storage_root=storage_root,
         start_month=args.start_month,
         end_month=args.end_month,
     )
-    event_feed_row_coverage = _event_feed_row_coverage(
+    event_feed_row_coverage = compute_event_feed_row_coverage(
         event_artifact_paths,
         start_month=args.start_month,
         end_month=args.end_month,
     )
-    missing_artifacts = _missing_event_feed_artifacts(event_feed_coverage)
-    missing_rows = _missing_event_feed_rows(event_feed_row_coverage)
+    missing_artifacts = missing_event_feed_artifacts(event_feed_coverage)
+    missing_rows = missing_event_feed_rows(event_feed_row_coverage)
     payload = {
         "contract_type": "manager_model_03_event_observation_materialization",
         "manager_stage_id": "model_03_event_state.data_acquisition",

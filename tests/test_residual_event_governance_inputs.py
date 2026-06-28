@@ -7,7 +7,8 @@ import unittest
 from pathlib import Path
 
 from trading_manager_tasks.control_plane import TaskSystemError
-from trading_manager_tasks.residual_event_governance_inputs import _discover_event_feed_artifacts, materialize_residual_event_governance_inputs_inputs
+from trading_manager_tasks.event_feed_coverage import discover_event_feed_artifacts
+from trading_manager_tasks.residual_event_governance_inputs import materialize_residual_event_governance_inputs_inputs
 
 
 def _write_layer_two_bar_receipt(storage_root: Path, symbol: str, month: str, row_count: int = 1) -> None:
@@ -171,7 +172,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             os.utime(old_path, (1, 1))
             os.utime(new_path, (2, 2))
 
-            paths, coverage = _discover_event_feed_artifacts(trading_data_root=trading_data_root, start_month="2016-01", end_month="2016-01")
+            paths, coverage = discover_event_feed_artifacts(trading_data_root=trading_data_root, start_month="2016-01", end_month="2016-01")
 
             self.assertEqual(coverage["gdelt_news"], 1)
             self.assertEqual(paths, [str(new_path)])

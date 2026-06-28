@@ -32,6 +32,9 @@ concentrated live-flow replay has exposed failures, residuals, misses, or path
 deviations. It is not a pre-replay input stage. M03/M04 may consume only
 accepted event evidence packets that passed point-in-time checks, non-overlap
 checks, matched-control review, leakage review, and agent/manager acceptance.
+Shared event-feed coverage helpers are neutral source-coverage plumbing: their
+row counts can prove local evidence availability, but they do not by themselves
+complete M03 event-state substrate or perform M06 attribution.
 
 M05 remains the optional option-expression layer. It should not directly absorb event anomalies as alpha or duplicate M06 residual evidence.
 
