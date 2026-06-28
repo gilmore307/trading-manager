@@ -19,10 +19,6 @@ psycopg[binary]>=3.1,<4
 # JSON Schema validation for manager control-plane contract examples and write-path gates.
 jsonschema>=4.10,<5
 
-# LightGBM model training/inference used by the trading-model repository through the
-# shared trading-manager environment anchor.
-lightgbm>=4,<5
-
 # ThetaData Python library for direct historical option data acquisition through
 # the shared trading-manager environment.
 thetadata>=1,<2
