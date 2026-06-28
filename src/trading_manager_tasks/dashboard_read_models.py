@@ -1991,6 +1991,25 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
     }
 
 
+def _active_worker_progress_should_drive_task(progress: Mapping[str, Any]) -> bool:
+    return str(progress.get("progress_source") or "") == "active_progress_file" and str(progress.get("status") or "").lower() in {
+        "running",
+        "partial_ready",
+    }
+
+
+def _owner_facing_active_worker_progress(progress: Mapping[str, Any]) -> dict[str, Any]:
+    updated = dict(progress)
+    nodes = updated.get("nodes")
+    if isinstance(nodes, list) and any(
+        isinstance(node, Mapping) and str(node.get("node_id") or "") == "feature_generation_window_started"
+        for node in nodes
+    ):
+        updated["unit_label"] = "feature windows"
+        updated.setdefault("progress_basis", "feature windows in the active generation run")
+    return updated
+
+
 def _public_stage_name(stage_id: object, stage_type: object) -> str:
     stage_id_text = str(stage_id or "")
     if stage_id_text.startswith("layer_") and stage_type == "model_evaluation":
@@ -3393,14 +3412,17 @@ def _task_timeline(
                     and dashboard_progress is not None
                     and dashboard_progress.get("progress_source") == "model_generation_dataset_splits"
                 ):
-                    progress = {
-                        **dashboard_progress,
-                        "status": progress.get("status") or dashboard_progress.get("status"),
-                        "stage_id": progress.get("stage_id") or dashboard_progress.get("stage_id"),
-                        "nodes": progress.get("nodes", []),
-                        "updated_at_utc": progress.get("updated_at_utc"),
-                        "worker_id": progress.get("worker_id"),
-                    }
+                    if _active_worker_progress_should_drive_task(progress):
+                        progress = _owner_facing_active_worker_progress(progress)
+                    else:
+                        progress = {
+                            **dashboard_progress,
+                            "status": progress.get("status") or dashboard_progress.get("status"),
+                            "stage_id": progress.get("stage_id") or dashboard_progress.get("stage_id"),
+                            "nodes": progress.get("nodes", []),
+                            "updated_at_utc": progress.get("updated_at_utc"),
+                            "worker_id": progress.get("worker_id"),
+                        }
                 if progress is None and str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "") == "data_acquisition":
                     progress = _fold_stage_coverage_progress(
                         storage_root=storage_root,
