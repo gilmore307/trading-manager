@@ -502,7 +502,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["kind"], "config")
         self.assertEqual(
             rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["payload"],
-            "03_feed_alpaca_news;05_feed_gdelt_news;08_feed_sec_company_financials;07_feed_trading_economics_calendar_web",
+            "03_feed_alpaca_news;05_feed_gdelt_news;08_feed_sec_company_financials;manager_market_session_calendar;07_feed_trading_economics_calendar_web",
         )
         self.assertEqual(rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["payload"], "model_buy_point_triggered_chain_snapshots")
         self.assertIn("model buy/expression decisions", rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["note"])
@@ -654,6 +654,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(event_row_coverage["payload"], "m06_event_feed_in_window_row_coverage")
         event_source_gate = rows["M06_EVENT_SOURCE_COVERAGE_GATE"]
         self.assertEqual(event_source_gate["payload"], "m06_event_source_coverage_gate")
+        self.assertIn("market-session calendar", event_source_gate["note"])
 
         event_sql_field = rows["EVENT_FEED_SQL_INPUTS"]
         self.assertEqual(event_sql_field["kind"], "field")

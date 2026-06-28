@@ -65,6 +65,10 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             self.assertTrue(Path(detector_task_key["output_root"]).is_relative_to(tmp / "manager-storage"))
             self.assertIn("bars_sql_source", detector_task_key["params"])
             self.assertNotIn("bars_csv_path", detector_task_key["params"])
+            source_task_key = json.loads(Path(summary.source_task_key_path).read_text(encoding="utf-8"))
+            self.assertIn("market_session_calendar", summary.event_feed_coverage)
+            self.assertGreater(summary.event_feed_row_coverage["market_session_calendar"], 0)
+            self.assertTrue(any(event["event_category_type"] == "market_structure" for event in source_task_key["params"]["events"]))
 
     def test_zero_row_feed_receipts_are_skipped_before_detector_execution(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -150,14 +154,17 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             )
             task_key = json.loads(Path(summary.source_task_key_path).read_text(encoding="utf-8"))
 
-            self.assertEqual(set(summary.event_feed_coverage), set(artifacts))
-            self.assertTrue(all(count == 1 for count in summary.event_feed_coverage.values()))
+            self.assertEqual(set(summary.event_feed_coverage), {*artifacts, "market_session_calendar"})
+            for source_id in artifacts:
+                self.assertEqual(summary.event_feed_coverage[source_id], 1)
             self.assertGreaterEqual(summary.event_feed_row_coverage["alpaca_news"], 1)
             self.assertGreaterEqual(summary.event_feed_row_coverage["gdelt_news"], 1)
             self.assertGreaterEqual(summary.event_feed_row_coverage["sec_company_financials"], 1)
+            self.assertGreaterEqual(summary.event_feed_row_coverage["market_session_calendar"], 1)
             self.assertGreaterEqual(summary.event_feed_row_coverage["trading_economics_calendar_web"], 1)
             self.assertGreaterEqual(summary.event_feed_row_coverage["release_calendar"], 1)
             self.assertEqual(len(task_key["params"]["event_artifact_paths"]), 5)
+            self.assertTrue(any(event["source_name"] == "manager_market_session_calendar" for event in task_key["params"]["events"]))
             self.assertEqual(summary.provider_calls, 0)
 
     def test_uses_latest_reviewed_feed_artifact_per_source_month(self) -> None:
@@ -305,8 +312,10 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             task_key = json.loads(Path(summary.source_task_key_path).read_text(encoding="utf-8"))
 
         self.assertEqual(summary.event_feed_row_coverage["release_calendar"], 0)
+        self.assertGreater(summary.event_feed_row_coverage["market_session_calendar"], 0)
         self.assertNotIn("release_calendar", {item["kind"] for item in task_key["params"]["event_sql_inputs"]})
         self.assertIn("sec_company_financials", {item["kind"] for item in task_key["params"]["event_sql_inputs"]})
+        self.assertTrue(any(event["event_category_type"] == "market_structure" for event in task_key["params"]["events"]))
 
     def test_write_blocks_when_reviewed_event_feed_artifacts_have_zero_in_window_rows(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

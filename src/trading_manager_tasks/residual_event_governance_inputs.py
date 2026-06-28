@@ -15,9 +15,10 @@ import os
 import subprocess
 import sys
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
+from zoneinfo import ZoneInfo
 
 from .control_plane import TaskSystemError
 from .event_feed_coverage import (
@@ -34,6 +35,7 @@ from .event_feed_coverage import (
 )
 from .layer_three_target_state import BAR_SOURCE_TABLE, FeedArtifactRef, _bar_source_ref, _latest_successful_run, discover_target_candidate_feed_artifacts
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .scheduler import is_regular_us_equity_trading_day, us_equity_market_holidays
 from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
@@ -83,6 +85,9 @@ EVENT_FEED_SQL_INPUTS = {
         "order_by": ["release_time", "symbol", "event_name"],
     },
 }
+
+MARKET_SESSION_SOURCE = "manager_market_session_calendar"
+ET = ZoneInfo("America/New_York")
 
 @dataclass(frozen=True)
 class DetectorRunRef:
@@ -346,6 +351,136 @@ def _discover_event_feed_sql_inputs(
     return sql_inputs, coverage, row_coverage
 
 
+def _parse_month_start(month: str) -> date:
+    year, month_number = int(month[:4]), int(month[5:])
+    return date(year, month_number, 1)
+
+
+def _next_month_date(day: date) -> date:
+    if day.month == 12:
+        return date(day.year + 1, 1, 1)
+    return date(day.year, day.month + 1, 1)
+
+
+def _market_holiday_name(day: date) -> str:
+    if day not in us_equity_market_holidays(day.year):
+        return ""
+    fixed_names = (
+        (date(day.year, 1, 1), "New Year's Day"),
+        (date(day.year, 6, 19), "Juneteenth National Independence Day"),
+        (date(day.year, 7, 4), "Independence Day"),
+        (date(day.year, 12, 25), "Christmas Day"),
+    )
+    for actual, name in fixed_names:
+        if day in us_equity_market_holidays(day.year) and abs((day - actual).days) <= 1:
+            return name
+    named_rules = {
+        (1, 0): "Martin Luther King Jr. Day",
+        (2, 0): "Washington's Birthday",
+        (5, 0): "Memorial Day",
+        (9, 0): "Labor Day",
+        (11, 3): "Thanksgiving Day",
+    }
+    for (month, weekday), name in named_rules.items():
+        if day.month == month and day.weekday() == weekday:
+            return name
+    if day.month in {3, 4} and day.weekday() == 4:
+        return "Good Friday"
+    return "US equity market holiday"
+
+
+def _early_close_name(day: date) -> str:
+    christmas_eve = date(day.year, 12, 24)
+    if day == christmas_eve and is_regular_us_equity_trading_day(day):
+        return "Christmas Eve early close"
+    thanksgiving = next(candidate for candidate in (date(day.year, 11, 22) + timedelta(days=offset) for offset in range(7)) if candidate.weekday() == 3)
+    if day == thanksgiving + timedelta(days=1) and is_regular_us_equity_trading_day(day):
+        return "Day after Thanksgiving early close"
+    july_fourth = date(day.year, 7, 4)
+    if july_fourth.weekday() == 1 and day == date(day.year, 7, 3) and is_regular_us_equity_trading_day(day):
+        return "Independence Day eve early close"
+    if july_fourth.weekday() == 3 and day == date(day.year, 7, 5) and is_regular_us_equity_trading_day(day):
+        return "Independence Day observed early close"
+    return ""
+
+
+def _next_regular_market_open(day: date) -> str:
+    candidate = day + timedelta(days=1)
+    while not is_regular_us_equity_trading_day(candidate):
+        candidate += timedelta(days=1)
+    return datetime(candidate.year, candidate.month, candidate.day, 9, 30, tzinfo=ET).isoformat()
+
+
+def _market_session_calendar_events(*, start_month: str, end_month: str) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, int]]:
+    start = _parse_month_start(start_month)
+    end = _next_month_date(_parse_month_start(end_month))
+    events: list[dict[str, Any]] = []
+    month_coverage = {month: 0 for month in iter_months(start_month, end_month)}
+    day = start
+    while day < end:
+        month = f"{day.year:04d}-{day.month:02d}"
+        title = ""
+        summary_bits: list[str] = []
+        event_time = datetime(day.year, day.month, day.day, 0, 0, tzinfo=ET).isoformat()
+        if day.weekday() >= 5:
+            title = "US equity weekend market closure"
+            summary_bits = ["market_structure_type=weekend_closure", "session_status=closed"]
+        elif not is_regular_us_equity_trading_day(day):
+            holiday_name = _market_holiday_name(day)
+            title = f"US equity market holiday: {holiday_name}"
+            summary_bits = [
+                "market_structure_type=market_holiday",
+                "session_status=closed",
+                f"holiday_name={holiday_name}",
+            ]
+        else:
+            early_close = _early_close_name(day)
+            if early_close:
+                title = f"US equity early close: {early_close}"
+                event_time = datetime(day.year, day.month, day.day, 13, 0, tzinfo=ET).isoformat()
+                summary_bits = [
+                    "market_structure_type=early_close",
+                    "session_status=early_close",
+                    f"holiday_name={early_close}",
+                ]
+        if title:
+            summary_bits.extend(
+                [
+                    "event_phase=calendar_state",
+                    "lifecycle_class=scheduled_periodic_calendar",
+                    f"calendar_date={day.isoformat()}",
+                    f"next_regular_open={_next_regular_market_open(day)}",
+                ]
+            )
+            events.append(
+                {
+                    "event_id": f"market_session_{day.isoformat()}_{summary_bits[0].split('=', 1)[1]}",
+                    "canonical_event_id": f"market_session_{day.isoformat()}",
+                    "dedup_status": "canonical",
+                    "source_priority": "approved_calendar",
+                    "coverage_reason": "generated_market_session_calendar_for_m06_market_structure_context",
+                    "fold_month": month,
+                    "event_time": event_time,
+                    "available_time": event_time,
+                    "information_role_type": "prior_signal",
+                    "event_category_type": "market_structure",
+                    "scope_type": "macro",
+                    "symbol": None,
+                    "title": title,
+                    "summary": "; ".join(summary_bits),
+                    "source_name": MARKET_SESSION_SOURCE,
+                    "reference_type": "source_reference",
+                    "reference": f"generated_us_equity_market_session:{day.isoformat()}",
+                    "source_artifact_path": "generated://manager/market_session_calendar",
+                }
+            )
+            month_coverage[month] = 1
+        day += timedelta(days=1)
+    coverage = {"market_session_calendar": sum(1 for value in month_coverage.values() if value)}
+    row_coverage = {"market_session_calendar": len(events)}
+    return events, coverage, row_coverage
+
+
 def _write_source_task_key(
     *,
     output_dir: Path,
@@ -413,12 +548,13 @@ def materialize_residual_event_governance_inputs_inputs(
     event_artifact_paths, artifact_coverage = discover_event_feed_artifacts(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
     artifact_row_coverage = compute_event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
     event_sql_inputs, sql_coverage, sql_row_coverage = _discover_event_feed_sql_inputs(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
+    market_session_events, market_session_coverage, market_session_row_coverage = _market_session_calendar_events(start_month=start_month, end_month=end_month)
     event_feed_coverage = {
-        source_id: int(artifact_coverage.get(source_id) or 0) + int(sql_coverage.get(source_id) or 0)
+        source_id: int(artifact_coverage.get(source_id) or 0) + int(sql_coverage.get(source_id) or 0) + int(market_session_coverage.get(source_id) or 0)
         for source_id in EVENT_FEED_ARTIFACTS
     }
     event_feed_row_coverage = {
-        source_id: int(artifact_row_coverage.get(source_id) or 0) + int(sql_row_coverage.get(source_id) or 0)
+        source_id: int(artifact_row_coverage.get(source_id) or 0) + int(sql_row_coverage.get(source_id) or 0) + int(market_session_row_coverage.get(source_id) or 0)
         for source_id in EVENT_FEED_ARTIFACTS
     }
     missing_feed_artifacts = missing_event_feed_artifacts(event_feed_coverage)
@@ -445,6 +581,7 @@ def materialize_residual_event_governance_inputs_inputs(
         for ref in refs
     )
     events = [event for detector_run in detector_runs for event in _read_detector_events(detector_run)]
+    events.extend(market_session_events)
     if not events and not event_artifact_paths and not event_sql_inputs and write:
         raise TaskSystemError("M06 event-risk materialization emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
     source_task_key_path = _write_source_task_key(
