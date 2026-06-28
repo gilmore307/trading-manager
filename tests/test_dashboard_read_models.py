@@ -7,6 +7,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from trading_manager_tasks.dashboard_read_models import (
@@ -18,6 +19,8 @@ from trading_manager_tasks.dashboard_read_models import (
     _compatible_replay_run_ids,
     _mark_superseded_agent_errors,
     _model_group_replay_timeline_tasks,
+    _runtime_activity_decision,
+    _scheduler_decision_runtime_activity,
     _stage_id_from_error_row,
     _task_error_intervention_status,
     build_historical_task_progress_summary,
@@ -27,6 +30,70 @@ from trading_manager_tasks.task_progress import write_task_progress_node
 
 
 class DashboardReadModelProducerTests(unittest.TestCase):
+    def test_scheduler_decision_runtime_activity_describes_m06_missing_event_inputs(self):
+        activity = _scheduler_decision_runtime_activity(
+            {
+                "decision_status": "backoff",
+                "reason_code": "model_group_residual_event_evidence_missing",
+                "reason": "replay review is ready, but M06 has no local point-in-time event observations or candidates to attribute",
+                "selected_work": "model_group.residual_event_governance",
+                "next_internal_stage": "residual_event_governance",
+                "now_utc": "2026-06-28T13:30:21.213306+00:00",
+                "execution_summary": {
+                    "event_source_summary": {
+                        "checked_paths": ["/tmp/model_03_event_observation_inputs.json", "/tmp/source_06_task_key.json"],
+                        "raw_event_count": 0,
+                        "standardized_event_candidate_count": 0,
+                    },
+                    "fold_scope": {"start_month": "2021-01", "end_month": "2025-12"},
+                    "required_next_action": "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
+                },
+            }
+        )
+
+        self.assertIsNotNone(activity)
+        assert activity is not None
+        self.assertEqual(activity["activity_label"], "M06 Event Risk Governor")
+        self.assertIn("waiting for PIT event observations/candidates", activity["activity_summary"])
+        self.assertIn("2021-01 to 2025-12", activity["activity_summary"])
+        self.assertIn("raw events 0", activity["activity_summary"])
+        self.assertIn("candidates 0", activity["activity_summary"])
+        self.assertEqual(activity["reason_code"], "model_group_residual_event_evidence_missing")
+        self.assertEqual(
+            activity["required_next_step"],
+            "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
+        )
+        self.assertIn("Checked 2 event input paths", activity["activity_details"])
+
+    def test_runtime_activity_decision_falls_back_to_decision_log_tail(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            decision_log_path = Path(raw_tmp) / "historical_scheduler_decisions.jsonl"
+            decision_log_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps({"selected_work": "model_group.replay", "now_utc": "2026-06-28T13:00:00+00:00"}),
+                        json.dumps(
+                            {
+                                "selected_work": "model_group.residual_event_governance",
+                                "reason_code": "model_group_residual_event_evidence_missing",
+                                "now_utc": "2026-06-28T13:30:00+00:00",
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = SimpleNamespace(
+                latest_decision=None,
+                decision_log_file=SimpleNamespace(path=str(decision_log_path)),
+            )
+
+            decision = _runtime_activity_decision(status)
+
+        self.assertEqual(decision["selected_work"], "model_group.residual_event_governance")
+        self.assertEqual(decision["reason_code"], "model_group_residual_event_evidence_missing")
+
     def test_task_error_intervention_prioritizes_open_diagnosis_over_awaiting_retry(self):
         status = _task_error_intervention_status(
             task={},

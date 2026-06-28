@@ -1371,7 +1371,7 @@ def _runtime_replay_task_started_at(runtime_activity: Mapping[str, Any]) -> str 
 
 
 def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Path | None = None) -> dict[str, Any]:
-    latest_decision = status.latest_decision or {}
+    latest_decision = _runtime_activity_decision(status)
     provider_status = status.provider_status or {}
     selected_work = latest_decision.get("selected_work") or status.current_stage
     next_internal_stage = latest_decision.get("next_internal_stage") or provider_status.get("next_internal_stage")
@@ -1386,6 +1386,13 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
     )
     resolved_storage_root = storage_root or _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
     runtime_activity = None
+    decision_activity = _scheduler_decision_runtime_activity(latest_decision)
+    is_replay_work = (
+        str(selected_work or "") == "model_group.replay"
+        or str(selected_work or "") == "model_group.replay_option_features"
+        or str(next_internal_stage or "") == "model_group.replay"
+        or str(next_internal_stage or "") == "model_group.replay_option_features"
+    )
     if (
         str(selected_work or "") == "model_group.replay_option_features"
         or str(selected_work or "") == "model_group.replay"
@@ -1396,12 +1403,17 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
         runtime_activity = _replay_option_feature_drain_activity(resolved_storage_root)
     replay_activity = _replay_execution_runtime_activity(resolved_storage_root)
     replay_progress_activity = replay_activity if isinstance(replay_activity, Mapping) else None
-    if isinstance(replay_activity, Mapping) and status.lock.status == "active":
+    if isinstance(replay_activity, Mapping) and status.lock.status == "active" and is_replay_work:
         if runtime_activity is None or (
             not _replay_option_drain_activity_is_live(runtime_activity)
             and _iso_sort_key(replay_activity.get("updated_at_utc")) > _iso_sort_key(runtime_activity.get("updated_at_utc"))
         ):
             runtime_activity = replay_activity
+    if isinstance(decision_activity, Mapping) and (
+        runtime_activity is None
+        or _iso_sort_key(decision_activity.get("updated_at_utc")) >= _iso_sort_key(runtime_activity.get("updated_at_utc"))
+    ):
+        runtime_activity = decision_activity
     runtime_status = "ready"
     if not status.service_runtime_ready:
         runtime_status = "blocked"
@@ -1421,6 +1433,107 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
         "runtime_activity": runtime_activity,
         "replay_progress_activity": replay_progress_activity,
     }
+
+
+def _runtime_activity_decision(status: HistoricalSchedulerStatus) -> dict[str, Any]:
+    if isinstance(status.latest_decision, Mapping):
+        return dict(status.latest_decision)
+    decision_log_path = str(status.decision_log_file.path or "").strip()
+    if not decision_log_path:
+        return {}
+    latest = _last_jsonl_object(Path(decision_log_path))
+    return latest if isinstance(latest, dict) else {}
+
+
+def _scheduler_decision_runtime_activity(latest_decision: Mapping[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(latest_decision, Mapping) or not latest_decision:
+        return None
+    selected_work = str(latest_decision.get("selected_work") or "").strip()
+    reason = str(latest_decision.get("reason") or "").strip()
+    reason_code = str(latest_decision.get("reason_code") or "").strip()
+    decision_status = str(latest_decision.get("decision_status") or "").strip()
+    execution_summary = latest_decision.get("execution_summary")
+    execution_summary = execution_summary if isinstance(execution_summary, Mapping) else {}
+    label = _scheduler_work_activity_label(selected_work, latest_decision.get("next_internal_stage"))
+    summary = _scheduler_decision_activity_summary(
+        label=label,
+        reason=reason,
+        reason_code=reason_code,
+        execution_summary=execution_summary,
+    )
+    details = [
+        reason,
+        str(execution_summary.get("required_next_action") or execution_summary.get("required_next_step") or "").strip(),
+        _scheduler_decision_event_source_detail(execution_summary),
+    ]
+    command = latest_decision.get("command")
+    return {
+        "activity_type": "scheduler_decision",
+        "activity_label": label,
+        "activity_summary": summary,
+        "activity_details": [line for line in details if line],
+        "decision_status": decision_status or None,
+        "reason_code": reason_code or None,
+        "reason": reason or None,
+        "selected_work": selected_work or None,
+        "next_internal_stage": latest_decision.get("next_internal_stage"),
+        "updated_at_utc": latest_decision.get("now_utc") or latest_decision.get("generated_at_utc"),
+        "started_at_utc": latest_decision.get("now_utc") or latest_decision.get("generated_at_utc"),
+        "required_next_step": execution_summary.get("required_next_action") or execution_summary.get("required_next_step"),
+        "command": command if isinstance(command, list) else None,
+    }
+
+
+def _scheduler_work_activity_label(selected_work: object, next_internal_stage: object = None) -> str:
+    work = str(selected_work or "").strip()
+    stage = str(next_internal_stage or "").strip()
+    if work == "model_group.residual_event_governance" or stage == "residual_event_governance":
+        return "M06 Event Risk Governor"
+    if work == "model_group.replay_review" or stage == "replay_review":
+        return "Replay Review"
+    if work == "model_group.replay":
+        return "Replay execution"
+    if work == "model_group.replay_option_features":
+        return "Replay option feature drain"
+    return _public_stage_name(work, "") if work else "Scheduler"
+
+
+def _scheduler_decision_activity_summary(
+    *,
+    label: str,
+    reason: str,
+    reason_code: str,
+    execution_summary: Mapping[str, Any],
+) -> str:
+    event_source_summary = execution_summary.get("event_source_summary")
+    if isinstance(event_source_summary, Mapping):
+        raw_event_count = _int_field(event_source_summary, "raw_event_count")
+        candidate_count = _int_field(event_source_summary, "standardized_event_candidate_count")
+        fold_scope = execution_summary.get("fold_scope")
+        window = ""
+        if isinstance(fold_scope, Mapping):
+            start = str(fold_scope.get("start_month") or "").strip()
+            end = str(fold_scope.get("end_month") or "").strip()
+            if start and end:
+                window = f" · {start} to {end}"
+        return (
+            f"{label} · waiting for PIT event observations/candidates{window} · "
+            f"raw events {raw_event_count} · candidates {candidate_count}"
+        )
+    if reason:
+        return f"{label} · {reason}"
+    if reason_code:
+        return f"{label} · {reason_code}"
+    return label
+
+
+def _scheduler_decision_event_source_detail(execution_summary: Mapping[str, Any]) -> str | None:
+    event_source_summary = execution_summary.get("event_source_summary")
+    if not isinstance(event_source_summary, Mapping):
+        return None
+    checked_paths = event_source_summary.get("checked_paths")
+    checked_count = len(checked_paths) if isinstance(checked_paths, list) else 0
+    return f"Checked {checked_count} event input paths"
 
 
 def _public_active_task_summary(task: Mapping[str, Any] | None) -> dict[str, Any] | None:
