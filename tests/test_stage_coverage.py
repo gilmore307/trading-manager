@@ -4,11 +4,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from trading_manager_tasks.model_training_state import advance_workflow_state
 from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.monthly_backfill import LAYER_ONE_MODEL_LAYER, load_market_regime_universe
-from trading_manager_tasks.stage_coverage import summarize_stage_coverage_from_rows
+from trading_manager_tasks.stage_coverage import collect_stage_coverage, summarize_stage_coverage_from_rows
 
 
 def _write_task_keys(root: Path, *, model_layer: str, month: str = "2016-01") -> None:
@@ -331,6 +332,52 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.observed_count, 1)
         self.assertEqual(report.failed_request_ids, ())
         self.assertEqual(report.ready_request_ids, (current_request,))
+
+    def test_option_chain_coverage_is_target_scoped(self):
+        aaoi_request = "mgrreq_option_chain_window_aaoi_2016_01_2016_01_05_0930"
+        aapl_request = "mgrreq_option_chain_window_aapl_2016_01_2016_01_05_0930"
+        rows = [
+            _option_chain_summary_row(aaoi_request, ready=True),
+            _option_chain_summary_row(aapl_request, ready=True),
+        ]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="model_05_option_expression.option_chain_data_acquisition",
+            start_month="2016-01",
+            end_month="2016-06",
+            target_symbol="AAOI",
+            expected_count=1,
+            source_row_count=3,
+        )
+
+        self.assertEqual(report.observed_count, 1)
+        self.assertEqual(report.ready_request_ids, (aaoi_request,))
+        self.assertEqual(report.source_row_count, 3)
+        self.assertTrue(report.can_unlock_downstream)
+
+    def test_option_chain_coverage_blocks_downstream_when_sql_source_rows_are_missing(self):
+        request_id = "mgrreq_option_chain_window_aaoi_2016_01_2016_01_05_0930"
+        rows = [_option_chain_summary_row(request_id, ready=True)]
+
+        with patch("trading_manager_tasks.stage_coverage.fetch_task_summary", return_value=rows), patch(
+            "trading_manager_tasks.stage_coverage.accepted_failure_request_ids_from_register",
+            return_value=((), ()),
+        ), patch("trading_manager_tasks.m05_option_expression_feature_stage.option_source_row_count", return_value=0):
+            report = collect_stage_coverage(
+                stage_id="model_05_option_expression.option_chain_data_acquisition",
+                start_month="2016-01",
+                end_month="2016-06",
+                target_symbol="AAOI",
+                expected_count=1,
+            )
+
+        self.assertEqual(report.status, "blocked")
+        self.assertEqual(report.ready_count, 0)
+        self.assertEqual(report.pending_count, 1)
+        self.assertEqual(report.source_row_count, 0)
+        self.assertFalse(report.can_unlock_downstream)
+        self.assertIn("option source SQL row coverage missing for AAOI", report.reason)
 
     def test_partial_coverage_report_does_not_complete_workflow_stage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

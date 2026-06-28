@@ -517,6 +517,7 @@ def _reconcile_provider_stage_unlocked(
             stage_id=stage_id,
             start_month=start_month,
             end_month=end_month,
+            target_symbol=selected_target_symbol,
             database_url=database_url,
         )
     output_path: Path | None = coverage_report_path

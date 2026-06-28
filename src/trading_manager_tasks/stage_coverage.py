@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Literal, Mapping, Sequence, TextIO
 
@@ -50,6 +50,7 @@ class StageCoverageReport:
     pending_request_ids: tuple[str, ...]
     accepted_failure_refs: tuple[str, ...]
     reason: str
+    source_row_count: int | None = None
     provider_calls: int = 0
     model_activation_performed: bool = False
     broker_execution_performed: bool = False
@@ -90,9 +91,22 @@ def _stage_request_ids(*, stage_id: str, start_month: str) -> set[str]:
     }
 
 
-def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str) -> bool:
+def _matches_target_symbol(row: Mapping[str, Any], *, target_symbol: str | None) -> bool:
+    if not target_symbol:
+        return True
+    symbol = target_symbol.strip().lower()
+    if not symbol:
+        return True
+    text = _row_text(row).lower()
+    return f"_{symbol}_" in text or f"/target_{symbol}/" in text
+
+
+def _matches_stage(row: Mapping[str, Any], *, stage_id: str, start_month: str, end_month: str, target_symbol: str | None = None) -> bool:
     if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
-        return is_current_option_chain_request(row, start_month=start_month, end_month=end_month)
+        return is_current_option_chain_request(row, start_month=start_month, end_month=end_month) and _matches_target_symbol(
+            row,
+            target_symbol=target_symbol,
+        )
     if row.get("target_component_id") != "01_feed_alpaca_bars":
         return False
     if row.get("request_kind") != "data_backfill_month":
@@ -120,20 +134,69 @@ def _is_failed(row: Mapping[str, Any]) -> bool:
     )
 
 
+def _option_source_row_count(
+    *,
+    stage_id: str,
+    start_month: str,
+    end_month: str,
+    target_symbol: str | None,
+    database_url: str | None,
+) -> int | None:
+    if stage_id != OPTION_CHAIN_SOURCE_STAGE_ID:
+        return None
+    from .m05_option_expression_feature_stage import option_source_row_count
+
+    return option_source_row_count(
+        start_month=start_month,
+        end_month=end_month,
+        target_symbol=target_symbol,
+        database_url=database_url,
+    )
+
+
+def _gate_option_source_sql_coverage(report: StageCoverageReport, *, source_row_count: int | None, target_symbol: str | None) -> StageCoverageReport:
+    if report.stage_id != OPTION_CHAIN_SOURCE_STAGE_ID:
+        return report
+    if source_row_count is None or report.status != "ready":
+        return replace(report, source_row_count=source_row_count)
+    if source_row_count > 0:
+        return replace(report, source_row_count=source_row_count)
+    target_text = target_symbol.strip().upper() if target_symbol and target_symbol.strip() else "selected target"
+    return replace(
+        report,
+        ready_count=0,
+        pending_count=report.expected_count,
+        status="blocked",
+        can_unlock_downstream=False,
+        ready_request_ids=(),
+        source_row_count=source_row_count,
+        reason=(
+            f"option source SQL row coverage missing for {target_text}; "
+            f"{report.observed_count}/{report.expected_count} task signals cannot unlock downstream"
+        ),
+    )
+
+
 def summarize_stage_coverage_from_rows(
     rows: Sequence[Mapping[str, Any]],
     *,
     stage_id: str,
     start_month: str,
     end_month: str,
+    target_symbol: str | None = None,
     expected_count: int | None = None,
     accepted_failure_request_ids: Sequence[str] = (),
     accepted_failure_refs: Sequence[str] = (),
+    source_row_count: int | None = None,
 ) -> StageCoverageReport:
     """Summarize stage readiness from task-summary-like rows."""
 
     matched = sorted(
-        [dict(row) for row in rows if _matches_stage(row, stage_id=stage_id, start_month=start_month, end_month=end_month)],
+        [
+            dict(row)
+            for row in rows
+            if _matches_stage(row, stage_id=stage_id, start_month=start_month, end_month=end_month, target_symbol=target_symbol)
+        ],
         key=lambda row: str(row.get("request_id") or ""),
     )
     if expected_count is None:
@@ -172,7 +235,7 @@ def summarize_stage_coverage_from_rows(
         status = "blocked"
         reason = f"stage coverage not ready 0/{expected_count}; downstream remains blocked"
 
-    return StageCoverageReport(
+    report = StageCoverageReport(
         contract_type="manager_stage_coverage",
         stage_id=stage_id,
         start_month=start_month,
@@ -192,6 +255,7 @@ def summarize_stage_coverage_from_rows(
         accepted_failure_refs=tuple(str(ref) for ref in accepted_failure_refs),
         reason=reason,
     )
+    return _gate_option_source_sql_coverage(report, source_row_count=source_row_count, target_symbol=target_symbol)
 
 
 def collect_stage_coverage(
@@ -200,6 +264,7 @@ def collect_stage_coverage(
     start_month: str = "2016-01",
     end_month: str = "2016-01",
     expected_count: int | None = None,
+    target_symbol: str | None = None,
     database_url: str | None = None,
     accepted_failure_request_ids: Sequence[str] = (),
     accepted_failure_refs: Sequence[str] = (),
@@ -216,9 +281,17 @@ def collect_stage_coverage(
         stage_id=stage_id,
         start_month=start_month,
         end_month=end_month,
+        target_symbol=target_symbol,
         expected_count=expected_count,
         accepted_failure_request_ids=tuple(dict.fromkeys([*accepted_failure_request_ids, *registered_request_ids])),
         accepted_failure_refs=tuple(dict.fromkeys([*accepted_failure_refs, *registered_refs])),
+        source_row_count=_option_source_row_count(
+            stage_id=stage_id,
+            start_month=start_month,
+            end_month=end_month,
+            target_symbol=target_symbol,
+            database_url=database_url,
+        ),
     )
 
 
@@ -232,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stage-id", default="model_01_background_context.data_acquisition")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
+    parser.add_argument("--target-symbol")
     parser.add_argument("--expected-count", type=int)
     parser.add_argument("--database-url")
     parser.add_argument("--accepted-failure-request-id", action="append", default=[], help="Failed request id accepted by reviewed evidence; preserves failed_count but may satisfy terminal coverage.")
@@ -245,6 +319,7 @@ def main(argv: list[str] | None = None) -> int:
         start_month=args.start_month,
         end_month=args.end_month,
         expected_count=args.expected_count,
+        target_symbol=args.target_symbol,
         database_url=args.database_url,
         accepted_failure_request_ids=args.accepted_failure_request_id,
         accepted_failure_refs=args.accepted_failure_ref,
