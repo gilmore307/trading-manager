@@ -2000,7 +2000,10 @@ def _progress_display_label(progress: Mapping[str, Any] | None) -> str | None:
         active = max(0, int(progress.get("active_count") or progress.get("current_count") or ready))
     except (TypeError, ValueError):
         return None
-    display_count = max(ready, active)
+    if str(progress.get("progress_source") or "") == "model_task_internal_stages":
+        display_count = ready
+    else:
+        display_count = max(ready, active)
     unit_label = str(progress.get("unit_label") or "units")
     if expected <= 0:
         return f"{display_count} {unit_label}"
@@ -2942,7 +2945,6 @@ def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status
         "can_unlock_downstream": bool(expected_count and ready_count == expected_count and failed_count == 0),
         "progress_source": "model_task_internal_stages",
         "progress_basis": "all layer-internal source, feature, and train/validation/test units in the model task",
-        "expected_partition_count": expected_count,
     }
 
 

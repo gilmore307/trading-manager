@@ -847,7 +847,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["expected_count"], 8)
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(live_activity["activity_summary"], "Generating feature window 9 of 26")
-        self.assertEqual(live_activity["progress_label"], "2/8 task units")
+        self.assertEqual(live_activity["progress_label"], "1/8 task units")
 
     def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3000,7 +3000,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(live_activity["activity_summary"], "Stage process started")
-        self.assertEqual(live_activity["progress_label"], "5/6 task units")
+        self.assertEqual(live_activity["progress_label"], "4/6 task units")
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
