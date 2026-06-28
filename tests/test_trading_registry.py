@@ -3602,6 +3602,24 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("does_not_authorize_provider_streams_or_broker_mutation", rows["EXECUTION_REALTIME_CAPTURE_FOR_VALIDATION_BOUNDARY"]["payload"])
 
 
+    def test_train_replay_realtime_input_parity_is_registered(self):
+        with Path("scripts/registry/current.csv").open(newline="") as csv_file:
+            rows = {row["key"]: row for row in csv.DictReader(csv_file)}
+
+        parity = rows["TRAIN_REPLAY_REALTIME_INPUT_PARITY"]
+        self.assertEqual(parity["kind"], "term")
+        self.assertEqual(parity["payload"], "train_replay_realtime_input_parity")
+        self.assertIn("training", parity["applies_to"])
+        self.assertIn("replay", parity["applies_to"])
+        self.assertIn("realtime_trading", parity["applies_to"])
+        self.assertIn("feature/vector definitions", parity["note"])
+        self.assertIn("Execution guardrails can be broader", parity["note"])
+        self.assertIn(
+            "trading-manager/docs/29_train_replay_realtime_input_parity.md",
+            parity["path"],
+        )
+
+
     def test_execution_realtime_coverage_contracts_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
             rows = {row["key"]: row for row in csv.DictReader(csv_file)}

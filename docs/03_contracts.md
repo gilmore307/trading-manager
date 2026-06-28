@@ -164,6 +164,21 @@ Historical workflow stages must keep source data, derived features, and model-de
 
 For example, `trading_data.model_01_market_regime_feature_generation` is a valid feature surface when it is deterministically derived from acquired market bars. A target/event table that requires TargetStateVectorModel output, EventFailureRiskModel output, or replay portfolio state is not a feature surface under this definition.
 
+## Train Replay Realtime Input Parity
+
+`docs/29_train_replay_realtime_input_parity.md` owns the cross-phase model-input
+parity contract. Training, replay, and realtime may resolve different physical
+artifacts or refs, but model decision inputs must share the same semantic input
+families, registry terms, source identities, feature/vector definitions,
+point-in-time clock rules, freshness/quality rules, fallback states, and
+governance status.
+
+This parity contract applies to model decision inputs only. Realtime execution
+guardrails such as broker/account state, halt checks, restrictions, and kill
+switches may be broader than trained model inputs, but they must not be
+represented as trained model signals unless accepted by the normal model
+governance route.
+
 ## Model Group Rerun Semantics
 
 A model group rerun is a controlled invalidation and scheduler reentry operation used when an architecture, contract, schema, feature, source-scope, or execution-route change makes existing generated outputs stale. It is also a storage lifecycle trigger: stale downstream artifacts enter the storage lifecycle system as candidates, not as manager-owned deletion instructions.

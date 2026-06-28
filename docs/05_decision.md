@@ -113,6 +113,24 @@ The current run cycle is reusable foundation substrate, target substrate where n
 
 Equity/options replay uses five simultaneous risk slots by default, each based on a `0.20` model-owned target allocation fraction. Replay keeps scanning after cash or slots are committed and may replace the weakest held position when the new candidate is point-in-time executable, allocation-compatible, and clears the score-scale-aware switch threshold. Receipts using the old fixed `0.05` switch threshold are stale and not current replay evidence.
 
+## D019 - Training, Replay, And Realtime Share Model-Input Semantics
+
+Training, replay, and realtime trading must resolve model decision inputs
+through the same declared semantic families, registry terms, feature/vector
+definitions, point-in-time clock rules, freshness/quality rules, fallback states,
+and governance status. They may use different physical artifacts: training uses
+historical source/feature artifacts, replay uses frozen historical snapshots
+plus bounded on-demand replay cache, and realtime uses current provider/context
+refs. Those physical routes are valid only when they map back to the same model
+input contract.
+
+This rule is owned by `docs/29_train_replay_realtime_input_parity.md`. It does
+not make broker/account guardrails, halt checks, restrictions, or emergency
+kill-switches trained model inputs. Untrained realtime event/calendar context
+may support advisory C07/trading-review evidence, but it cannot become M03/M04/M06
+model input or automatic live trading action until accepted through the M06/M03
+governance route.
+
 ## D210 - Activity bridge non-overlap is mandatory
 
 Activity bridge evidence must prove one of these statuses before it can affect scoring or intervention:
