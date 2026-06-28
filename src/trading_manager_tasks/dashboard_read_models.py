@@ -2020,6 +2020,20 @@ def _worker_facing_progress(progress: Mapping[str, Any] | None) -> Mapping[str, 
     return updated
 
 
+def _worker_completed_progress_label(progress: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(progress, Mapping):
+        return None
+    try:
+        expected = max(0, int(progress.get("expected_count") or 0))
+        processed = max(0, int(progress.get("processed_count") or progress.get("ready_count") or 0))
+    except (TypeError, ValueError):
+        return None
+    unit_label = str(_worker_facing_progress(progress).get("unit_label") or "units") if isinstance(_worker_facing_progress(progress), Mapping) else "units"
+    if expected <= 0:
+        return f"{processed} {unit_label}"
+    return f"{processed}/{expected} {unit_label}"
+
+
 def _active_progress_node(progress: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
     if not isinstance(progress, Mapping):
         return None
@@ -2073,10 +2087,10 @@ def _task_runtime_activity_from_worker(
     if not node_label:
         node_label = active_stage_label
     progress_label = _progress_display_label(task_progress)
-    worker_progress_label = _progress_display_label(worker_progress)
+    worker_progress_label = _worker_completed_progress_label(active_progress) or _progress_display_label(worker_progress)
     activity_details = [
         f"Task progress {progress_label}" if progress_label else None,
-        f"Worker progress {worker_progress_label}" if worker_progress_label else None,
+        f"Worker completed {worker_progress_label}" if worker_progress_label else None,
         str(worker_info.get("worker_label") or worker_info.get("worker_id") or "") or None,
     ]
     return {
