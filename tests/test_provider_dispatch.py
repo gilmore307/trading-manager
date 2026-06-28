@@ -35,7 +35,7 @@ class ProviderDispatchTests(unittest.TestCase):
                 execute_provider_calls=False,
             )
         self.assertEqual(dispatch.contract_type, "manager_provider_dispatch_summary")
-        self.assertEqual(dispatch.stage_id, "model_01_market_context.data_acquisition")
+        self.assertEqual(dispatch.stage_id, "model_01_background_context.data_acquisition")
         self.assertEqual(dispatch.request_count, 19)
         self.assertEqual(dispatch.validation_count, 0)
         self.assertEqual(dispatch.dispatch_count, 0)
@@ -201,7 +201,7 @@ class ProviderDispatchTests(unittest.TestCase):
                 ready_request_ids=("mgrreq_backfill_alpaca_bars_xlk_2016_01",),
                 accepted_failed_request_ids=(),
             ),
-        ):
+        ) as coverage_mock:
             tmp = Path(raw_tmp)
             prepare_layer_two_historical_training_batch(
                 start_month="2016-01",
@@ -222,6 +222,36 @@ class ProviderDispatchTests(unittest.TestCase):
                     execute_provider_calls=True,
                     reject_terminal_coverage=True,
                 )
+        coverage_mock.assert_called_once()
+        self.assertEqual(coverage_mock.call_args.kwargs["stage_id"], "model_01_sector_context.data_acquisition")
+
+    def test_layer_one_terminal_coverage_uses_canonical_workflow_stage(self):
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.provider_dispatch.collect_stage_coverage",
+            return_value=SimpleNamespace(failed_request_ids=(), ready_request_ids=(), accepted_failed_request_ids=()),
+        ) as coverage_mock, patch(
+            "trading_manager_tasks.provider_dispatch.subprocess.run",
+            return_value=SimpleNamespace(returncode=0, stdout="", stderr=""),
+        ):
+            tmp = Path(raw_tmp)
+            prepare_layer_one_historical_training_batch(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                write=True,
+                validate_handoff=False,
+            )
+            dispatch_layer_one_provider_acquisition(
+                start_month="2016-01",
+                end_month="2016-01",
+                storage_root=tmp,
+                symbols=("SPY",),
+                execute_provider_calls=True,
+                reject_terminal_coverage=True,
+            )
+
+        coverage_mock.assert_called_once()
+        self.assertEqual(coverage_mock.call_args.kwargs["stage_id"], "model_01_background_context.data_acquisition")
 
     def test_execute_dispatch_can_continue_after_individual_failure(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

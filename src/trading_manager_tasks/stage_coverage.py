@@ -73,7 +73,7 @@ def _row_text(row: Mapping[str, Any]) -> str:
 
 
 def _model_layer_for_stage(stage_id: str) -> str:
-    if stage_id == "model_01_background_context.data_acquisition":
+    if stage_id in {"model_01_background_context.data_acquisition", "model_01_market_context.data_acquisition"}:
         return LAYER_ONE_MODEL_LAYER
     if stage_id == OPTION_CHAIN_SOURCE_STAGE_ID:
         return OPTION_CHAIN_SOURCE_STAGE_ID

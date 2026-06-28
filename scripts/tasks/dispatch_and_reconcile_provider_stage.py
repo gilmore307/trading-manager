@@ -17,7 +17,7 @@ from trading_manager_tasks.stage_reconcile import DEFAULT_COMPONENT_STORAGE_ROOT
 
 def _stage_id(model_layer: str) -> str:
     if model_layer == LAYER_ONE_MODEL_LAYER:
-        return "model_01_market_context.data_acquisition"
+        return "model_01_background_context.data_acquisition"
     if model_layer == LAYER_TWO_MODEL_LAYER:
         return "model_01_sector_context.data_acquisition"
     raise TaskSystemError(f"unsupported provider model: {model_layer}")
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     dispatch = dispatch_layer_provider_acquisition(
-        model_layer=args.model_layer,
+        model_layer=args.model,
         start_month=args.start_month,
         end_month=args.end_month,
         storage_root=args.storage_root,
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         database_url=args.database_url,
     )
     reconcile = reconcile_provider_stage(
-        stage_id=_stage_id(args.model_layer),
+        stage_id=_stage_id(args.model),
         start_month=args.start_month,
         end_month=args.end_month,
         component_storage_root=args.component_storage_root,
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     summary = {
         "contract_type": "manager_provider_dispatch_reconcile_summary",
-        "stage_id": _stage_id(args.model_layer),
+        "stage_id": _stage_id(args.model),
         "start_month": args.start_month,
         "end_month": args.end_month,
         "dispatch": dispatch.summary_row(),

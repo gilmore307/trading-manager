@@ -42,6 +42,12 @@ ALPACA_BARS_PROVIDER_POLICY = {
 }
 
 
+def _coverage_stage_id(model_layer: str) -> str:
+    if model_layer == LAYER_ONE_MODEL_LAYER:
+        return "model_01_background_context.data_acquisition"
+    return f"{model_layer}.data_acquisition"
+
+
 @dataclass(frozen=True)
 class ProviderWorkerSelection:
     dynamic_enabled: bool
@@ -326,7 +332,7 @@ def dispatch_layer_provider_acquisition(
     if skip_registered_failures:
         skip_ids, registered_skip_refs = accepted_failure_request_ids_from_register(
             database_url=database_url,
-            stage_id=f"{model_layer}.data_acquisition",
+            stage_id=_coverage_stage_id(model_layer),
             start_month=start_month,
             end_month=end_month,
         )
@@ -343,7 +349,7 @@ def dispatch_layer_provider_acquisition(
         live_requests.append(dict(row) | {"dry_run": False, "policy_refs": policy_refs})
     if execute_provider_calls and reject_terminal_coverage and live_requests:
         report = collect_stage_coverage(
-            stage_id=f"{model_layer}.data_acquisition",
+            stage_id=_coverage_stage_id(model_layer),
             start_month=start_month,
             end_month=end_month,
             database_url=database_url,
@@ -447,7 +453,7 @@ def dispatch_layer_provider_acquisition(
     dispatch_count = sum(1 for item in items if item.status in {"dispatched_succeeded", "dispatched_failed"})
     return ProviderDispatchSummary(
         contract_type="manager_provider_dispatch_summary",
-        stage_id=f"{model_layer}.data_acquisition",
+        stage_id=_coverage_stage_id(model_layer),
         request_count=len(selected_requests),
         validation_count=0,
         dispatch_count=dispatch_count,

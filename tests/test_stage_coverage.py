@@ -98,6 +98,20 @@ class StageCoverageTests(unittest.TestCase):
         self.assertEqual(report.ready_count, 19)
         self.assertTrue(report.can_unlock_downstream)
 
+    def test_legacy_market_context_stage_alias_uses_current_m01_coverage(self):
+        rows = [_summary_row(symbol, ready=True) for symbol in _symbols(LAYER_ONE_MODEL_LAYER)]
+
+        report = summarize_stage_coverage_from_rows(
+            rows,
+            stage_id="model_01_market_context.data_acquisition",
+            start_month="2016-01",
+            end_month="2016-01",
+            expected_count=19,
+        )
+
+        self.assertEqual(report.status, "ready")
+        self.assertEqual(report.ready_count, 19)
+
     def test_stage_coverage_ignores_rows_outside_m01_request_universe(self):
         rows = [
             *[_summary_row(symbol, ready=True) for symbol in _symbols(LAYER_ONE_MODEL_LAYER)],
