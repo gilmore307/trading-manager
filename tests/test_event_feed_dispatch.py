@@ -87,6 +87,60 @@ class EventFeedDispatchTests(unittest.TestCase):
             self.assertEqual(by_feed["08_feed_sec_company_financials"]["manager_controls"]["allowed_providers"], ["sec_edgar"])
             self.assertEqual(by_feed["08_feed_sec_company_financials"]["manager_controls"]["allowed_endpoint_families"], ["company_financials"])
 
+    def test_dispatch_skips_already_successful_requests_before_applying_limit(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            trading_data_root = root / "trading-data"
+            prepare_event_feed_backfill(
+                start_month="2016-01",
+                end_month="2016-01",
+                target_symbol="AAPL",
+                storage_root=root,
+                write_files=True,
+            )
+            receipt = trading_data_root / "storage" / "monthly_backfill" / "alpaca_news" / "2016-01" / "completion_receipt.json"
+            receipt.parent.mkdir(parents=True, exist_ok=True)
+            receipt.write_text(
+                json.dumps(
+                    {
+                        "runs": [
+                            {
+                                "run_id": "mgrreq_event_backfill_alpaca_news_aapl_2016_01_event_feed_20160101T000000Z",
+                                "status": "succeeded",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            class Result:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            captured_payloads = []
+
+            def fake_run(command, **_kwargs):
+                captured_payloads.append(json.loads(Path(command[3]).read_text()))
+                return Result()
+
+            with patch("trading_manager_tasks.event_feed_dispatch.subprocess.run", side_effect=fake_run):
+                summary = dispatch_event_feed_backfill(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    target_symbol="AAPL",
+                    storage_root=root,
+                    trading_data_root=trading_data_root,
+                    limit=1,
+                    execute_provider_calls=True,
+                    dynamic_workers=False,
+                )
+
+        self.assertEqual(summary.items[0].status, "already_succeeded")
+        self.assertEqual(summary.provider_calls, 1)
+        self.assertEqual(captured_payloads[0]["feed"], "05_feed_gdelt_news")
+
     def test_trading_economics_feed_is_not_dispatchable(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

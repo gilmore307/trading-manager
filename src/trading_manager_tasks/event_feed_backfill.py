@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from dataclasses import asdict, dataclass
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Iterable, TextIO
 
@@ -26,12 +27,15 @@ REQUIRED_EVENT_FEED_IDS = (
     "03_feed_alpaca_news",
     "05_feed_gdelt_news",
     "08_feed_sec_company_financials",
+    "12_feed_official_calendar_discovery",
 )
 SOURCE_BY_FEED_ID = {
     "03_feed_alpaca_news": "alpaca_news",
     "05_feed_gdelt_news": "gdelt_news",
     "08_feed_sec_company_financials": "sec_company_financials",
+    "12_feed_official_calendar_discovery": "release_calendar",
 }
+MONTHLY_EVENT_FEED_IDS = tuple(feed_id for feed_id in REQUIRED_EVENT_FEED_IDS if feed_id != "12_feed_official_calendar_discovery")
 
 
 @dataclass(frozen=True)
@@ -71,20 +75,23 @@ class EventFeedBackfillSummary:
         return row
 
 
-def _request_id(feed_id: str, month: str, target_symbol: str) -> str:
+def _request_id(feed_id: str, month: str, target_symbol: str, *, request_date: str | None = None) -> str:
     source_id = SOURCE_BY_FEED_ID[feed_id]
-    return f"mgrreq_event_backfill_{source_id}_{target_symbol.lower()}_{month.replace('-', '_')}"
+    suffix = (request_date or month).replace("-", "_")
+    return f"mgrreq_event_backfill_{source_id}_{target_symbol.lower()}_{suffix}"
 
 
-def _parameter_ref(feed_id: str, month: str, target_symbol: str) -> str:
+def _parameter_ref(feed_id: str, month: str, target_symbol: str, *, request_date: str | None = None) -> str:
     source_id = SOURCE_BY_FEED_ID[feed_id]
-    return f"storage://trading-manager/monthly_backfill/{source_id}/{month}/task_key.json"
+    key_name = f"{request_date}_task_key.json" if request_date else "task_key.json"
+    return f"storage://trading-manager/monthly_backfill/{source_id}/{month}/task_keys/{target_symbol.lower()}/{key_name}"
 
 
-def _base_request(feed_id: str, window: MonthlyWindow, *, target_symbol: str) -> dict[str, Any]:
+def _base_request(feed_id: str, window: MonthlyWindow, *, target_symbol: str, request_date: str | None = None) -> dict[str, Any]:
     source_id = SOURCE_BY_FEED_ID[feed_id]
+    request_id = _request_id(feed_id, window.month, target_symbol, request_date=request_date)
     return {
-        "request_id": _request_id(feed_id, window.month, target_symbol),
+        "request_id": request_id,
         "contract_type": "manager_request",
         "request_kind": "data_backfill_month",
         "status": "requested",
@@ -95,14 +102,28 @@ def _base_request(feed_id: str, window: MonthlyWindow, *, target_symbol: str) ->
         "expected_outputs": [f"storage://trading-data/monthly_backfill/{source_id}/{window.month}/"],
         "policy_refs": ["read_only_provider_acquisition", "secret_aliases_only", "no_model_activation", "no_broker_execution"],
         "priority": "high",
-        "parameter_ref": _parameter_ref(feed_id, window.month, target_symbol),
+        "parameter_ref": _parameter_ref(feed_id, window.month, target_symbol, request_date=request_date),
         "dry_run": True,
         "month": window.month,
-        "start_date": window.start_date,
-        "end_date_exclusive": window.end_date_exclusive,
+        "start_date": request_date or window.start_date,
+        "end_date_exclusive": _next_date(request_date) if request_date else window.end_date_exclusive,
         "symbol": target_symbol.upper(),
         "availability_note": "M06 event-risk source coverage repair; reviewed artifact required before downstream rebuild.",
     }
+
+
+def _next_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    return (date.fromisoformat(value) + timedelta(days=1)).isoformat()
+
+
+def _iter_dates(start_date: str, end_date_exclusive: str) -> Iterable[str]:
+    current = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date_exclusive)
+    while current < end:
+        yield current.isoformat()
+        current += timedelta(days=1)
 
 
 def _enrich_payload(payload: dict[str, Any], *, target_symbol: str, target_cik: str) -> dict[str, Any]:
@@ -136,6 +157,18 @@ def _enrich_payload(payload: dict[str, Any], *, target_symbol: str, target_cik: 
         params.update({"data_kind": "sec_company_fact", "cik": str(target_cik).zfill(10), "taxonomy": "us-gaap"})
         params.pop("tag", None)
         params.pop("unit", None)
+    elif feed_id == "12_feed_official_calendar_discovery":
+        window = payload.get("window") if isinstance(payload.get("window"), dict) else {}
+        request_date = str(window.get("start_date") or payload.get("params", {}).get("date") or "")
+        params.update(
+            {
+                "data_kind": "nasdaq_earnings_calendar",
+                "date": request_date,
+                "symbols": [target_symbol.upper()],
+                "calendar_source": "nasdaq_earnings_calendar",
+                "user_agent": "trading-manager M06 historical event backfill; contact configured by manager task",
+            }
+        )
     payload["params"] = params
     return payload
 
@@ -143,8 +176,10 @@ def _enrich_payload(payload: dict[str, Any], *, target_symbol: str, target_cik: 
 def plan_event_feed_requests(*, start_month: str, end_month: str, target_symbol: str = DEFAULT_TARGET_SYMBOL) -> list[dict[str, Any]]:
     requests: list[dict[str, Any]] = []
     for window in iter_monthly_windows(start_month, end_month):
-        for feed_id in REQUIRED_EVENT_FEED_IDS:
+        for feed_id in MONTHLY_EVENT_FEED_IDS:
             requests.append(_base_request(feed_id, window, target_symbol=target_symbol))
+        for request_date in _iter_dates(window.start_date, window.end_date_exclusive):
+            requests.append(_base_request("12_feed_official_calendar_discovery", window, target_symbol=target_symbol, request_date=request_date))
     return requests
 
 

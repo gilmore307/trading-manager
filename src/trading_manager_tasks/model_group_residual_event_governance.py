@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
-from .event_feed_backfill import prepare_event_feed_backfill
 from .model_group_attribution import REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE, REPLAY_REVIEW_ROW_CONTRACT_TYPE
 from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -244,17 +243,6 @@ def run_model_group_residual_event_governance_if_ready(
     event_candidates, event_source_summary = _load_event_candidates(storage_root=storage_root, fold_scope=fold_scope)
 
     if not event_candidates:
-        event_feed_backfill_preparation = None
-        target_symbol = _target_symbol_from_review_rows(review_rows)
-        if execute and target_symbol == "AAPL":
-            backfill_summary = prepare_event_feed_backfill(
-                start_month=fold_scope["start_month"],
-                end_month=fold_scope["end_month"],
-                target_symbol=target_symbol,
-                storage_root=storage_root,
-                write_files=True,
-            )
-            event_feed_backfill_preparation = _compact_backfill_preparation(backfill_summary)
         return _decision(
             now=now,
             decision_status="backoff",
@@ -268,7 +256,7 @@ def run_model_group_residual_event_governance_if_ready(
                 "review_rows_ref": str(review_rows_path),
                 "fold_scope": fold_scope,
                 "event_source_summary": event_source_summary,
-                "event_feed_backfill_preparation": event_feed_backfill_preparation,
+                "event_feed_backfill_preparation": None,
                 "required_next_action": "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
             },
         )
@@ -460,24 +448,6 @@ def _decision(
         execution_summary=execution_summary,
         lock_plan=scheduler_lock_plan(month=None, selected_work="model_group.residual_event_governance", next_internal_stage="residual_event_governance"),
     )
-
-
-def _compact_backfill_preparation(summary: Any) -> dict[str, Any]:
-    task_keys = tuple(getattr(summary, "task_keys", ()) or ())
-    return {
-        "contract_type": getattr(summary, "contract_type", "manager_residual_event_governance_event_feed_backfill_preparation"),
-        "start_month": getattr(summary, "start_month", None),
-        "end_month": getattr(summary, "end_month", None),
-        "target_symbol": getattr(summary, "target_symbol", None),
-        "target_cik": getattr(summary, "target_cik", None),
-        "request_count": getattr(summary, "request_count", None),
-        "task_key_count": getattr(summary, "task_key_count", None),
-        "write_performed": getattr(summary, "write_performed", None),
-        "provider_calls": getattr(summary, "provider_calls", None),
-        "model_activation_performed": getattr(summary, "model_activation_performed", None),
-        "broker_execution_performed": getattr(summary, "broker_execution_performed", None),
-        "sample_task_key_refs": [str(getattr(task_key, "local_path", "")) for task_key in task_keys[:6]],
-    }
 
 
 def _build_attribution_rows(
@@ -2075,18 +2045,6 @@ def _observation_payload_has_event_refs(payload: Mapping[str, Any]) -> bool:
         if isinstance(value, list) and bool(value):
             return True
     return False
-
-
-def _target_symbol_from_review_rows(review_rows: Sequence[Mapping[str, Any]]) -> str:
-    counts: dict[str, int] = {}
-    for row in review_rows:
-        symbol = str(row.get("target_symbol") or "").strip().upper()
-        if not symbol:
-            continue
-        counts[symbol] = counts.get(symbol, 0) + 1
-    if not counts:
-        return "AAPL"
-    return sorted(counts.items(), key=lambda item: (item[1], item[0]), reverse=True)[0][0]
 
 
 def _failure_window(decision_time: str, *, replay_month: str) -> tuple[str | None, str | None]:

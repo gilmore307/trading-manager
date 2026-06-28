@@ -83,6 +83,11 @@ FEED_TASK_DEFAULTS: dict[str, FeedTaskDefaults] = {
         feed_id="08_feed_sec_company_financials",
         params={"data_kind": "sec_company_fact", "cik": "0000320193", "taxonomy": "us-gaap", "tag": "Revenues", "unit": "USD"},
     ),
+    "12_feed_official_calendar_discovery": FeedTaskDefaults(
+        source_id="release_calendar",
+        feed_id="12_feed_official_calendar_discovery",
+        params={"data_kind": "nasdaq_earnings_calendar", "date": "2016-01-01", "symbols": ["AAPL"]},
+    ),
     "10_feed_thetadata_option_primary_tracking": FeedTaskDefaults(
         source_id="thetadata_option_primary_tracking",
         feed_id="10_feed_thetadata_option_primary_tracking",
@@ -147,6 +152,8 @@ def _symbol_from_parameter_ref(parameter_ref: str) -> str | None:
     parts = _parameter_ref_parts(parameter_ref)
     if len(parts) >= 4 and parts[0] == "alpaca_bars" and parts[-1] == "task_key.json":
         return parts[1].upper()
+    if len(parts) >= 5 and parts[-3] == "task_keys":
+        return parts[-2].upper()
     return None
 
 
@@ -168,6 +175,9 @@ def _month_from_request(row: Mapping[str, Any]) -> str:
         return str(month)
     parameter_ref = str(row.get("parameter_ref") or "")
     parts = parameter_ref.split("/")
+    for part in parts:
+        if len(part) == 7 and part[4] == "-" and part[:4].isdigit() and part[5:].isdigit():
+            return part
     if len(parts) >= 2 and parts[-1] == "task_key.json":
         return parts[-2]
     raise TaskSystemError(f"request {row.get('request_id')} missing month and parseable parameter_ref")
@@ -221,6 +231,8 @@ def _task_params(row: Mapping[str, Any], defaults: FeedTaskDefaults, start_date:
     elif feed_id == "07_feed_trading_economics_calendar_web":
         params.setdefault("start_date", start_date)
         params.setdefault("end_date", end_date_exclusive)
+    elif feed_id == "12_feed_official_calendar_discovery":
+        params["date"] = start_date
     elif feed_id in {"10_feed_thetadata_option_primary_tracking", "11_feed_thetadata_option_event_timeline"}:
         params.setdefault("start_date", start_date)
         params.setdefault("end_date", end_date_exclusive)

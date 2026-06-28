@@ -47,6 +47,7 @@ from trading_manager_tasks.scheduler_daemon import (
     _run_model_worker_decision,
     _pending_replay_option_feature_backoff_decision,
     _run_replay_contract_path_requirement_handoff,
+    _run_m06_event_input_requirement_handoff,
     _run_replay_review_data_requirement_handoff,
     _emit_replay_option_feature_drain_status,
 )
@@ -618,6 +619,55 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(decision.selected_work, "model_group.replay_contract_paths")
         self.assertEqual(decision.provider_calls, 0)
         self.assertEqual((decision.execution_summary or {})["resume_stage_id"], "model_group.replay")
+
+    def test_m06_event_input_requirement_prepares_backfill_before_attribution(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            review_rows = root / "review_rows.jsonl"
+            review_rows.write_text(
+                json.dumps({"target_symbol": "AAPL", "review_status": "needs_event_attribution"}) + "\n",
+                encoding="utf-8",
+            )
+            residual_decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-06-18T00:00:00+00:00",
+                now_et="2026-06-17T20:00:00-04:00",
+                decision_status="backoff",
+                reason_code="model_group_residual_event_evidence_missing",
+                reason="missing M06 event evidence",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work="model_group.residual_event_governance",
+                command=[],
+                next_internal_stage="residual_event_governance",
+                execution_summary={
+                    "review_rows_ref": str(review_rows),
+                    "fold_scope": {"start_month": "2016-01", "end_month": "2016-01"},
+                },
+            )
+
+            decision = _run_m06_event_input_requirement_handoff(
+                residual_decision,
+                storage_root=root / "storage" / "02_control_plane",
+                execute=True,
+                execute_provider_acquisition=False,
+                limit=5,
+                provider_max_workers=1,
+            )
+
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.decision_status, "backoff")
+        self.assertEqual(decision.reason_code, "model_group_m06_event_feed_provider_required")
+        self.assertEqual(decision.selected_work, "model_group.m06_event_inputs")
+        self.assertEqual(decision.provider_calls, 0)
+        summary = decision.execution_summary or {}
+        self.assertEqual(summary["resume_stage_id"], "model_group.residual_event_governance")
+        self.assertEqual(summary["target_symbol"], "AAPL")
+        self.assertEqual(summary["target_symbols"], ["AAPL"])
+        self.assertGreater(summary["event_feed_backfill_preparations"][0]["task_key_count"], 3)
+        task_key_sample = summary["event_feed_backfill_preparations"][0]["task_keys_sample"]
+        self.assertTrue(any(item["feed_id"] == "12_feed_official_calendar_discovery" for item in task_key_sample))
 
     def test_replay_contract_path_requirement_routes_selected_contract_paths(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

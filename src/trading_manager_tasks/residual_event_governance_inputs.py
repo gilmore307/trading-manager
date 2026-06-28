@@ -36,6 +36,7 @@ REQUIRED_EVENT_FEED_ARTIFACTS = {
     "alpaca_news": "equity_news.csv",
     "gdelt_news": "gdelt_article.csv",
     "sec_company_financials": "sec_company_fact.csv",
+    "release_calendar": "release_calendar.csv",
 }
 EVENT_FEED_SQL_INPUTS = {
     "alpaca_news": {
@@ -69,11 +70,19 @@ EVENT_FEED_SQL_INPUTS = {
         "time_column": "filed",
         "order_by": ["filed", "accession_number", "tag"],
     },
+    "release_calendar": {
+        "table": "feed_12_release_calendar",
+        "kind": "release_calendar",
+        "columns": ["calendar_source", "event_name", "event_date", "release_time", "timezone", "source_url", "retrieved_time", "symbol", "company_name", "time_hint", "certainty_status"],
+        "time_column": "release_time",
+        "order_by": ["release_time", "symbol", "event_name"],
+    },
 }
 EVENT_FEED_TIME_FIELDS = {
     "alpaca_news": ("created_at", "updated_at"),
     "gdelt_news": ("seen_at", "gdelt_date"),
     "sec_company_financials": ("filing_date", "filed", "end", "report_date"),
+    "release_calendar": ("release_time", "event_date"),
 }
 ET = ZoneInfo("America/New_York")
 
@@ -468,6 +477,19 @@ def _latest_successful_feed_run(receipt_path: Path) -> Mapping[str, Any] | None:
     return None
 
 
+def _successful_feed_runs(receipt_path: Path) -> tuple[Mapping[str, Any], ...]:
+    if not receipt_path.exists():
+        return ()
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ()
+    runs = receipt.get("runs")
+    if not isinstance(runs, list):
+        return ()
+    return tuple(run for run in runs if isinstance(run, Mapping) and str(run.get("status") or "") == "succeeded")
+
+
 def _discover_event_feed_sql_inputs(
     *,
     trading_storage_root: Path,
@@ -478,12 +500,13 @@ def _discover_event_feed_sql_inputs(
     row_coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
     for month in _iter_months(start_month, end_month):
         for source_id in REQUIRED_EVENT_FEED_ARTIFACTS:
-            run = _latest_successful_feed_run(trading_storage_root / "monthly_backfill" / source_id / month / "completion_receipt.json")
-            if run is None:
+            runs = _successful_feed_runs(trading_storage_root / "monthly_backfill" / source_id / month / "completion_receipt.json")
+            if not runs:
                 continue
             coverage[source_id] += 1
-            row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
-            row_coverage[source_id] += sum(int(value or 0) for value in row_counts.values())
+            for run in runs:
+                row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
+                row_coverage[source_id] += sum(int(value or 0) for value in row_counts.values())
     start, end = _range_bounds(start_month, end_month)
     sql_inputs: list[dict[str, Any]] = []
     for source_id, template in EVENT_FEED_SQL_INPUTS.items():

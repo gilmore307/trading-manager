@@ -34,6 +34,7 @@ FEED_MODULE_BY_ID = {
     "03_feed_alpaca_news": "data_feed.03_feed_alpaca_news",
     "05_feed_gdelt_news": "data_feed.05_feed_gdelt_news",
     "08_feed_sec_company_financials": "data_feed.08_feed_sec_company_financials",
+    "12_feed_official_calendar_discovery": "data_feed.12_feed_official_calendar_discovery",
 }
 
 PROVIDER_CONTROLS_BY_FEED_ID = {
@@ -56,6 +57,13 @@ PROVIDER_CONTROLS_BY_FEED_ID = {
         "allowed_providers": ["sec_edgar"],
         "allowed_endpoint_families": ["company_financials"],
         "max_requests": 1,
+    },
+    "12_feed_official_calendar_discovery": {
+        "allowed_providers": ["nasdaq"],
+        "allowed_endpoint_families": ["calendar_discovery"],
+        "max_requests": 1,
+        "max_symbols": 1,
+        "max_time_window": "1d",
     },
 }
 
@@ -185,6 +193,29 @@ def _command(feed_id: str, task_key_path: Path, request_id: str, *, attempt: int
     return [sys.executable, "-m", module, str(task_key_path), "--run-id", _run_id(request_id, attempt=attempt)]
 
 
+def _receipt_path(trading_data_root: Path, task_key: Mapping[str, Any]) -> Path:
+    return (trading_data_root / str(task_key.get("output_root") or "storage") / "completion_receipt.json").resolve()
+
+
+def _request_already_succeeded(receipt_path: Path, request_id: str) -> bool:
+    if not receipt_path.exists():
+        return False
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    runs = receipt.get("runs")
+    if not isinstance(runs, list):
+        return False
+    for run in runs:
+        if not isinstance(run, Mapping) or str(run.get("status") or "") != "succeeded":
+            continue
+        run_id = str(run.get("run_id") or "")
+        if run_id.startswith(f"{request_id}_event_feed_"):
+            return True
+    return False
+
+
 def _pythonpath(trading_data_root: Path) -> str:
     parts = [str(trading_data_root / "src")]
     existing = os.environ.get("PYTHONPATH")
@@ -216,14 +247,15 @@ def dispatch_event_feed_backfill(
     """Validate or run selected M06 event-feed backfill task keys."""
 
     planned = plan_event_feed_requests(start_month=start_month, end_month=end_month, target_symbol=target_symbol)
-    selected = _filter_requests(planned, feed_ids=feed_ids, request_ids=request_ids, limit=limit)
+    selected = _filter_requests(planned, feed_ids=feed_ids, request_ids=request_ids, limit=None)
     worker_selection = select_provider_worker_count(
-        request_count=len(selected),
+        request_count=len(selected) if limit is None else min(len(selected), limit),
         execute_provider_calls=execute_provider_calls,
         dynamic_workers=dynamic_workers,
         max_workers=max_workers,
     )
     items: list[EventFeedDispatchItem] = []
+    pending_count = 0
     for row in selected:
         request_id = str(row["request_id"])
         feed_id = str(row["target_component_id"])
@@ -236,12 +268,32 @@ def dispatch_event_feed_backfill(
             raise TaskSystemError(f"event feed task key must be a JSON object: {task_key_path}")
         if str(task_key.get("feed") or "") != feed_id:
             raise TaskSystemError(f"event feed task key feed mismatch for {task_key_path}: expected {feed_id}")
+        receipt_path = _receipt_path(trading_data_root, task_key)
         command_path = task_key_path
         runtime_task_key_path: Path | None = None
         runtime_task_key_retained = False
         status = "validated_not_dispatched"
         return_code = None
         error_summary = None
+        if _request_already_succeeded(receipt_path, request_id):
+            items.append(
+                EventFeedDispatchItem(
+                    request_id=request_id,
+                    feed_id=feed_id,
+                    source_id=source_id,
+                    task_key_path=str(task_key_path),
+                    runtime_task_key_path=None,
+                    runtime_task_key_retained=False,
+                    command=_command(feed_id, command_path, request_id),
+                    receipt_path=str(receipt_path),
+                    status="already_succeeded",
+                    return_code=0,
+                )
+            )
+            continue
+        if limit is not None and pending_count >= limit:
+            continue
+        pending_count += 1
         if execute_provider_calls:
             runtime_task_key_path = (storage_root / "runtime" / "event_feed_task_keys" / request_id / "task_key.json").resolve()
             runtime_task_key_path.parent.mkdir(parents=True, exist_ok=True)
@@ -252,7 +304,6 @@ def dispatch_event_feed_backfill(
             command_path = runtime_task_key_path
             runtime_task_key_retained = True
         command = _command(feed_id, command_path, request_id)
-        receipt_path = str((trading_data_root / str(task_key.get("output_root") or "storage") / "completion_receipt.json").resolve())
         attempt_count = 0
         browser_ui_fallback_required = False
         if execute_provider_calls:
@@ -298,7 +349,7 @@ def dispatch_event_feed_backfill(
                 runtime_task_key_path=str(runtime_task_key_path) if runtime_task_key_path is not None and runtime_task_key_retained else None,
                 runtime_task_key_retained=runtime_task_key_retained,
                 command=command,
-                receipt_path=receipt_path,
+                receipt_path=str(receipt_path),
                 status=status,
                 return_code=return_code,
                 error_summary=error_summary,
@@ -314,8 +365,8 @@ def dispatch_event_feed_backfill(
         start_month=start_month,
         end_month=end_month,
         target_symbol=target_symbol.upper(),
-        request_count=len(selected),
-        validation_count=len(selected) if not execute_provider_calls else 0,
+        request_count=len(items),
+        validation_count=sum(1 for item in items if item.status == "validated_not_dispatched"),
         dispatch_count=dispatch_count,
         provider_calls=provider_call_count,
         dispatch_performed=execute_provider_calls,
