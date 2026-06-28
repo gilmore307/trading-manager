@@ -1725,7 +1725,8 @@ def _m06_event_input_start_decision(
             "target_symbols": list(target_symbols),
             "target_symbol_count": len(target_symbols),
             "review_rows_ref": review_rows_ref,
-            "required_event_inputs": ["alpaca_news", "gdelt_news", "sec_company_financials", "release_calendar"],
+            "required_event_inputs": ["alpaca_news", "gdelt_news", "sec_company_financials"],
+            "optional_event_inputs": ["release_calendar", "macro_release_calendar"],
             "required_next_step": "prepare and dispatch bounded M06 event-feed backfill before attribution",
         },
     )
@@ -1770,7 +1771,8 @@ def _run_m06_event_input_requirement_handoff(
         "target_symbol_count": len(target_symbols),
         "review_rows_ref": review_rows_ref,
         "event_feed_backfill_preparations": [_compact_task_key_summary(preparation) for preparation in preparations],
-        "required_event_inputs": ["alpaca_news", "gdelt_news", "sec_company_financials", "release_calendar"],
+        "required_event_inputs": ["alpaca_news", "gdelt_news", "sec_company_financials"],
+        "optional_event_inputs": ["release_calendar", "macro_release_calendar"],
     }
     command = [
         sys.executable,

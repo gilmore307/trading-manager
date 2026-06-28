@@ -21,6 +21,7 @@ from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
 from .event_feed_coverage import (
+    EVENT_FEED_ARTIFACTS,
     REQUIRED_EVENT_FEED_ARTIFACTS,
     discover_event_feed_artifacts,
     event_feed_row_coverage as compute_event_feed_row_coverage,
@@ -322,10 +323,10 @@ def _discover_event_feed_sql_inputs(
     start_month: str,
     end_month: str,
 ) -> tuple[list[dict[str, Any]], dict[str, int], dict[str, int]]:
-    coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
-    row_coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
+    coverage = {source_id: 0 for source_id in EVENT_FEED_ARTIFACTS}
+    row_coverage = {source_id: 0 for source_id in EVENT_FEED_ARTIFACTS}
     for month in iter_months(start_month, end_month):
-        for source_id in REQUIRED_EVENT_FEED_ARTIFACTS:
+        for source_id in EVENT_FEED_ARTIFACTS:
             runs = successful_feed_runs(trading_storage_root / "monthly_backfill" / source_id / month / "completion_receipt.json")
             if not runs:
                 continue
@@ -414,11 +415,11 @@ def materialize_residual_event_governance_inputs_inputs(
     event_sql_inputs, sql_coverage, sql_row_coverage = _discover_event_feed_sql_inputs(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
     event_feed_coverage = {
         source_id: int(artifact_coverage.get(source_id) or 0) + int(sql_coverage.get(source_id) or 0)
-        for source_id in REQUIRED_EVENT_FEED_ARTIFACTS
+        for source_id in EVENT_FEED_ARTIFACTS
     }
     event_feed_row_coverage = {
         source_id: int(artifact_row_coverage.get(source_id) or 0) + int(sql_row_coverage.get(source_id) or 0)
-        for source_id in REQUIRED_EVENT_FEED_ARTIFACTS
+        for source_id in EVENT_FEED_ARTIFACTS
     }
     missing_feed_artifacts = missing_event_feed_artifacts(event_feed_coverage)
     missing_feed_rows = missing_event_feed_rows(event_feed_row_coverage)

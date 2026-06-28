@@ -19,11 +19,16 @@ from .control_plane import TaskSystemError
 from .storage_paths import data_storage_root
 
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
-REQUIRED_EVENT_FEED_ARTIFACTS = {
+EVENT_FEED_ARTIFACTS = {
     "alpaca_news": "equity_news.csv",
     "gdelt_news": "gdelt_article.csv",
     "sec_company_financials": "sec_company_fact.csv",
     "release_calendar": "release_calendar.csv",
+}
+REQUIRED_EVENT_FEED_ARTIFACTS = {
+    "alpaca_news": EVENT_FEED_ARTIFACTS["alpaca_news"],
+    "gdelt_news": EVENT_FEED_ARTIFACTS["gdelt_news"],
+    "sec_company_financials": EVENT_FEED_ARTIFACTS["sec_company_financials"],
 }
 EVENT_FEED_TIME_FIELDS = {
     "alpaca_news": ("created_at", "updated_at"),
@@ -87,9 +92,9 @@ def discover_event_feed_artifacts(
     root = trading_storage_root or (trading_data_root / "storage" if trading_data_root is not None else DEFAULT_TRADING_STORAGE_ROOT)
     base = root / "monthly_backfill"
     paths: list[str] = []
-    coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
+    coverage = {source_id: 0 for source_id in EVENT_FEED_ARTIFACTS}
     for month in iter_months(start_month, end_month):
-        for source_id, filename in REQUIRED_EVENT_FEED_ARTIFACTS.items():
+        for source_id, filename in EVENT_FEED_ARTIFACTS.items():
             candidates = sorted((base / source_id / month).glob(f"runs/*/saved/{filename}"))
             candidates.extend(sorted((base / source_id / month).glob(f"saved/{filename}")))
             unique = [candidate for candidate in dict.fromkeys(candidates) if candidate.exists()]
@@ -125,7 +130,7 @@ def parse_event_feed_time(value: str) -> datetime | None:
 
 def event_feed_source_from_path(path: str | Path) -> str | None:
     text = str(path)
-    for source_id in REQUIRED_EVENT_FEED_ARTIFACTS:
+    for source_id in EVENT_FEED_ARTIFACTS:
         if f"/{source_id}/" in text or text.startswith(f"{source_id}/"):
             return source_id
     return None
@@ -154,7 +159,7 @@ def event_feed_row_coverage(event_artifact_paths: Sequence[str], *, start_month:
     end = parse_event_feed_time(end_text)
     if start is None or end is None:
         raise TaskSystemError(f"invalid event-feed coverage bounds: {start_text} -> {end_text}")
-    coverage = {source_id: 0 for source_id in REQUIRED_EVENT_FEED_ARTIFACTS}
+    coverage = {source_id: 0 for source_id in EVENT_FEED_ARTIFACTS}
     for raw_path in event_artifact_paths:
         source_id = event_feed_source_from_path(raw_path)
         if source_id is None:
@@ -184,6 +189,7 @@ def successful_feed_runs(receipt_path: Path) -> tuple[Mapping[str, Any], ...]:
 
 
 __all__ = [
+    "EVENT_FEED_ARTIFACTS",
     "EVENT_FEED_TIME_FIELDS",
     "REQUIRED_EVENT_FEED_ARTIFACTS",
     "discover_event_feed_artifacts",

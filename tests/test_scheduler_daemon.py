@@ -665,9 +665,9 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(summary["resume_stage_id"], "model_group.residual_event_governance")
         self.assertEqual(summary["target_symbol"], "AAPL")
         self.assertEqual(summary["target_symbols"], ["AAPL"])
-        self.assertGreater(summary["event_feed_backfill_preparations"][0]["task_key_count"], 3)
-        task_key_sample = summary["event_feed_backfill_preparations"][0]["task_keys_sample"]
-        self.assertTrue(any(item["feed_id"] == "12_feed_official_calendar_discovery" for item in task_key_sample))
+        self.assertEqual(summary["event_feed_backfill_preparations"][0]["task_key_count"], 3)
+        task_key_sample = summary["event_feed_backfill_preparations"][0]["task_keys"]
+        self.assertFalse(any(item["feed_id"] == "12_feed_official_calendar_discovery" for item in task_key_sample))
 
     def test_replay_contract_path_requirement_routes_selected_contract_paths(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

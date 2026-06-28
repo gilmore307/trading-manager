@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.event_feed_coverage import discover_event_feed_artifacts
@@ -252,6 +253,44 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
 
         self.assertEqual(summary.event_feed_coverage["release_calendar"], 1)
         self.assertEqual(summary.event_feed_row_coverage["release_calendar"], 2)
+
+    def test_write_allows_missing_optional_release_calendar_when_sec_release_evidence_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            trading_data_root = tmp / "trading-data"
+            storage_root = trading_data_root / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
+            _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01", row_count=0)
+            for source_id, row_counts in {
+                "alpaca_news": {"equity_news": 1},
+                "gdelt_news": {"gdelt_article": 1},
+                "sec_company_financials": {"sec_company_fact": 1},
+            }.items():
+                receipt = storage_root / "monthly_backfill" / source_id / "2016-01" / "completion_receipt.json"
+                receipt.parent.mkdir(parents=True, exist_ok=True)
+                receipt.write_text(json.dumps({"runs": [{"status": "succeeded", "row_counts": row_counts}]}), encoding="utf-8")
+
+            class Result:
+                returncode = 0
+                stdout = json.dumps({"references": [], "row_counts": {"m06_residual_event_governance_data_acquisition": 0}})
+                stderr = ""
+
+            with patch("trading_manager_tasks.residual_event_governance_inputs.subprocess.run", return_value=Result()):
+                summary = materialize_residual_event_governance_inputs_inputs(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    manager_storage_root=tmp / "manager-storage",
+                    trading_data_root=trading_data_root,
+                    trading_storage_root=storage_root,
+                    universe_path=universe_path,
+                    write=True,
+                )
+            task_key = json.loads(Path(summary.source_task_key_path).read_text(encoding="utf-8"))
+
+        self.assertEqual(summary.event_feed_row_coverage["release_calendar"], 0)
+        self.assertNotIn("release_calendar", {item["kind"] for item in task_key["params"]["event_sql_inputs"]})
+        self.assertIn("sec_company_financials", {item["kind"] for item in task_key["params"]["event_sql_inputs"]})
 
     def test_write_blocks_when_reviewed_event_feed_artifacts_have_zero_in_window_rows(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
