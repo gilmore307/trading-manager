@@ -729,8 +729,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["detail"]["blockers"], [])
         self.assertEqual(task["detail"]["progress"]["expected_count"], 1)
         self.assertEqual(task["detail"]["progress"]["ready_count"], 0)
-        self.assertEqual(task["detail"]["progress"]["pending_count"], 1)
-        self.assertEqual(task["detail"]["progress"]["unit_label"], "option source")
+        self.assertEqual(task["detail"]["progress"]["active_count"], 1)
+        self.assertEqual(task["detail"]["progress"]["pending_count"], 0)
+        self.assertEqual(task["detail"]["progress"]["unit_label"], "task units")
+        self.assertEqual(task["detail"]["runtime_activity"]["activity_summary"], "Stage process started")
 
     def test_model_task_aggregate_shows_started_internal_stage_as_running(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -823,10 +825,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.feature_generation")
         self.assertEqual(task["started_at_utc"], "2026-06-28T06:14:12Z")
         progress = task["detail"]["progress"]
-        self.assertEqual(progress["progress_source"], "active_progress_file")
-        self.assertEqual(progress["unit_label"], "feature windows")
-        self.assertEqual(progress["ready_count"], 8)
-        self.assertEqual(progress["expected_count"], 26)
+        self.assertEqual(progress["progress_source"], "model_task_internal_stages")
+        self.assertEqual(progress["unit_label"], "task units")
+        self.assertEqual(progress["ready_count"], 1)
+        self.assertEqual(progress["active_count"], 2)
+        self.assertEqual(progress["expected_count"], 8)
+        live_activity = task["detail"]["runtime_activity"]
+        self.assertEqual(live_activity["activity_summary"], "Generating feature window 9 of 26")
+        self.assertEqual(live_activity["progress_label"], "2/8 task units")
 
     def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2885,12 +2891,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
-        self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
-        self.assertEqual(progress["unit_label"], "dataset months")
-        self.assertEqual(progress["expected_count"], 6)
-        self.assertEqual(progress["ready_count"], 4)
-        self.assertEqual(progress["pending_count"], 2)
-        self.assertIn("train=4 months", progress["progress_basis"])
+        self.assertEqual(progress["progress_source"], "model_task_internal_stages")
+        self.assertEqual(progress["unit_label"], "task units")
+        self.assertEqual(progress["expected_count"], 8)
+        self.assertEqual(progress["ready_count"], 6)
+        self.assertEqual(progress["active_count"], 7)
+        self.assertEqual(progress["pending_count"], 1)
+        self.assertIn("all layer-internal", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
 
     def test_active_model_generation_progress_preserves_split_total(self):
@@ -2968,13 +2975,17 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["status"], "running")
-        self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
-        self.assertEqual(progress["unit_label"], "dataset months")
+        self.assertEqual(progress["progress_source"], "model_task_internal_stages")
+        self.assertEqual(progress["unit_label"], "task units")
         self.assertEqual(progress["expected_count"], 6)
         self.assertEqual(progress["ready_count"], 4)
-        self.assertEqual(progress["pending_count"], 2)
+        self.assertEqual(progress["active_count"], 5)
+        self.assertEqual(progress["pending_count"], 1)
         self.assertEqual(progress["stage_id"], "model_02_target_state.model_generation.validation")
         self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
+        live_activity = task["detail"]["runtime_activity"]
+        self.assertEqual(live_activity["activity_summary"], "Stage process started")
+        self.assertEqual(live_activity["progress_label"], "5/6 task units")
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3048,8 +3059,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
-        self.assertEqual(progress["progress_source"], "model_generation_dataset_splits")
-        self.assertEqual(progress["unit_label"], "dataset months")
+        self.assertEqual(progress["progress_source"], "model_task_internal_stages")
+        self.assertEqual(progress["unit_label"], "task units")
         self.assertEqual(progress["expected_count"], 6)
         self.assertEqual(progress["ready_count"], 6)
         self.assertEqual(progress["pending_count"], 0)

@@ -1991,14 +1991,25 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
     }
 
 
-def _active_worker_progress_should_drive_task(progress: Mapping[str, Any]) -> bool:
-    return str(progress.get("progress_source") or "") == "active_progress_file" and str(progress.get("status") or "").lower() in {
-        "running",
-        "partial_ready",
-    }
+def _progress_display_label(progress: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(progress, Mapping):
+        return None
+    try:
+        expected = max(0, int(progress.get("expected_count") or 0))
+        ready = max(0, int(progress.get("ready_count") or 0))
+        active = max(0, int(progress.get("active_count") or progress.get("current_count") or ready))
+    except (TypeError, ValueError):
+        return None
+    display_count = max(ready, active)
+    unit_label = str(progress.get("unit_label") or "units")
+    if expected <= 0:
+        return f"{display_count} {unit_label}"
+    return f"{display_count}/{expected} {unit_label}"
 
 
-def _owner_facing_active_worker_progress(progress: Mapping[str, Any]) -> dict[str, Any]:
+def _worker_facing_progress(progress: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if not isinstance(progress, Mapping):
+        return None
     updated = dict(progress)
     nodes = updated.get("nodes")
     if isinstance(nodes, list) and any(
@@ -2006,8 +2017,83 @@ def _owner_facing_active_worker_progress(progress: Mapping[str, Any]) -> dict[st
         for node in nodes
     ):
         updated["unit_label"] = "feature windows"
-        updated.setdefault("progress_basis", "feature windows in the active generation run")
     return updated
+
+
+def _active_progress_node(progress: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    if not isinstance(progress, Mapping):
+        return None
+    nodes = progress.get("nodes")
+    if not isinstance(nodes, list):
+        return None
+    for node in reversed(nodes):
+        if isinstance(node, Mapping):
+            return node
+    return None
+
+
+def _active_progress_has_counter(progress: Mapping[str, Any] | None) -> bool:
+    if not isinstance(progress, Mapping):
+        return False
+    return progress.get("expected_count") is not None or progress.get("processed_count") is not None or progress.get("ready_count") is not None
+
+
+def _merge_task_progress_with_active_worker(
+    dashboard_progress: Mapping[str, Any],
+    active_progress: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Keep task-level progress as the progress bar while attaching worker context."""
+
+    merged = dict(dashboard_progress)
+    if not isinstance(active_progress, Mapping):
+        return merged
+    for key in ("status", "stage_id", "nodes", "updated_at_utc", "worker_id"):
+        value = active_progress.get(key)
+        if value not in (None, "", []):
+            merged[key] = value
+    return merged
+
+
+def _task_runtime_activity_from_worker(
+    *,
+    dashboard_stage: Mapping[str, Any],
+    task_period: str | None,
+    task_progress: Mapping[str, Any] | None,
+    active_progress: Mapping[str, Any] | None,
+    worker_info: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if not isinstance(active_progress, Mapping):
+        return None
+    node = _active_progress_node(active_progress)
+    worker_progress = _worker_facing_progress(active_progress)
+    active_stage_id = str(active_progress.get("stage_id") or dashboard_stage.get("active_stage_id") or dashboard_stage.get("stage_id") or "")
+    active_stage_type = str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "")
+    active_stage_label = _public_stage_name(active_stage_id, active_stage_type)
+    node_label = str(node.get("node_label") or "") if isinstance(node, Mapping) else ""
+    if not node_label:
+        node_label = active_stage_label
+    progress_label = _progress_display_label(task_progress)
+    worker_progress_label = _progress_display_label(worker_progress)
+    activity_details = [
+        f"Task progress {progress_label}" if progress_label else None,
+        f"Worker progress {worker_progress_label}" if worker_progress_label else None,
+        str(worker_info.get("worker_label") or worker_info.get("worker_id") or "") or None,
+    ]
+    return {
+        "activity_type": "task_worker_progress",
+        "activity_label": active_stage_label,
+        "activity_summary": node_label,
+        "activity_details": [line for line in activity_details if line],
+        "progress_label": progress_label,
+        "progress_hint": str(task_progress.get("progress_basis") or "") if isinstance(task_progress, Mapping) else None,
+        "updated_at_utc": active_progress.get("updated_at_utc"),
+        "started_at_utc": dashboard_stage.get("started_at_utc") or dashboard_stage.get("started_at"),
+        "elapsed_seconds": active_progress.get("elapsed_seconds"),
+        "required_next_step": active_stage_id or None,
+        "sample_targets": [str(dashboard_stage.get("target_symbol"))] if dashboard_stage.get("target_symbol") else [],
+        "task_period": task_period,
+        "active_stage_id": active_stage_id or None,
+    }
 
 
 def _public_stage_name(stage_id: object, stage_type: object) -> str:
@@ -2795,56 +2881,48 @@ def _raw_stage_status_for_aggregation(stage: Mapping[str, Any]) -> str:
 
 def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status: str) -> dict[str, Any]:
     terminal_statuses = {"succeeded", "not_applicable"}
-    model_generation_stages = [stage for stage in stages if str(stage.get("stage_type") or "") == "model_generation"]
     split_months_by_name = {name: months for name, months in ROLLING_FOLD_SPLIT_MONTHS}
-    if model_generation_stages:
-        counted_stages = [
-            stage
-            for stage in model_generation_stages
-            if isinstance(stage.get("dataset_split"), Mapping)
-            and str(stage["dataset_split"].get("split_name") or "") in split_months_by_name
-        ]
-        expected_count = MODEL_GENERATION_SPLIT_MONTH_COUNT
-    else:
-        counted_stages = stages
-        expected_count = len(counted_stages)
+
     def stage_weight(stage: Mapping[str, Any]) -> int:
-        if not model_generation_stages:
-            return 1
         dataset_split = stage.get("dataset_split")
         split_name = str(dataset_split.get("split_name") or "") if isinstance(dataset_split, Mapping) else ""
-        return split_months_by_name.get(split_name, 0)
+        return split_months_by_name.get(split_name, 1)
 
+    counted_stages = [stage for stage in stages if stage_weight(stage) > 0]
+    expected_count = sum(stage_weight(stage) for stage in counted_stages)
     ready_count = sum(stage_weight(stage) for stage in counted_stages if str(stage.get("status") or "") in terminal_statuses)
     failed_count = sum(stage_weight(stage) for stage in counted_stages if str(stage.get("status") or "") == "failed")
-    pending_count = max(expected_count - ready_count - failed_count, 0)
+    active_stage = next(
+        (
+            stage
+            for stage in counted_stages
+            if _raw_stage_status_for_aggregation(stage) not in {*terminal_statuses, "failed"}
+        ),
+        None,
+    )
+    active_count = ready_count
+    if active_stage is not None and str(status or "") in {"running", "ready", "blocked", "pending"}:
+        active_count = min(expected_count, ready_count + stage_weight(active_stage))
+    pending_count = max(expected_count - max(ready_count, active_count) - failed_count, 0)
     if expected_count and ready_count == expected_count and failed_count == 0:
         progress_status = "complete"
     elif failed_count:
         progress_status = "failed"
-    elif model_generation_stages and str(status or "") in terminal_statuses:
-        progress_status = "pending"
     else:
         progress_status = status
-    unit_label = "dataset months" if model_generation_stages else "model stages"
-    progress_source = "model_generation_dataset_splits" if model_generation_stages else "model_task_internal_stages"
-    progress_basis = (
-        "chronological train/validation/test month coverage required by the six-month fold: train=4 months, validation=1 month, test=1 month"
-        if model_generation_stages
-        else "layer-internal model task stages"
-    )
     return {
         "stage_id": layer_key,
         "status": progress_status,
-        "unit_label": unit_label,
+        "unit_label": "task units",
         "expected_count": expected_count,
         "ready_count": ready_count,
+        "active_count": active_count,
         "pending_count": pending_count,
         "failed_count": failed_count,
         "accepted_failed_count": 0,
         "can_unlock_downstream": bool(expected_count and ready_count == expected_count and failed_count == 0),
-        "progress_source": progress_source,
-        "progress_basis": progress_basis,
+        "progress_source": "model_task_internal_stages",
+        "progress_basis": "all layer-internal source, feature, and train/validation/test units in the model task",
         "expected_partition_count": expected_count,
     }
 
@@ -3391,11 +3469,12 @@ def _task_timeline(
                     dashboard_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
                 )
                 task_uid = _stable_task_uid(dashboard_stage, task_period=task_month)
-                progress = active_task_progress.get(task_uid)
-                if progress is None and dashboard_stage.get("active_stage_id"):
-                    progress = active_task_progress.get(
+                active_progress = active_task_progress.get(task_uid)
+                if active_progress is None and dashboard_stage.get("active_stage_id"):
+                    active_progress = active_task_progress.get(
                         _stable_task_uid({"stage_id": dashboard_stage.get("active_stage_id")}, task_period=task_month)
                     )
+                progress = active_progress if _active_progress_has_counter(active_progress) else None
                 dashboard_progress = (
                     dict(dashboard_stage["dashboard_progress"])
                     if isinstance(dashboard_stage.get("dashboard_progress"), Mapping)
@@ -3410,19 +3489,9 @@ def _task_timeline(
                 if (
                     progress is not None
                     and dashboard_progress is not None
-                    and dashboard_progress.get("progress_source") == "model_generation_dataset_splits"
+                    and str(dashboard_stage.get("stage_type") or "") == "model_task"
                 ):
-                    if _active_worker_progress_should_drive_task(progress):
-                        progress = _owner_facing_active_worker_progress(progress)
-                    else:
-                        progress = {
-                            **dashboard_progress,
-                            "status": progress.get("status") or dashboard_progress.get("status"),
-                            "stage_id": progress.get("stage_id") or dashboard_progress.get("stage_id"),
-                            "nodes": progress.get("nodes", []),
-                            "updated_at_utc": progress.get("updated_at_utc"),
-                            "worker_id": progress.get("worker_id"),
-                        }
+                    progress = _merge_task_progress_with_active_worker(dashboard_progress, active_progress)
                 if progress is None and str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "") == "data_acquisition":
                     progress = _fold_stage_coverage_progress(
                         storage_root=storage_root,
@@ -3450,6 +3519,13 @@ def _task_timeline(
                     and _progress_shows_incomplete_active_work(progress if isinstance(progress, Mapping) else None)
                 ):
                     display_status = "running"
+                runtime_activity = _task_runtime_activity_from_worker(
+                    dashboard_stage=dashboard_stage,
+                    task_period=task_month,
+                    task_progress=progress if isinstance(progress, Mapping) else None,
+                    active_progress=active_progress,
+                    worker_info=worker_info,
+                )
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
                     "task_number": None,
@@ -3495,6 +3571,7 @@ def _task_timeline(
                         "layer_label": dashboard_stage.get("layer_label"),
                         "internal_stages": dashboard_stage.get("internal_stages") if isinstance(dashboard_stage.get("internal_stages"), list) else None,
                         "worker": worker_info,
+                        "runtime_activity": runtime_activity,
                     },
                     "_period_source": dashboard_stage.get("__dashboard_period_source"),
                 }
