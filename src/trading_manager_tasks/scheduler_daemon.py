@@ -1419,7 +1419,8 @@ def update_state_from_decision(
     completed_utc: str,
     decision: SchedulerDecision,
 ) -> SchedulerDaemonState:
-    progress_utc = completed_utc if _decision_advances_progress(decision) else state.last_progress_utc
+    progress_advanced = _decision_advances_progress(decision)
+    progress_utc = completed_utc if progress_advanced else state.last_progress_utc
     return replace(
         state,
         total_ticks=state.total_ticks + 1,
@@ -1433,6 +1434,7 @@ def update_state_from_decision(
         last_next_internal_stage=decision.next_internal_stage,
         last_error=None,
         last_progress_utc=progress_utc,
+        last_stall_agent_error_ref=None if progress_advanced else state.last_stall_agent_error_ref,
         updated_utc=completed_utc,
     )
 

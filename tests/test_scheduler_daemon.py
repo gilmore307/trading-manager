@@ -39,6 +39,7 @@ from trading_manager_tasks.scheduler_daemon import (
     select_model_worker_target,
     select_month_ingest_worker_months,
     select_next_historical_work,
+    update_state_from_decision,
     update_state_from_error,
     write_daemon_state,
     _decision_advances_progress,
@@ -323,6 +324,38 @@ class SchedulerDaemonTests(unittest.TestCase):
         call = handler.call_args.kwargs
         self.assertEqual(call["error_kind"], "scheduler_progress_stalled")
         self.assertIn("historical scheduler made no progress", call["summary"])
+
+    def test_successful_progress_clears_prior_stall_error_ref(self):
+        state = SchedulerDaemonState(
+            start_month="2016-01",
+            end_month="2016-06",
+            last_stall_agent_call_utc="2026-06-25T19:47:00+00:00",
+            last_stall_agent_error_ref="ERR-000019",
+            last_progress_utc="2026-06-25T19:47:00+00:00",
+        )
+        decision = SchedulerDecision(
+            contract_type="manager_scheduler_decision",
+            now_utc="2026-06-28T05:53:27+00:00",
+            now_et="2026-06-28T01:53:27-04:00",
+            decision_status="executed",
+            reason_code="model_group_replay_executed",
+            reason="executed side-effect-free model-group replay over frozen local dataset",
+            market_protection_active=False,
+            resource_pressure_active=False,
+            selected_work="model_group.replay",
+            command=[],
+            next_internal_stage="model_group_replay",
+        )
+
+        updated = update_state_from_decision(
+            state,
+            started_utc="2026-06-28T05:52:00+00:00",
+            completed_utc="2026-06-28T05:53:27+00:00",
+            decision=decision,
+        )
+
+        self.assertIsNone(updated.last_stall_agent_error_ref)
+        self.assertEqual(updated.last_progress_utc, "2026-06-28T05:53:27+00:00")
 
     def test_scheduler_progress_stall_ignores_future_fold_wait(self):
         state = SchedulerDaemonState(

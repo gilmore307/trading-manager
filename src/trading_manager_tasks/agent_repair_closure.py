@@ -110,6 +110,23 @@ def _load_json(path: Path) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _parse_utc_timestamp(raw_value: object) -> datetime | None:
+    if not raw_value:
+        return None
+    raw = str(raw_value).strip()
+    if not raw:
+        return None
+    if raw.endswith("Z"):
+        raw = f"{raw[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def _parse_stdout_payload(diagnosis: Mapping[str, Any]) -> dict[str, Any]:
     stdout = diagnosis.get("stdout")
     if isinstance(stdout, Mapping):
@@ -220,6 +237,115 @@ def _successful_replay_option_source_receipts(control_plane_root: Path, request:
             }
         )
     return tuple(receipts)
+
+
+def _request_occurred_at(request: Mapping[str, Any]) -> datetime | None:
+    for key in ("occurred_at_utc", "created_at_utc", "created_at"):
+        parsed = _parse_utc_timestamp(request.get(key))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _option_replay_coverage_complete(receipt: Mapping[str, Any]) -> bool:
+    summary = receipt.get("portfolio_selection_summary")
+    if isinstance(summary, Mapping) and summary.get("missing_option_feature_requirement_count") not in (None, 0):
+        return False
+    coverage = receipt.get("option_replay_coverage")
+    if not isinstance(coverage, Mapping):
+        return False
+    coverage_status = str(coverage.get("coverage_status") or coverage.get("feature_snapshot_coverage_status") or "").lower()
+    if coverage_status and coverage_status != "complete":
+        return False
+    expected = coverage.get("expected_option_signal_snapshot_count")
+    actual = coverage.get("feature_snapshot_count")
+    if expected is not None and actual is not None and expected != actual:
+        return False
+    return True
+
+
+def _successful_replay_option_feature_run(control_plane_root: Path, request: Mapping[str, Any]) -> dict[str, Any] | None:
+    if str(request.get("error_kind") or "") != "model_group_replay_option_feature_generation_failed":
+        return None
+    decisions_path = control_plane_root / "runtime" / "historical_scheduler_decisions.jsonl"
+    if not decisions_path.exists():
+        return None
+    request_time = _request_occurred_at(request)
+    latest: dict[str, Any] | None = None
+    try:
+        lines = decisions_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        try:
+            decision = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(decision, Mapping):
+            continue
+        if str(decision.get("reason_code") or "") != "model_group_replay_executed":
+            continue
+        decision_time = _parse_utc_timestamp(decision.get("now_utc"))
+        if request_time is not None and decision_time is not None and decision_time < request_time:
+            continue
+        execution_summary = decision.get("execution_summary") or {}
+        if not isinstance(execution_summary, Mapping):
+            continue
+        receipt = execution_summary.get("replay_execution_receipt") or {}
+        if not isinstance(receipt, Mapping):
+            continue
+        if str(receipt.get("validation_status") or "").lower() != "passed":
+            continue
+        if not _option_replay_coverage_complete(receipt):
+            continue
+        latest = {
+            "path": str(decisions_path),
+            "decision_time_utc": decision.get("now_utc"),
+            "replay_execution_run_id": receipt.get("replay_execution_run_id"),
+            "completed_replay_month_count": receipt.get("completed_replay_month_count"),
+            "validation_status": receipt.get("validation_status"),
+            "missing_option_feature_requirement_count": (
+                (receipt.get("portfolio_selection_summary") or {}).get("missing_option_feature_requirement_count")
+                if isinstance(receipt.get("portfolio_selection_summary"), Mapping)
+                else None
+            ),
+            "option_replay_coverage": receipt.get("option_replay_coverage"),
+        }
+    return latest
+
+
+def _successful_scheduler_progress(control_plane_root: Path, request: Mapping[str, Any]) -> dict[str, Any] | None:
+    if str(request.get("error_kind") or "") != "scheduler_progress_stalled":
+        return None
+    decisions_path = control_plane_root / "runtime" / "historical_scheduler_decisions.jsonl"
+    if not decisions_path.exists():
+        return None
+    request_time = _request_occurred_at(request)
+    latest: dict[str, Any] | None = None
+    try:
+        lines = decisions_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        try:
+            decision = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(decision, Mapping):
+            continue
+        decision_time = _parse_utc_timestamp(decision.get("now_utc"))
+        if request_time is not None and decision_time is not None and decision_time < request_time:
+            continue
+        if str(decision.get("decision_status") or "").lower() != "executed":
+            continue
+        latest = {
+            "path": str(decisions_path),
+            "decision_time_utc": decision.get("now_utc"),
+            "decision_status": decision.get("decision_status"),
+            "reason_code": decision.get("reason_code"),
+            "selected_work": decision.get("selected_work"),
+        }
+    return latest
 
 
 def _provider_failures_resolved(request: Mapping[str, Any]) -> bool:
@@ -530,6 +656,8 @@ def close_agent_repair(
     stage_id = _stage_id_from_request(request)
     retry_receipt = _successful_retry_receipt(_control_plane_root(candidate), stage_id) if stage_id else None
     source_receipts = _successful_replay_option_source_receipts(_control_plane_root(candidate), request)
+    replay_option_feature_run = _successful_replay_option_feature_run(_control_plane_root(candidate), request)
+    scheduler_progress = _successful_scheduler_progress(_control_plane_root(candidate), request)
 
     if retry_receipt:
         closure_status = "closed"
@@ -542,6 +670,24 @@ def close_agent_repair(
                 "status": "completed",
                 "receipt_count": len(source_receipts),
                 "receipts": list(source_receipts),
+            }
+        )
+    elif replay_option_feature_run:
+        closure_status = "closed"
+        actions.append(
+            {
+                "action": "replay_option_feature_run_observed",
+                "status": "completed",
+                "receipt": replay_option_feature_run,
+            }
+        )
+    elif scheduler_progress:
+        closure_status = "closed"
+        actions.append(
+            {
+                "action": "scheduler_progress_observed",
+                "status": "completed",
+                "receipt": scheduler_progress,
             }
         )
     elif diagnosis.get("status") != "completed":

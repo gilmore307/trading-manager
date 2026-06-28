@@ -419,6 +419,155 @@ class AgentRepairClosureTests(unittest.TestCase):
             self.assertEqual(receipt["actions"][0]["receipt_count"], 2)
             self.assertTrue(candidate.receipt_path.exists())
 
+    def test_blocked_replay_option_feature_error_closes_when_later_replay_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            control_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            root = control_root / "runtime" / "agent_error_handling"
+            candidate = self._write_candidate(
+                root,
+                request_overrides={
+                    "created_at_utc": "2026-06-27T20:18:45Z",
+                    "occurred_at_utc": "2026-06-27T20:18:45Z",
+                    "source_component": "trading-manager.model_group_replay_option_features",
+                    "error_scope": "server.replay_option_feature_repair",
+                    "error_kind": "model_group_replay_option_feature_generation_failed",
+                    "summary": "replay option source/feature repair failed for emitted signal SNOW 2022-09-14T16:00:00-04:00",
+                    "evidence_refs": [str(control_root / "runtime" / "historical_scheduler_decisions.jsonl")],
+                },
+                stdout_payload={
+                    "diagnosis_status": "repaired_verified_push_blocked",
+                    "files_changed": ["src/data_feature/m05_option_expression_feature_generation/generator.py"],
+                    "retry_recommendation": "retry_or_continue_model_group_replay_option_features_drain",
+                    "blockers": ["git push failed before closure retry"],
+                },
+            )
+            candidate.receipt_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_repair_closure_receipt",
+                        "closure_status": "blocked",
+                        "actions": [{"action": "git_push", "status": "failed"}],
+                        "blockers": ["existing blocked closure requires new successful retry evidence"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            decisions_path = control_root / "runtime" / "historical_scheduler_decisions.jsonl"
+            decisions_path.parent.mkdir(parents=True, exist_ok=True)
+            decisions_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "now_utc": "2026-06-27T20:00:00+00:00",
+                                "reason_code": "model_group_replay_executed",
+                                "execution_summary": {
+                                    "replay_execution_receipt": {
+                                        "replay_execution_run_id": "too_old",
+                                        "validation_status": "passed",
+                                        "portfolio_selection_summary": {"missing_option_feature_requirement_count": 0},
+                                        "option_replay_coverage": {
+                                            "coverage_status": "complete",
+                                            "feature_snapshot_count": 10,
+                                            "expected_option_signal_snapshot_count": 10,
+                                        },
+                                    }
+                                },
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "now_utc": "2026-06-28T05:50:41+00:00",
+                                "reason_code": "model_group_replay_executed",
+                                "execution_summary": {
+                                    "replay_execution_receipt": {
+                                        "replay_execution_run_id": "model_group_replay_20260628T055041Z_complete",
+                                        "completed_replay_month_count": 52,
+                                        "validation_status": "passed",
+                                        "portfolio_selection_summary": {"missing_option_feature_requirement_count": 0},
+                                        "option_replay_coverage": {
+                                            "coverage_status": "complete",
+                                            "feature_snapshot_count": 134,
+                                            "expected_option_signal_snapshot_count": 134,
+                                        },
+                                    }
+                                },
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            receipt = close_agent_repair(candidate)
+
+        self.assertEqual(receipt["closure_status"], "closed")
+        self.assertEqual(receipt["blockers"], [])
+        self.assertEqual(receipt["actions"][0]["action"], "replay_option_feature_run_observed")
+        self.assertEqual(
+            receipt["actions"][0]["receipt"]["replay_execution_run_id"],
+            "model_group_replay_20260628T055041Z_complete",
+        )
+
+    def test_scheduler_progress_stalled_closes_when_later_scheduler_work_executes(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            control_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            root = control_root / "runtime" / "agent_error_handling"
+            candidate = self._write_candidate(
+                root,
+                request_overrides={
+                    "created_at_utc": "2026-06-23T14:38:38Z",
+                    "occurred_at_utc": "2026-06-23T14:38:38Z",
+                    "error_kind": "scheduler_progress_stalled",
+                    "error_scope": "server.scheduler_progress",
+                    "source_component": "trading-manager.scheduler_daemon",
+                    "summary": "historical scheduler made no progress for 729 seconds",
+                },
+                stdout_payload={
+                    "diagnosis_status": "repaired_verified",
+                    "files_changed": [],
+                    "retry_recommendation": "continue scheduler",
+                    "blockers": [],
+                },
+            )
+            diagnosis = json.loads(candidate.diagnosis_path.read_text(encoding="utf-8"))
+            diagnosis["status"] = "agent_call_failed"
+            candidate.diagnosis_path.write_text(json.dumps(diagnosis), encoding="utf-8")
+            decisions_path = control_root / "runtime" / "historical_scheduler_decisions.jsonl"
+            decisions_path.parent.mkdir(parents=True, exist_ok=True)
+            decisions_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "now_utc": "2026-06-23T14:37:00+00:00",
+                                "decision_status": "executed",
+                                "reason_code": "too_old",
+                                "selected_work": "model_group.replay",
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "now_utc": "2026-06-28T05:53:27+00:00",
+                                "decision_status": "executed",
+                                "reason_code": "model_group_replay_executed",
+                                "selected_work": "model_group.replay",
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            receipt = close_agent_repair(candidate)
+
+        self.assertEqual(receipt["closure_status"], "closed")
+        self.assertEqual(receipt["blockers"], [])
+        self.assertEqual(receipt["actions"][0]["action"], "scheduler_progress_observed")
+        self.assertEqual(receipt["actions"][0]["receipt"]["reason_code"], "model_group_replay_executed")
+
     def test_blocked_closure_does_not_repeat_scheduler_restart(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
