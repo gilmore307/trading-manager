@@ -2447,13 +2447,20 @@ def _task_timestamp_fields(raw_stage: Mapping[str, Any], *, storage_root: Path) 
             receipt_started.extend(candidates["started"])
             receipt_ended.extend(candidates["ended"])
     status_updated = raw_stage.get("status_updated_at_utc") or raw_stage.get("status_updated_utc") or raw_stage.get("updated_utc")
-    started = raw_stage.get("started_at_utc") or raw_stage.get("started_at") or _min_timestamp(receipt_started)
     stage_type = str(raw_stage.get("stage_type") or "")
     status = str(raw_stage.get("status") or "")
+    terminal_model_task = stage_type == "model_task" and status in {"succeeded", "not_applicable", "failed"}
+    if terminal_model_task:
+        started = _min_timestamp(receipt_started) or raw_stage.get("started_at_utc") or raw_stage.get("started_at")
+    else:
+        started = raw_stage.get("started_at_utc") or raw_stage.get("started_at") or _min_timestamp(receipt_started)
     suppress_child_receipt_ended = stage_type == "model_task" and status not in {"succeeded", "not_applicable", "failed"}
     ended = None
     if not suppress_child_receipt_ended:
-        ended = raw_stage.get("ended_at_utc") or raw_stage.get("completed_at_utc") or raw_stage.get("completed_at") or _max_timestamp(receipt_ended)
+        if terminal_model_task:
+            ended = _max_timestamp(receipt_ended) or raw_stage.get("ended_at_utc") or raw_stage.get("completed_at_utc") or raw_stage.get("completed_at")
+        else:
+            ended = raw_stage.get("ended_at_utc") or raw_stage.get("completed_at_utc") or raw_stage.get("completed_at") or _max_timestamp(receipt_ended)
     created = raw_stage.get("created_at_utc") or raw_stage.get("created_utc") or raw_stage.get("created_at")
     return {
         "created_at_utc": str(created) if created else None,

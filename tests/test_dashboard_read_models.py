@@ -860,6 +860,112 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(live_activity["sample_targets"], ["AAPL", "BTC", "MSFT", "NVDA"])
         self.assertIn("Candidate symbols 50", live_activity["activity_details"])
 
+    def test_completed_model_task_runtime_spans_internal_stage_receipts(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            receipt_root = runtime / "model_training_stage_receipts"
+            receipts: dict[str, Path] = {}
+            for stage_name, started_at, completed_at in (
+                ("data_acquisition", "2026-06-28T06:14:07Z", "2026-06-28T06:14:12Z"),
+                ("feature_generation", "2026-06-28T06:14:12Z", "2026-06-28T07:19:52Z"),
+                ("model_generation__train", "2026-06-28T07:19:58Z", "2026-06-28T07:25:03Z"),
+                ("model_generation__validation", "2026-06-28T07:25:08Z", "2026-06-28T07:26:28Z"),
+                ("model_generation__test", "2026-06-28T07:26:28Z", "2026-06-28T07:27:48Z"),
+            ):
+                receipt = receipt_root / f"model_02_target_state__{stage_name}" / "completion_receipt.json"
+                receipt.parent.mkdir(parents=True, exist_ok=True)
+                receipt.write_text(
+                    json.dumps(
+                        {
+                            "started_at": started_at,
+                            "completed_at": completed_at,
+                            "status": "succeeded",
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                receipts[stage_name] = receipt
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "target_symbol": "AAPL",
+                        "stages": [
+                            {
+                                "stage_id": "model_02_target_state.data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "succeeded",
+                                "receipt_refs": [str(receipts["data_acquisition"])],
+                            },
+                            {
+                                "stage_id": "model_02_target_state.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "succeeded",
+                                "receipt_refs": [str(receipts["feature_generation"])],
+                            },
+                            {
+                                "stage_id": "model_02_target_state.model_generation.train",
+                                "stage_type": "model_generation",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "succeeded",
+                                "dataset_split": {"split_name": "train"},
+                                "receipt_refs": [str(receipts["model_generation__train"])],
+                            },
+                            {
+                                "stage_id": "model_02_target_state.model_generation.validation",
+                                "stage_type": "model_generation",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "succeeded",
+                                "dataset_split": {"split_name": "validation"},
+                                "receipt_refs": [str(receipts["model_generation__validation"])],
+                            },
+                            {
+                                "stage_id": "model_02_target_state.model_generation.test",
+                                "stage_type": "model_generation",
+                                "layer": 2,
+                                "layer_key": "model_02_target_state",
+                                "status": "succeeded",
+                                "dataset_split": {"split_name": "test"},
+                                "started_at_utc": "2026-06-28T07:26:28Z",
+                                "ended_at_utc": "2026-06-28T07:27:48Z",
+                                "receipt_refs": [str(receipts["model_generation__test"])],
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-28T07:28:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
+        self.assertEqual(task["status"], "succeeded")
+        self.assertEqual(task["started_at_utc"], "2026-06-28T06:14:07Z")
+        self.assertEqual(task["ended_at_utc"], "2026-06-28T07:27:48Z")
+        self.assertEqual(task["receipt_count"], 5)
+
     def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
