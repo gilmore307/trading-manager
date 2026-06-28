@@ -502,7 +502,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["kind"], "config")
         self.assertEqual(
             rows["REPLAY_EVENT_LAYER_ACQUISITION_FEEDS"]["payload"],
-            "03_feed_alpaca_news;05_feed_gdelt_news;08_feed_sec_company_financials",
+            "03_feed_alpaca_news;05_feed_gdelt_news;08_feed_sec_company_financials;07_feed_trading_economics_calendar_web",
         )
         self.assertEqual(rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["payload"], "model_buy_point_triggered_chain_snapshots")
         self.assertIn("model buy/expression decisions", rows["REPLAY_OPTION_CHAIN_SNAPSHOT_POLICY"]["note"])

@@ -23,17 +23,20 @@ EVENT_FEED_ARTIFACTS = {
     "alpaca_news": "equity_news.csv",
     "gdelt_news": "gdelt_article.csv",
     "sec_company_financials": "sec_company_fact.csv",
+    "trading_economics_calendar_web": "trading_economics_calendar_event.csv",
     "release_calendar": "release_calendar.csv",
 }
 REQUIRED_EVENT_FEED_ARTIFACTS = {
     "alpaca_news": EVENT_FEED_ARTIFACTS["alpaca_news"],
     "gdelt_news": EVENT_FEED_ARTIFACTS["gdelt_news"],
     "sec_company_financials": EVENT_FEED_ARTIFACTS["sec_company_financials"],
+    "trading_economics_calendar_web": EVENT_FEED_ARTIFACTS["trading_economics_calendar_web"],
 }
 EVENT_FEED_TIME_FIELDS = {
     "alpaca_news": ("created_at", "updated_at"),
     "gdelt_news": ("seen_at", "gdelt_date"),
     "sec_company_financials": ("filing_date", "filed", "end", "report_date"),
+    "trading_economics_calendar_web": ("event_time",),
     "release_calendar": ("release_time", "event_date"),
 }
 ET = ZoneInfo("America/New_York")

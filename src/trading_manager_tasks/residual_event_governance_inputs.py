@@ -326,7 +326,7 @@ def _discover_event_feed_sql_inputs(
     coverage = {source_id: 0 for source_id in EVENT_FEED_ARTIFACTS}
     row_coverage = {source_id: 0 for source_id in EVENT_FEED_ARTIFACTS}
     for month in iter_months(start_month, end_month):
-        for source_id in EVENT_FEED_ARTIFACTS:
+        for source_id in EVENT_FEED_SQL_INPUTS:
             runs = successful_feed_runs(trading_storage_root / "monthly_backfill" / source_id / month / "completion_receipt.json")
             if not runs:
                 continue
