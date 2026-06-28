@@ -2082,6 +2082,8 @@ def _task_runtime_activity_from_worker(
     if not isinstance(active_progress, Mapping):
         return None
     node = _active_progress_node(active_progress)
+    extra = active_progress.get("extra")
+    extra = extra if isinstance(extra, Mapping) else {}
     worker_progress = _worker_facing_progress(active_progress)
     active_stage_id = str(active_progress.get("stage_id") or dashboard_stage.get("active_stage_id") or dashboard_stage.get("stage_id") or "")
     active_stage_type = str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "")
@@ -2089,11 +2091,19 @@ def _task_runtime_activity_from_worker(
     node_label = str(node.get("node_label") or "") if isinstance(node, Mapping) else ""
     if not node_label:
         node_label = active_stage_label
+    window_label = _worker_window_label(extra)
+    sample_targets = _worker_sample_targets(extra)
+    if window_label and window_label not in node_label:
+        node_label = f"{node_label} · {window_label}"
+    if sample_targets:
+        node_label = f"{node_label} · examples {', '.join(sample_targets[:4])}"
     progress_label = _progress_display_label(task_progress)
     worker_progress_label = _worker_completed_progress_label(active_progress) or _progress_display_label(worker_progress)
     activity_details = [
         f"Task progress {progress_label}" if progress_label else None,
         f"Worker completed {worker_progress_label}" if worker_progress_label else None,
+        f"Window {window_label}" if window_label else None,
+        _worker_candidate_label(extra),
         str(worker_info.get("worker_label") or worker_info.get("worker_id") or "") or None,
     ]
     return {
@@ -2107,10 +2117,43 @@ def _task_runtime_activity_from_worker(
         "started_at_utc": dashboard_stage.get("started_at_utc") or dashboard_stage.get("started_at"),
         "elapsed_seconds": active_progress.get("elapsed_seconds"),
         "required_next_step": active_stage_id or None,
-        "sample_targets": [str(dashboard_stage.get("target_symbol"))] if dashboard_stage.get("target_symbol") else [],
+        "sample_targets": sample_targets or ([str(dashboard_stage.get("target_symbol"))] if dashboard_stage.get("target_symbol") else []),
         "task_period": task_period,
         "active_stage_id": active_stage_id or None,
     }
+
+
+def _worker_window_label(extra: Mapping[str, Any]) -> str | None:
+    start = _short_date(extra.get("window_start"))
+    end = _short_date(extra.get("window_end"))
+    if start and end:
+        return f"{start} to {end}"
+    return start or end
+
+
+def _short_date(value: object) -> str | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    return text.split("T", 1)[0]
+
+
+def _worker_sample_targets(extra: Mapping[str, Any]) -> list[str]:
+    raw = extra.get("sample_targets") or extra.get("target_examples")
+    if not isinstance(raw, list):
+        return []
+    return [str(item).strip().upper() for item in raw if str(item).strip()][:6]
+
+
+def _worker_candidate_label(extra: Mapping[str, Any]) -> str | None:
+    value = extra.get("candidate_symbol_count") or extra.get("candidate_count")
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    if count <= 0:
+        return None
+    return f"Candidate symbols {count}"
 
 
 def _public_stage_name(stage_id: object, stage_type: object) -> str:

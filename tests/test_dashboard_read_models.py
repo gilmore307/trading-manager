@@ -820,6 +820,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 expected_count=26,
                 node_id="feature_generation_window_started",
                 node_label="Generating feature window 9 of 26",
+                extra={
+                    "window_start": "2016-02-25T00:00:00-05:00",
+                    "window_end": "2016-03-03T00:00:00-05:00",
+                    "candidate_symbol_count": 50,
+                    "sample_targets": ["AAPL", "BTC", "MSFT", "NVDA"],
+                },
             )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
@@ -846,8 +852,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["active_count"], 2)
         self.assertEqual(progress["expected_count"], 8)
         live_activity = task["detail"]["runtime_activity"]
-        self.assertEqual(live_activity["activity_summary"], "Generating feature window 9 of 26")
+        self.assertEqual(
+            live_activity["activity_summary"],
+            "Generating feature window 9 of 26 · 2016-02-25 to 2016-03-03 · examples AAPL, BTC, MSFT, NVDA",
+        )
         self.assertEqual(live_activity["progress_label"], "1/8 task units")
+        self.assertEqual(live_activity["sample_targets"], ["AAPL", "BTC", "MSFT", "NVDA"])
+        self.assertIn("Candidate symbols 50", live_activity["activity_details"])
 
     def test_task_timeline_reports_only_unresolved_blockers_from_waiting_reason(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

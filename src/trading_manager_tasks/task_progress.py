@@ -369,6 +369,9 @@ def load_active_task_progress(progress_root: Path) -> dict[str, dict[str, Any]]:
         nodes = payload.get("nodes")
         if isinstance(nodes, list):
             progress["nodes"] = nodes
+        extra = payload.get("extra")
+        if isinstance(extra, Mapping):
+            progress["extra"] = dict(extra)
         rows[task_uid] = progress
     return rows
 
