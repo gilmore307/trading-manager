@@ -1,9 +1,10 @@
 """Safe M06 event-risk input materialization.
 
-This module builds ``model_06_residual_event_governance_data_acquisition`` SQL rows only from already-saved local
-M02 bar SQL receipts. It may run the trading-data equity abnormal activity
-source-detector, but it performs no provider calls, no model activation, no
-broker execution, and no storage lifecycle mutation.
+This module builds ``model_06_residual_event_governance_data_acquisition`` SQL
+rows from already-reviewed local evidence: target-local bar receipts for the
+bounded abnormal-activity detector, reviewed event-feed SQL/artifact coverage,
+and generated market-session calendar context. It performs no provider calls,
+no model activation, no broker execution, and no storage lifecycle mutation.
 """
 
 from __future__ import annotations
@@ -603,7 +604,7 @@ def _write_source_task_key(
         },
         "output_root": str(trading_data_output_root / SOURCE / f"model_06_residual_event_governance_{fold_key}"),
         "manager_stage_id": "model_06_residual_event_governance.data_acquisition",
-        "source_policy": "local_event_index_over_source_detector_outputs_no_provider_calls",
+        "source_policy": "local_event_index_over_reviewed_feeds_detectors_and_market_calendar_no_provider_calls",
     }
     path = output_dir / "m06_residual_event_governance_data_acquisition_task_key.json"
     path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
