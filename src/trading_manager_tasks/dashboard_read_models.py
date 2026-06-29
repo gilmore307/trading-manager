@@ -478,12 +478,13 @@ def _agent_error_summary(
         ):
             continue
         diagnosis_path = _resolve_stage_ref_path(row.get("diagnosis_path"), storage_root=storage_root)
+        if diagnosis_path is None or not diagnosis_path.exists():
+            continue
         diagnosis: dict[str, Any] = {}
-        if diagnosis_path is not None and diagnosis_path.exists():
-            try:
-                diagnosis = _load_json_object(diagnosis_path)
-            except (OSError, ValueError, json.JSONDecodeError):
-                diagnosis = {}
+        try:
+            diagnosis = _load_json_object(diagnosis_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            diagnosis = {}
         closure_receipt = _agent_repair_closure_receipt(diagnosis_path)
         agent_payload = _agent_result_payload(diagnosis)
         repair_status = _agent_repair_status(diagnosis, agent_payload)

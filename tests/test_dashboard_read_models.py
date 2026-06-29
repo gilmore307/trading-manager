@@ -379,6 +379,41 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         self.assertEqual(rows, [])
 
+    def test_agent_error_summary_filters_missing_diagnosis_artifacts(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            agent_root = storage_root / "runtime" / "agent_error_handling"
+            agent_root.mkdir(parents=True, exist_ok=True)
+            (agent_root / "server_error_catalog.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "server_error_catalog_entry",
+                        "schema_version": "1",
+                        "error_number": 27,
+                        "error_ref": "ERR-000027",
+                        "error_fingerprint": "errfp_missing_diagnosis",
+                        "request_id": "erragent_missing_diagnosis",
+                        "request_path": "02_control_plane/runtime/agent_error_handling/erragent_missing_diagnosis/server_error_agent_request.json",
+                        "diagnosis_path": "02_control_plane/runtime/agent_error_handling/erragent_missing_diagnosis/agent_error_diagnosis.json",
+                        "source_component": "trading-manager.stage_executor",
+                        "source_repo": "trading-manager",
+                        "error_scope": "server.provider_stage_failure_register",
+                        "error_kind": "provider_stage_requests_failed",
+                        "severity": "warning",
+                        "summary": "stale provider stage error",
+                        "occurred_at_utc": "2026-06-11T06:10:58Z",
+                        "created_at_utc": "2026-06-11T06:10:58Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            rows = _agent_error_summary(storage_root)
+
+        self.assertEqual(rows, [])
+
     def test_agent_error_summary_filters_targets_outside_current_training_queue(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
