@@ -3383,6 +3383,98 @@ def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status
     }
 
 
+def _internal_stage_weight(stage: Mapping[str, Any]) -> int:
+    dataset_split = stage.get("dataset_split")
+    split_name = str(dataset_split.get("split_name") or "") if isinstance(dataset_split, Mapping) else ""
+    split_months_by_name = {name: months for name, months in ROLLING_FOLD_SPLIT_MONTHS}
+    return max(1, int(split_months_by_name.get(split_name, 1)))
+
+
+def _internal_stage_progress(stage: Mapping[str, Any], *, is_active: bool = False) -> dict[str, Any]:
+    terminal_statuses = {"succeeded", "not_applicable"}
+    stage_id = str(stage.get("stage_id") or "")
+    stage_type = str(stage.get("stage_type") or "")
+    status = _raw_stage_status_for_aggregation(stage)
+    if is_active and status in {"ready", "pending", "blocked", "unknown", ""}:
+        status = "running"
+    expected_count = _internal_stage_weight(stage)
+    ready_count = expected_count if str(stage.get("status") or "") in terminal_statuses else 0
+    failed_count = expected_count if str(stage.get("status") or "") == "failed" else 0
+    dataset_split = stage.get("dataset_split")
+    is_dataset_split = isinstance(dataset_split, Mapping)
+    split_name = str(dataset_split.get("split_name") or "") if is_dataset_split else ""
+    if expected_count and ready_count == expected_count and failed_count == 0:
+        progress_status = "complete"
+    elif failed_count:
+        progress_status = "failed"
+    else:
+        progress_status = status
+    progress_basis = (
+        f"{split_name} dataset split in the chronological 12+3+3 walk-forward fold"
+        if split_name
+        else "single internal stage required by the model task"
+    )
+    return {
+        "stage_id": stage_id,
+        "status": progress_status,
+        "unit_label": "dataset months" if is_dataset_split else "task units",
+        "expected_count": expected_count,
+        "ready_count": ready_count,
+        "active_count": ready_count,
+        "pending_count": max(expected_count - ready_count - failed_count, 0),
+        "failed_count": failed_count,
+        "accepted_failed_count": 0,
+        "can_unlock_downstream": bool(expected_count and ready_count == expected_count and failed_count == 0),
+        "progress_source": "internal_stage_progress",
+        "progress_basis": progress_basis,
+        "stage_type": stage_type,
+    }
+
+
+def _enrich_internal_stages(
+    internal_stages: object,
+    *,
+    task_period: str | None,
+    active_progress: Mapping[str, Any] | None,
+    worker_info: Mapping[str, Any],
+) -> list[dict[str, Any]] | None:
+    if not isinstance(internal_stages, list):
+        return None
+    active_stage_id = str(active_progress.get("stage_id") or "") if isinstance(active_progress, Mapping) else ""
+    rows: list[dict[str, Any]] = []
+    for raw_stage in internal_stages:
+        if not isinstance(raw_stage, Mapping):
+            continue
+        stage = dict(raw_stage)
+        stage_id = str(stage.get("stage_id") or "")
+        stage_type = str(stage.get("stage_type") or "")
+        is_active = bool(active_stage_id and stage_id == active_stage_id)
+        if is_active and _active_progress_has_counter(active_progress):
+            progress = dict(active_progress)  # type: ignore[arg-type]
+            progress.setdefault("progress_scope", "active_stage")
+        else:
+            progress = _internal_stage_progress(stage, is_active=is_active)
+        runtime_activity = None
+        if is_active and isinstance(active_progress, Mapping):
+            runtime_activity = _task_runtime_activity_from_worker(
+                dashboard_stage={**stage, "active_stage_id": stage_id, "active_stage_type": stage_type},
+                task_period=task_period,
+                task_progress=progress,
+                active_progress=active_progress,
+                worker_info=worker_info,
+            )
+        stage.update(
+            {
+                "stage_label": _public_stage_name(stage_id, stage_type),
+                "status": progress.get("status") or stage.get("status"),
+                "progress": progress,
+                "runtime_activity": runtime_activity,
+            }
+        )
+        rows.append(stage)
+    return rows
+
+
 def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     order: list[str] = []
@@ -3452,6 +3544,10 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
                         "stage_id": stage.get("stage_id"),
                         "stage_type": stage.get("stage_type"),
                         "status": stage.get("status"),
+                        "last_reason": stage.get("last_reason"),
+                        "started_at_utc": stage.get("started_at_utc") or stage.get("started_at"),
+                        "ended_at_utc": stage.get("ended_at_utc") or stage.get("completed_at_utc") or stage.get("completed_at") or stage.get("ended_at"),
+                        "updated_utc": stage.get("updated_utc") or stage.get("updated_at_utc"),
                         "blockers": list(stage.get("blockers") or []),
                         "dataset_split": stage.get("dataset_split") if isinstance(stage.get("dataset_split"), Mapping) else None,
                     }
@@ -4009,6 +4105,12 @@ def _task_timeline(
                     active_progress=active_progress,
                     worker_info=worker_info,
                 )
+                internal_stages = _enrich_internal_stages(
+                    dashboard_stage.get("internal_stages"),
+                    task_period=task_month,
+                    active_progress=active_progress,
+                    worker_info=worker_info,
+                )
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
                     "task_number": None,
@@ -4053,7 +4155,7 @@ def _task_timeline(
                         "model_name": dashboard_stage.get("model_name"),
                         "model_display_name": dashboard_stage.get("model_display_name"),
                         "layer_label": dashboard_stage.get("layer_label"),
-                        "internal_stages": dashboard_stage.get("internal_stages") if isinstance(dashboard_stage.get("internal_stages"), list) else None,
+                        "internal_stages": internal_stages,
                         "worker": worker_info,
                         "runtime_activity": runtime_activity,
                     },

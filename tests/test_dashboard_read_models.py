@@ -3483,6 +3483,21 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["pending_count"], 6)
         self.assertIn("all layer-internal", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
+        internal_stages = {stage["stage_id"]: stage for stage in task["detail"]["internal_stages"]}
+        self.assertEqual(internal_stages["model_02_target_state.data_acquisition"]["progress"]["ready_count"], 1)
+        self.assertEqual(internal_stages["model_02_target_state.feature_generation"]["progress"]["ready_count"], 1)
+        self.assertEqual(
+            internal_stages["model_02_target_state.model_generation.train"]["progress"]["ready_count"],
+            12,
+        )
+        self.assertEqual(
+            internal_stages["model_02_target_state.model_generation.validation"]["progress"]["expected_count"],
+            3,
+        )
+        self.assertEqual(
+            internal_stages["model_02_target_state.model_generation.test"]["progress"]["status"],
+            "blocked",
+        )
 
     def test_stage_started_model_generation_uses_parent_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3566,6 +3581,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(live_activity["activity_summary"], "Stage process started")
         self.assertEqual(live_activity["progress_label"], "12/18 task units")
         self.assertFalse(any("Worker completed" in line for line in live_activity["activity_details"]))
+        internal_stages = {stage["stage_id"]: stage for stage in task["detail"]["internal_stages"]}
+        validation_stage = internal_stages["model_02_target_state.model_generation.validation"]
+        self.assertEqual(validation_stage["progress"]["progress_source"], "internal_stage_progress")
+        self.assertEqual(validation_stage["progress"]["expected_count"], 3)
+        self.assertEqual(validation_stage["progress"]["unit_label"], "dataset months")
+        self.assertEqual(validation_stage["runtime_activity"]["activity_summary"], "Stage process started")
+        self.assertEqual(validation_stage["runtime_activity"]["progress_label"], "0/3 dataset months")
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
