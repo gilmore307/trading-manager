@@ -453,7 +453,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "legacy": {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": "legacy",
-                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "validation_status": "passed",
@@ -461,7 +461,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "bounded": {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": "bounded",
-                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
@@ -473,7 +473,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "canonical": {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": "canonical",
-                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                     "target_refs": ["AAPL", "MSFT"],
                     "asset_class_counts": {"us_equity": 2},
                     "candidate_handoff_status": "available",
@@ -492,7 +492,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "layer2_handoff": {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": "layer2_handoff",
-                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
@@ -2689,7 +2689,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -3487,7 +3487,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -3621,7 +3621,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -3747,7 +3747,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},

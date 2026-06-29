@@ -1166,7 +1166,10 @@ def _pre_replay_stages_terminal(stages: list[Any]) -> bool:
 
 
 def _candidate_model_ref(*, target_symbol: str | None, start_month: str, end_month: str) -> str:
-    return f"storage://trading-manager/model_group/{start_month}_{end_month}"
+    target_part = str(target_symbol or "").strip().lower()
+    if not target_part:
+        raise ValueError("target_symbol is required for model_group candidate_model_ref")
+    return f"storage://trading-manager/model_group/{target_part}/{start_month}_{end_month}"
 
 
 def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | None:

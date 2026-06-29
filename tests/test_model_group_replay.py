@@ -275,7 +275,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "replay_execution_run_id": run_id,
                     "replay_month": month,
                     "decision_rows_ref": str(decision_rows_path),
-                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                     "candidate_fold_id": "fold_2016-01_2016-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
@@ -331,7 +331,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": run_id,
                     "decision_rows_ref": str(decision_rows_path),
-                    "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                     "candidate_fold_id": "fold_2016-01_2016-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
@@ -422,7 +422,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.provider_calls, 0)
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
-            self.assertIn("storage://trading-manager/model_group/2016-01_2016-06", decision.command)
+            self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2016-06", decision.command)
             self.assertNotIn("--replay-month", decision.command)
             self.assertIn("--after-cost-alpha-model-json", decision.command)
             alpha_ref = decision.command[decision.command.index("--after-cost-alpha-model-json") + 1]
@@ -573,7 +573,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": run_id,
                         "replay_month": "2021-02",
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "candidate_fold_id": "fold_2016-01_2016-06",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -801,7 +801,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": run_id,
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "candidate_fold_id": "fold_2016-01_2016-06",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -1170,7 +1170,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "legacy_run",
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "pre_replay_target_refs": ["XLK"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -1222,7 +1222,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "diagnostic_run",
                         "decision_rows_ref": str(decision_rows_path),
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "pre_replay_target_refs": ["XLK"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -1313,7 +1313,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "replay_execution_run_id": run_id,
                         "decision_rows_ref": str(decision_rows_path),
                         "progress_ref": str(progress_path),
-                        "candidate_model_ref": "storage://trading-manager/model_group/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                         "candidate_fold_id": "fold_2016-01_2016-06",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},

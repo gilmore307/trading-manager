@@ -266,7 +266,7 @@ class SchedulerDaemonTests(unittest.TestCase):
     def _write_terminal_promotion_decision_after(self, *, storage_root: Path, state_path: Path, status: str = "deferred") -> Path:
         state_payload = json.loads(state_path.read_text(encoding="utf-8"))
         fold_id = f"fold_{state_payload['start_month']}_{state_payload['end_month']}"
-        model_ref = f"storage://trading-manager/model_group/{state_payload['start_month']}_{state_payload['end_month']}"
+        model_ref = f"storage://trading-manager/model_group/aapl/{state_payload['start_month']}_{state_payload['end_month']}"
         replay_receipt_path = (
             storage_root.parent
             / "05_replay_datasets"
