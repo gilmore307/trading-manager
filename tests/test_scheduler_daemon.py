@@ -403,6 +403,46 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(call["error_kind"], "scheduler_progress_stalled")
         self.assertIn("historical scheduler made no progress", call["summary"])
 
+    def test_scheduler_progress_stall_ignores_recent_active_task_progress(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            progress_root = tmp / "storage" / "runtime" / "task_progress"
+            progress_root.mkdir(parents=True)
+            (progress_root / "model_worker_1.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_worker_task_progress",
+                        "status": "running",
+                        "stage_id": "model_02_target_state.feature_generation",
+                        "task_uid": "2017-01..2017-06:model_02_target_state.feature_generation",
+                        "updated_at_utc": "2026-01-01T00:19:30Z",
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            state = SchedulerDaemonState(
+                start_month="2017-01",
+                end_month="2017-06",
+                last_decision_status="executed",
+                last_reason_code="workflow_stage_executed",
+                last_progress_utc="2026-01-01T00:00:00+00:00",
+            )
+            with patch("trading_manager_tasks.scheduler_daemon.utc_now_iso") as now, patch(
+                "trading_manager_tasks.scheduler_daemon.handle_server_error"
+            ) as handler:
+                now.return_value = "2026-01-01T00:20:00+00:00"
+                updated = handle_scheduler_progress_stall(
+                    state,
+                    storage_root=tmp / "storage",
+                    state_path=tmp / "runtime" / "state.json",
+                    decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                    stall_seconds=600,
+                )
+
+        self.assertIsNone(updated.last_stall_agent_error_ref)
+        handler.assert_not_called()
+
     def test_successful_progress_clears_prior_stall_error_ref(self):
         state = SchedulerDaemonState(
             start_month="2016-01",

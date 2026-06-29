@@ -1698,6 +1698,34 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
     return state.last_work_selection_reason in known_nonprogress_reasons or state.last_reason_code in known_nonprogress_reasons
 
 
+def _active_task_progress_updated_after_last_scheduler_progress(
+    *,
+    storage_root: Path,
+    state: SchedulerDaemonState,
+    now: datetime,
+    stall_seconds: float,
+) -> bool:
+    progress_root = storage_root / "runtime" / "task_progress"
+    last_progress = _parse_utc_iso(state.last_progress_utc or state.updated_utc)
+    if last_progress is None or not progress_root.exists():
+        return False
+    for path in progress_root.glob("*.json"):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("contract_type") != "manager_worker_task_progress" or payload.get("status") != "running":
+            continue
+        updated = _parse_utc_iso(str(payload.get("updated_at_utc") or ""))
+        if updated is None:
+            continue
+        if updated > last_progress and (now - updated).total_seconds() < stall_seconds:
+            return True
+    return False
+
+
 def handle_scheduler_progress_stall(
     state: SchedulerDaemonState,
     *,
@@ -1717,6 +1745,13 @@ def handle_scheduler_progress_stall(
         return replace(state, last_progress_utc=now_text)
     stalled_for_seconds = (now - last_progress).total_seconds()
     if stalled_for_seconds < stall_seconds:
+        return state
+    if _active_task_progress_updated_after_last_scheduler_progress(
+        storage_root=storage_root,
+        state=state,
+        now=now,
+        stall_seconds=stall_seconds,
+    ):
         return state
     last_alert = _parse_utc_iso(state.last_stall_agent_call_utc)
     if last_alert is not None and (now - last_alert).total_seconds() < stall_seconds:
