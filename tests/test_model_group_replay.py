@@ -43,24 +43,49 @@ class ModelGroupReplayTests(unittest.TestCase):
         )
         return dataset_root
 
-    def _write_completed_fold(self, storage_root: Path) -> None:
-        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
-        state_path.parent.mkdir(parents=True)
+    def _write_completed_fold(
+        self,
+        storage_root: Path,
+        *,
+        start_month: str = "2016-01",
+        end_month: str = "2016-06",
+        parent_start_month: str | None = None,
+        parent_end_month: str | None = None,
+    ) -> None:
+        fold_key = f"{start_month}_{end_month}"
+        state_path = storage_root / "runtime" / f"model_training_fold_state_aapl_{fold_key}.json"
+        state_path.parent.mkdir(parents=True, exist_ok=True)
         self._write_fixed_equity_universe(self._default_fixed_universe_path(storage_root), ["AAPL"])
         artifact_path = (
             storage_root.parent
             / "03_model_artifacts"
             / "runtime"
             / "model_05_alpha_confidence"
-            / "after_cost_alpha_model_2016-01_2016-06.json"
+            / f"after_cost_alpha_model_{start_month}_{end_month}.json"
         )
+        parent_checkpoint_ref = None
+        if parent_start_month and parent_end_month:
+            parent_checkpoint_ref = str(
+                storage_root.parent
+                / "03_model_artifacts"
+                / "runtime"
+                / "model_05_alpha_confidence"
+                / f"after_cost_alpha_model_{parent_start_month}_{parent_end_month}.json"
+            )
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
         artifact_path.write_text(
             json.dumps(
                 {
                     "contract_type": "current_replay_entry_utility_model_bundle",
+                    "fold_id": f"fold_{start_month}_{end_month}",
+                    "target_symbol": "AAPL",
+                    "learning_contract": "replayable_cumulative_fold_checkpoint",
+                    "seed_checkpoint_ref": parent_checkpoint_ref,
+                    "parent_checkpoint_ref": parent_checkpoint_ref,
+                    "checkpoint_ref": str(artifact_path),
                     "training_summary": {
                         "training_mode": "supervised_fit",
+                        "cumulative_learning_mode": "cumulative_checkpoint",
                         "sample_count": 128,
                     },
                 },
@@ -92,9 +117,9 @@ class ModelGroupReplayTests(unittest.TestCase):
             json.dumps(
                 {
                     "target_candidate_id": "tcand_fixture_aapl",
-                    "fold_id": "fold_2016-01_2016-06",
-                    "fold_start_month": "2016-01",
-                    "fold_end_month": "2016-06",
+                    "fold_id": f"fold_{start_month}_{end_month}",
+                    "fold_start_month": start_month,
+                    "fold_end_month": end_month,
                     "routing_symbol_ref": "AAPL",
                     "audit_symbol_ref": "AAPL",
                     "candidate_eligibility_state": "eligible",
@@ -124,8 +149,8 @@ class ModelGroupReplayTests(unittest.TestCase):
             json.dumps(
                 {
                     "contract_type": "manager_model_training_workflow_state",
-                    "start_month": "2016-01",
-                    "end_month": "2016-06",
+                    "start_month": start_month,
+                    "end_month": end_month,
                     "stages": stages,
                 }
             )
@@ -742,6 +767,64 @@ class ModelGroupReplayTests(unittest.TestCase):
                 decision.execution_summary["after_cost_alpha_training_script_ref"].endswith(
                     "scripts/models/model_05_alpha_confidence/train_model_05_alpha_confidence.py"
                 )
+            )
+
+    def test_cumulative_fold_blocks_when_parent_checkpoint_missing(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(
+                storage_root,
+                start_month="2016-07",
+                end_month="2016-12",
+                parent_start_month="2016-01",
+                parent_end_month="2016-06",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_parent_checkpoint_missing")
+            self.assertTrue(decision.execution_summary["parent_checkpoint_ref"].endswith("after_cost_alpha_model_2016-01_2016-06.json"))
+
+    def test_cumulative_fold_blocks_when_artifact_lacks_parent_lineage(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            self._write_completed_fold(storage_root, start_month="2016-07", end_month="2016-12")
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_model_not_trained")
+            self.assertEqual(
+                decision.execution_summary["model_artifact_status"]["reason"],
+                "after-cost alpha artifact parent checkpoint lineage does not match previous fold",
             )
 
     def test_current_entry_utility_policy_bundle_blocks_replay_without_supervised_fit(self):

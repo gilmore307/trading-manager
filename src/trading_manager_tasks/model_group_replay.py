@@ -116,6 +116,27 @@ def run_model_group_replay_if_ready(
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
     after_cost_alpha_model_path = _after_cost_alpha_model_path(storage_root=storage_root, training_fold=training_fold)
+    previous_after_cost_alpha_model_path = _previous_after_cost_alpha_model_path(
+        storage_root=storage_root,
+        training_fold=training_fold,
+    )
+    if previous_after_cost_alpha_model_path is not None and not previous_after_cost_alpha_model_path.exists():
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_after_cost_alpha_parent_checkpoint_missing",
+            reason="cumulative fold replay requires the previous fold after-cost alpha checkpoint",
+            selected_work="model_group.replay",
+            command=[],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+                "parent_checkpoint_ref": str(previous_after_cost_alpha_model_path),
+                "required_next_step": "train or restore the previous fold checkpoint before replaying this fold",
+            },
+        )
     if not after_cost_alpha_model_path.exists():
         alpha_training_script_path = _after_cost_alpha_training_script_path(model_repo_root)
         if execute and not alpha_training_script_path.exists():
@@ -212,7 +233,12 @@ def run_model_group_replay_if_ready(
                     "required_next_step": required_next_step,
                 },
             )
-    model_artifact_status = _after_cost_alpha_model_status(after_cost_alpha_model_path)
+    model_artifact_status = _after_cost_alpha_model_status(
+        after_cost_alpha_model_path,
+        parent_checkpoint_ref=str(previous_after_cost_alpha_model_path) if previous_after_cost_alpha_model_path else None,
+        fold_id=str(training_fold.get("fold_id") or "").strip() or None,
+        target_symbol=str(training_fold.get("target_symbol") or "").strip().upper() or None,
+    )
     if not model_artifact_status["compatible"]:
         alpha_training_script_path = _after_cost_alpha_training_script_path(model_repo_root)
         alpha_training_command = _after_cost_alpha_training_command(
@@ -281,7 +307,12 @@ def run_model_group_replay_if_ready(
                         "required_next_step": "repair or populate fold-scoped after-cost alpha supervised training labels, then retry model_group.replay",
                     },
                 )
-            model_artifact_status = _after_cost_alpha_model_status(after_cost_alpha_model_path)
+            model_artifact_status = _after_cost_alpha_model_status(
+                after_cost_alpha_model_path,
+                parent_checkpoint_ref=str(previous_after_cost_alpha_model_path) if previous_after_cost_alpha_model_path else None,
+                fold_id=str(training_fold.get("fold_id") or "").strip() or None,
+                target_symbol=str(training_fold.get("target_symbol") or "").strip().upper() or None,
+            )
             if model_artifact_status["compatible"]:
                 return run_model_group_replay_if_ready(
                     storage_root=storage_root,
@@ -972,6 +1003,18 @@ def _after_cost_alpha_model_path(*, storage_root: Path, training_fold: Mapping[s
     return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / filename
 
 
+def _previous_after_cost_alpha_model_path(*, storage_root: Path, training_fold: Mapping[str, Any]) -> Path | None:
+    start_month = str(training_fold.get("start_month") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}", start_month):
+        return None
+    if start_month == "2016-01":
+        return None
+    previous_start_month = _add_months(start_month, -6)
+    previous_end_month = _add_months(start_month, -1)
+    filename = f"after_cost_alpha_model_{previous_start_month}_{previous_end_month}.json"
+    return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / filename
+
+
 def _after_cost_alpha_training_command(
     *,
     python_executable: str,
@@ -981,8 +1024,9 @@ def _after_cost_alpha_training_command(
     output_path: Path,
 ) -> list[str]:
     source_start, source_end = _after_cost_alpha_training_bounds(training_fold)
+    parent_checkpoint_path = _previous_after_cost_alpha_model_path(storage_root=storage_root, training_fold=training_fold)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    return [
+    command = [
         python_executable,
         str(_after_cost_alpha_training_script_path(model_repo_root)),
         "--from-database",
@@ -993,9 +1037,14 @@ def _after_cost_alpha_training_command(
         source_end,
         "--target-symbol",
         str(training_fold.get("target_symbol") or "").strip().upper(),
+        "--fold-id",
+        str(training_fold.get("fold_id") or "").strip(),
         "--output-json",
         str(output_path),
     ]
+    if parent_checkpoint_path is not None:
+        command.extend(["--parent-checkpoint-ref", str(parent_checkpoint_path)])
+    return command
 
 
 def _after_cost_alpha_training_script_path(model_repo_root: Path) -> Path:
@@ -1046,15 +1095,27 @@ def _after_cost_alpha_training_bounds(training_fold: Mapping[str, Any]) -> tuple
     return f"{start_month}-01T00:00:00-05:00", f"{source_end_month}-01T00:00:00-05:00"
 
 
-def _after_cost_alpha_model_status(path: Path) -> dict[str, Any]:
+def _after_cost_alpha_model_status(
+    path: Path,
+    *,
+    parent_checkpoint_ref: str | None = None,
+    fold_id: str | None = None,
+    target_symbol: str | None = None,
+) -> dict[str, Any]:
     artifact = _load_json_object(path)
     contract_type = str(artifact.get("contract_type") or "").strip()
     model_type = str(artifact.get("model_type") or "").strip()
     score_policy = str(artifact.get("score_policy") or "").strip()
+    artifact_fold_id = str(artifact.get("fold_id") or "").strip()
+    artifact_target_symbol = str(artifact.get("target_symbol") or "").strip().upper()
+    learning_contract = str(artifact.get("learning_contract") or "").strip()
+    artifact_parent_checkpoint_ref = str(artifact.get("parent_checkpoint_ref") or "").strip()
+    artifact_checkpoint_ref = str(artifact.get("checkpoint_ref") or "").strip()
     training_summary = artifact.get("training_summary")
     if not isinstance(training_summary, Mapping):
         training_summary = {}
     training_mode = str(training_summary.get("training_mode") or "").strip()
+    cumulative_learning_mode = str(training_summary.get("cumulative_learning_mode") or "").strip()
     sample_count = _int_value(training_summary.get("sample_count"))
     if training_mode == "policy_bundle_no_supervised_fit" or sample_count <= 0:
         return {
@@ -1067,10 +1128,74 @@ def _after_cost_alpha_model_status(path: Path) -> dict[str, Any]:
             "model_type": model_type or None,
             "score_policy": score_policy or None,
         }
+    if fold_id and artifact_fold_id != fold_id:
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha artifact fold scope does not match completed training fold",
+            "after_cost_alpha_model_ref": str(path),
+            "expected_fold_id": fold_id,
+            "artifact_fold_id": artifact_fold_id or None,
+            "training_mode": training_mode or None,
+            "sample_count": sample_count,
+        }
+    if target_symbol and artifact_target_symbol != target_symbol:
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha artifact target scope does not match completed training fold",
+            "after_cost_alpha_model_ref": str(path),
+            "expected_target_symbol": target_symbol,
+            "artifact_target_symbol": artifact_target_symbol or None,
+            "training_mode": training_mode or None,
+            "sample_count": sample_count,
+        }
+    if learning_contract != "replayable_cumulative_fold_checkpoint" or cumulative_learning_mode != "cumulative_checkpoint":
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha artifact lacks replayable cumulative checkpoint contract",
+            "after_cost_alpha_model_ref": str(path),
+            "learning_contract": learning_contract or None,
+            "cumulative_learning_mode": cumulative_learning_mode or None,
+            "training_mode": training_mode or None,
+            "sample_count": sample_count,
+        }
+    if parent_checkpoint_ref and artifact_parent_checkpoint_ref != parent_checkpoint_ref:
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha artifact parent checkpoint lineage does not match previous fold",
+            "after_cost_alpha_model_ref": str(path),
+            "expected_parent_checkpoint_ref": parent_checkpoint_ref,
+            "artifact_parent_checkpoint_ref": artifact_parent_checkpoint_ref or None,
+            "training_mode": training_mode or None,
+            "sample_count": sample_count,
+        }
+    if not parent_checkpoint_ref and artifact_parent_checkpoint_ref:
+        return {
+            "compatible": False,
+            "reason": "first fold after-cost alpha artifact unexpectedly declares a parent checkpoint",
+            "after_cost_alpha_model_ref": str(path),
+            "artifact_parent_checkpoint_ref": artifact_parent_checkpoint_ref,
+            "training_mode": training_mode or None,
+            "sample_count": sample_count,
+        }
+    if artifact_checkpoint_ref != str(path):
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha artifact checkpoint ref does not match artifact path",
+            "after_cost_alpha_model_ref": str(path),
+            "artifact_checkpoint_ref": artifact_checkpoint_ref or None,
+            "training_mode": training_mode or None,
+            "sample_count": sample_count,
+        }
     return {
         "compatible": True,
-        "reason": "after-cost alpha artifact contains fold-specific supervised training evidence",
+        "reason": "after-cost alpha artifact contains fold-specific cumulative supervised training evidence",
         "after_cost_alpha_model_ref": str(path),
+        "parent_checkpoint_ref": artifact_parent_checkpoint_ref or None,
+        "checkpoint_ref": artifact_checkpoint_ref or None,
+        "fold_id": artifact_fold_id or None,
+        "target_symbol": artifact_target_symbol or None,
+        "learning_contract": learning_contract or None,
+        "cumulative_learning_mode": cumulative_learning_mode or None,
         "training_mode": training_mode or None,
         "sample_count": sample_count,
         "contract_type": contract_type or None,
