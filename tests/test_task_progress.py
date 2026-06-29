@@ -94,11 +94,15 @@ class TaskProgressTests(unittest.TestCase):
                 log_refs=[str(log_path)],
             )
             payloads = load_active_task_progress(progress_root)
+            progress_log_path = progress_root / "logs" / "model_worker_1.log"
+            progress_log_text = progress_log_path.read_text(encoding="utf-8")
 
         progress = payloads["2016-01..2017-06:model_02_target_state.feature_generation"]
         self.assertEqual(progress["current_activity"], "Generating AAPL 2016-03-01 target-state features")
         self.assertEqual(progress["activity_details"], ["Window 2016-02-26 to 2016-03-04", "Rows written 143,491"])
-        self.assertEqual(progress["log_refs"], [str(log_path)])
+        self.assertEqual(progress["log_refs"], [str(log_path), str(progress_log_path)])
+        self.assertIn("Generating AAPL 2016-03-01 target-state features", progress_log_text)
+        self.assertIn("8/18 feature months", progress_log_text)
 
 
 if __name__ == "__main__":

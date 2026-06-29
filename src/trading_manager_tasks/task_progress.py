@@ -62,6 +62,11 @@ def worker_progress_path(progress_root: Path, worker_id: str) -> Path:
     return progress_root / f"{safe_worker_id or 'worker'}.json"
 
 
+def worker_progress_log_path(progress_root: Path, worker_id: str) -> Path:
+    safe_worker_id = "".join(char if char.isalnum() or char in {"_", "-"} else "_" for char in worker_id)
+    return progress_root / "logs" / f"{safe_worker_id or 'worker'}.log"
+
+
 def _stage_type_from_stage_id(stage_id: object) -> str:
     text = str(stage_id or "")
     if ".model_training." in text:
@@ -108,7 +113,11 @@ def write_task_progress_node(
 
     progress_root.mkdir(parents=True, exist_ok=True)
     path = worker_progress_path(progress_root, worker_id)
+    progress_log_path = worker_progress_log_path(progress_root, worker_id)
     now = utc_now_iso()
+    merged_log_refs = [str(ref) for ref in (log_refs or []) if str(ref).strip()]
+    if str(progress_log_path) not in merged_log_refs:
+        merged_log_refs.append(str(progress_log_path))
     payload: dict[str, Any] = {
         "contract_type": "manager_worker_task_progress",
         "worker_id": worker_id,
@@ -124,7 +133,7 @@ def write_task_progress_node(
         "progress_source": "active_progress_file",
         "current_activity": current_activity,
         "activity_details": activity_details or [],
-        "log_refs": log_refs or [],
+        "log_refs": merged_log_refs,
         "nodes": [
             {
                 "node_id": node_id or stage_id,
@@ -142,6 +151,17 @@ def write_task_progress_node(
         payload["extra"] = dict(extra)
         if "progress_basis" in extra:
             payload["progress_basis"] = extra["progress_basis"]
+    _append_task_progress_log(
+        progress_log_path,
+        timestamp=now,
+        stage_id=stage_id,
+        unit_label=unit_label,
+        processed_count=processed_count,
+        expected_count=expected_count,
+        node_label=node_label or stage_id,
+        current_activity=current_activity,
+        extra=extra,
+    )
     tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
     try:
         tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -152,6 +172,62 @@ def write_task_progress_node(
         except FileNotFoundError:
             pass
     return path
+
+
+def _append_task_progress_log(
+    path: Path,
+    *,
+    timestamp: str,
+    stage_id: str,
+    unit_label: str | None,
+    processed_count: int | None,
+    expected_count: int | None,
+    node_label: str,
+    current_activity: str | None,
+    extra: Mapping[str, Any] | None,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    message = _task_progress_log_line(
+        timestamp=timestamp,
+        stage_id=stage_id,
+        unit_label=unit_label,
+        processed_count=processed_count,
+        expected_count=expected_count,
+        node_label=node_label,
+        current_activity=current_activity,
+        extra=extra,
+    )
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(message + "\n")
+
+
+def _task_progress_log_line(
+    *,
+    timestamp: str,
+    stage_id: str,
+    unit_label: str | None,
+    processed_count: int | None,
+    expected_count: int | None,
+    node_label: str,
+    current_activity: str | None,
+    extra: Mapping[str, Any] | None,
+) -> str:
+    extra = extra if isinstance(extra, Mapping) else {}
+    parts = [timestamp, stage_id, current_activity or node_label]
+    if processed_count is not None and expected_count is not None:
+        parts.append(f"{processed_count}/{expected_count} {unit_label or 'items'}")
+    window_start = extra.get("window_start")
+    window_end = extra.get("window_end")
+    if window_start or window_end:
+        parts.append(f"window {window_start or '?'} to {window_end or '?'}")
+    sample_targets = extra.get("sample_targets") or extra.get("target_examples")
+    if isinstance(sample_targets, list) and sample_targets:
+        parts.append("examples " + ", ".join(str(item) for item in sample_targets[:4]))
+    for key, label in (("window_row_count", "window rows"), ("rows_written", "rows written"), ("candidate_symbol_count", "candidate symbols")):
+        value = extra.get(key)
+        if value not in (None, ""):
+            parts.append(f"{label} {value}")
+    return " | ".join(str(part) for part in parts if str(part).strip())
 
 
 def write_task_progress_from_env(
@@ -397,6 +473,7 @@ __all__ = [
     "clear_worker_task_progress",
     "load_active_task_progress",
     "progress_contract_for_stage",
+    "worker_progress_log_path",
     "worker_progress_path",
     "write_task_progress_from_env",
     "write_task_progress_node",

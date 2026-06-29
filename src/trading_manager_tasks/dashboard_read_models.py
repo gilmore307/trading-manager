@@ -2492,13 +2492,19 @@ def _task_log_tail_for_active_worker(
     if not active_stage_id:
         return None
     refs: list[tuple[str, Path]] = []
+    worker_progress_line: str | None = None
     if isinstance(active_progress, Mapping):
+        worker_progress_line = _active_progress_log_line(active_progress)
         raw_refs = active_progress.get("log_refs")
         if isinstance(raw_refs, list):
             for raw_ref in raw_refs:
                 path = _resolve_local_path(raw_ref)
                 if path is not None:
                     refs.append((_stream_name_from_log_path(path), path))
+        worker_id = str(active_progress.get("worker_id") or "").strip()
+        if worker_id:
+            progress_log = storage_root / "runtime" / "task_progress" / "logs" / f"{_safe_file_stem(worker_id)}.log"
+            refs.append(("task-progress", progress_log))
         extra = active_progress.get("extra")
         if isinstance(extra, Mapping):
             for key, stream in (("stdout_log", "stdout"), ("stderr_log", "stderr")):
@@ -2539,6 +2545,17 @@ def _task_log_tail_for_active_worker(
                 "lines": lines,
             }
         )
+    if not any(entry.get("lines") for entry in entries) and worker_progress_line:
+        entries.insert(
+            0,
+            {
+                "stream": "task-progress",
+                "path": None,
+                "updated_at_utc": active_progress.get("updated_at_utc") if isinstance(active_progress, Mapping) else None,
+                "line_count": 1,
+                "lines": [worker_progress_line],
+            },
+        )
     if not entries:
         return None
     return {
@@ -2553,11 +2570,39 @@ def _task_log_tail_for_active_worker(
 
 def _stream_name_from_log_path(path: Path) -> str:
     name = path.name.lower()
+    if name.endswith(".log") and path.parent.name == "logs" and path.parent.parent.name == "task_progress":
+        return "task-progress"
     if ".stderr." in name or name.endswith(".stderr.log"):
         return "stderr"
     if ".stdout." in name or name.endswith(".stdout.log"):
         return "stdout"
     return "log"
+
+
+def _safe_file_stem(value: str) -> str:
+    return "".join(char if char.isalnum() or char in {"_", "-"} else "_" for char in value) or "worker"
+
+
+def _active_progress_log_line(progress: Mapping[str, Any]) -> str:
+    node = _active_progress_node(progress)
+    node_label = str(node.get("node_label") or progress.get("stage_id") or "Task progress") if isinstance(node, Mapping) else str(progress.get("stage_id") or "Task progress")
+    current_activity = str(progress.get("current_activity") or "").strip()
+    extra = progress.get("extra")
+    extra = extra if isinstance(extra, Mapping) else {}
+    parts = [str(progress.get("updated_at_utc") or ""), str(progress.get("stage_id") or ""), current_activity or node_label]
+    label = _progress_display_label(progress)
+    if label:
+        parts.append(label)
+    window = _worker_window_label(extra)
+    if window:
+        parts.append(f"window {window}")
+    sample_targets = _worker_sample_targets(extra)
+    if sample_targets:
+        parts.append(f"examples {', '.join(sample_targets[:4])}")
+    rows_label = _worker_rows_written_label(extra)
+    if rows_label:
+        parts.append(rows_label)
+    return " | ".join(part for part in parts if part)
 
 
 def _tail_text_lines(path: Path, *, max_lines: int, max_chars: int = 360) -> list[str]:
