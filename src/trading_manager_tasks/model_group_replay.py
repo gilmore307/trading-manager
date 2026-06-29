@@ -117,7 +117,7 @@ def run_model_group_replay_if_ready(
     replay_month = None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
-    run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
+    run_id = _model_group_replay_run_id(training_fold=training_fold, now=now)
     progress_path = dataset_root / "replay_progress.jsonl"
     runner_progress_path = _candidate_replay_progress_path(dataset_root, run_id)
     resume_checkpoint_path = _latest_replay_resume_checkpoint(dataset_root, training_fold=training_fold)
@@ -886,6 +886,17 @@ def _load_json_object(path: Path) -> dict[str, Any]:
 
 def _candidate_replay_progress_path(dataset_root: Path, run_id: str) -> Path:
     return dataset_root / "replay_execution_runs" / run_id / "candidate_replay_progress.jsonl"
+
+
+def _model_group_replay_run_id(*, training_fold: Mapping[str, Any], now: datetime) -> str:
+    fold_id = _safe_run_token(str(training_fold.get("fold_id") or training_fold.get("candidate_fold_id") or ""))
+    if fold_id:
+        return f"model_group_replay_{fold_id}_{now.strftime('%Y%m%dT%H%M%SZ')}"
+    return "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
+
+
+def _safe_run_token(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]+", "_", value.strip().lower()).strip("_")
 
 
 def _latest_replay_resume_checkpoint(dataset_root: Path, *, training_fold: Mapping[str, Any]) -> Path | None:
