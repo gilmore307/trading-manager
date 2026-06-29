@@ -280,6 +280,96 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 [],
             )
 
+    def test_scoped_empty_full_replay_writes_terminal_promotion_rejection(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+            replay_root = dataset_root / "replay_execution_runs" / "model_group_replay_fixture"
+            decision_rows_path = replay_root / "decision_rows.jsonl"
+            decision_rows_path.write_text("", encoding="utf-8")
+            receipt_path = replay_root / "replay_execution_receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt.update(
+                {
+                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_training_target": "AAPL",
+                    "replay_execution_run_id": "model_group_replay_fixture",
+                    "replay_completion_scope": "full_candidate_universe",
+                }
+            )
+            receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
+            (dataset_root / "replay_progress.jsonl").write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "stage_id": "model_group.replay",
+                                "month": "2021-01",
+                                "status": "completed",
+                                "replay_execution_run_id": "model_group_replay_fixture",
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "stage_id": "model_group.replay",
+                                "month": "2021-02",
+                                "status": "completed",
+                                "replay_execution_run_id": "model_group_replay_fixture",
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_fold_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "target_symbol": "AAPL",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            dry_run_decision = run_model_group_replay_review_if_ready(storage_root=storage_root, execute=False)
+
+            self.assertIsNotNone(dry_run_decision)
+            assert dry_run_decision is not None
+            self.assertEqual(dry_run_decision.decision_status, "ready")
+            self.assertEqual(dry_run_decision.reason_code, "model_group_replay_no_decisions_rejection_ready")
+
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_replay_no_decisions_rejected")
+            rejection_path = Path(decision.execution_summary["promotion_eligibility_decision_ref"])
+            rejection = json.loads(rejection_path.read_text(encoding="utf-8"))
+            self.assertEqual(rejection["contract_type"], "promotion_eligibility_decision")
+            self.assertEqual(rejection["decision_status"], "rejected")
+            self.assertEqual(rejection["decision_reason_code"], "no_replay_decisions")
+            self.assertEqual(rejection["fold_id"], "fold_2016-01_2016-06")
+            self.assertEqual(rejection["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2016-06")
+            self.assertEqual(rejection["source_fold_state_path"], str(state_path))
+            self.assertEqual(
+                list((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json")),
+                [],
+            )
+            second = run_model_group_replay_review_if_ready(storage_root=storage_root)
+            self.assertIsNone(second)
+            second_dry_run = run_model_group_replay_review_if_ready(storage_root=storage_root, execute=False)
+            self.assertIsNone(second_dry_run)
+
     def test_completed_replay_review_skips_replay_progress_scan(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

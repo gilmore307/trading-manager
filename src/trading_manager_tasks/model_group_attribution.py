@@ -11,6 +11,7 @@ observations, event candidates, controls, co-events, or confounder evidence.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import sys
 from collections.abc import Iterable as IterableABC
@@ -118,30 +119,54 @@ def run_model_group_replay_review_if_ready(
                 "required_next_step": "repair or acquire the required replay outcome data through the replay-owned provider-gated stages, then rerun model_group.replay and model_group.replay_review",
             },
         )
-    output_root = dataset_root / "post_replay_review_runs" / run_id
-    review_rows_path = output_root / "replay_review_rows.jsonl"
-    receipt_path = output_root / "post_replay_review_receipt.json"
-    performance_summary_path = output_root / "replay_review_performance_summary.json"
-    layer_attribution_root = output_root / "layer_attribution"
-
-    if not execute:
-        return _decision(
-            now=now,
-            decision_status="ready",
-            reason_code="model_group_replay_review_ready",
-            reason="model-group replay is complete; replay review is ready",
-            selected_work="model_group.replay_review",
-            command=command,
-            execution_summary={
-                "contract_id": contract_id,
-                "dataset_root": str(dataset_root),
-                "decision_rows_ref": str(decision_rows_path),
-                "expected_replay_review_rows": "not_counted_during_readiness_probe",
-            },
+    if not _jsonl_has_any_object(decision_rows_path):
+        existing_rejection = _existing_no_decision_promotion_rejection_for_replay(
+            dataset_root=dataset_root,
+            replay_receipt=replay_receipt,
         )
-
-    decision_rows = tuple(_load_jsonl_objects(decision_rows_path))
-    if not decision_rows:
+        if existing_rejection is not None:
+            return None
+        rejection_path = _write_no_decision_promotion_rejection(
+            dataset_root=dataset_root,
+            storage_root=storage_root,
+            replay_receipt=replay_receipt,
+            decision_rows_path=decision_rows_path,
+            now=now,
+            execute=execute,
+        )
+        if rejection_path is not None:
+            executing_rejection = execute
+            return _decision(
+                now=now,
+                decision_status="executed" if executing_rejection else "ready",
+                reason_code=(
+                    "model_group_replay_no_decisions_rejected"
+                    if executing_rejection
+                    else "model_group_replay_no_decisions_rejection_ready"
+                ),
+                reason=(
+                    "model-group replay completed without decision rows; "
+                    + (
+                        "wrote terminal promotion rejection evidence so the fold lane can advance"
+                        if executing_rejection
+                        else "terminal promotion rejection evidence is ready to write"
+                    )
+                ),
+                selected_work="model_group.replay_review",
+                command=command,
+                execution_summary={
+                    "contract_id": contract_id,
+                    "dataset_root": str(dataset_root),
+                    "decision_rows_ref": str(decision_rows_path),
+                    "replay_execution_run_id": replay_run_id,
+                    "completed_replay_month_count": completed_month_count,
+                    "ready_replay_month_count": len(ready_months),
+                    "promotion_eligibility_decision_ref": str(rejection_path),
+                    "terminal_decision_status": "rejected",
+                    "terminal_decision_reason_code": "no_replay_decisions",
+                    "required_next_step": "advance to the next eligible fold after the terminal no-decision replay rejection",
+                },
+            )
         return _decision(
             now=now,
             decision_status="backoff",
@@ -165,6 +190,29 @@ def run_model_group_replay_review_if_ready(
                 ),
             },
         )
+    output_root = dataset_root / "post_replay_review_runs" / run_id
+    review_rows_path = output_root / "replay_review_rows.jsonl"
+    receipt_path = output_root / "post_replay_review_receipt.json"
+    performance_summary_path = output_root / "replay_review_performance_summary.json"
+    layer_attribution_root = output_root / "layer_attribution"
+
+    if not execute:
+        return _decision(
+            now=now,
+            decision_status="ready",
+            reason_code="model_group_replay_review_ready",
+            reason="model-group replay is complete; replay review is ready",
+            selected_work="model_group.replay_review",
+            command=command,
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "decision_rows_ref": str(decision_rows_path),
+                "expected_replay_review_rows": "not_counted_during_readiness_probe",
+            },
+        )
+
+    decision_rows = tuple(_load_jsonl_objects(decision_rows_path))
     review_rows = tuple(_build_review_rows(decision_rows_path, max_rows=max_review_rows))
     replay_receipt_path = (
         dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json"
@@ -347,6 +395,158 @@ def _decision(
             next_internal_stage="replay_review",
         ),
     )
+
+
+def _write_no_decision_promotion_rejection(
+    *,
+    dataset_root: Path,
+    storage_root: Path,
+    replay_receipt: Mapping[str, Any],
+    decision_rows_path: Path,
+    now: datetime,
+    execute: bool,
+) -> Path | None:
+    """Write terminal rejection evidence for a scoped full replay with no trades."""
+
+    candidate_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "").strip()
+    candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "").strip()
+    replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "").strip()
+    if not candidate_fold_id or not candidate_model_ref or not replay_run_id:
+        return None
+    if not _replay_receipt_full_completion_scope(replay_receipt):
+        return None
+    replay_receipt_path = dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json"
+    if not replay_receipt_path.exists():
+        return None
+    if not execute:
+        return dataset_root / "promotion_review_runs" / "not_executed" / "promotion_eligibility_decision.json"
+
+    created_at_utc = now.isoformat()
+    candidate_training_target = str(
+        replay_receipt.get("candidate_training_target")
+        or replay_receipt.get("target_symbol")
+        or ""
+    ).strip().upper()
+    source_fold_state_path = _matching_fold_state_path(
+        storage_root=storage_root,
+        candidate_fold_id=candidate_fold_id,
+        candidate_training_target=candidate_training_target,
+    )
+    run_id = "no_decision_rejection_" + now.strftime("%Y%m%dT%H%M%SZ")
+    output_root = dataset_root / "promotion_review_runs" / run_id
+    decision_path = output_root / "promotion_eligibility_decision.json"
+    output_root.mkdir(parents=True, exist_ok=True)
+    decision = {
+        "contract_type": "promotion_eligibility_decision",
+        "promotion_eligibility_decision_id": "promelig_" + _stable_token(
+            candidate_fold_id,
+            candidate_model_ref,
+            replay_run_id,
+            "no_replay_decisions",
+        ),
+        "fold_id": candidate_fold_id,
+        "candidate_fold_id": candidate_fold_id,
+        "target_symbol": candidate_training_target,
+        "candidate_training_target": candidate_training_target,
+        "candidate_model_ref": candidate_model_ref,
+        "replay_contract_ref": str(replay_receipt.get("replay_contract_ref") or ""),
+        "replay_execution_run_id": replay_run_id,
+        "replay_validation_ref": str(replay_receipt_path),
+        "decision_rows_ref": str(decision_rows_path),
+        "decision_status": "rejected",
+        "decision_reason": "Full replay completed with zero decision rows; no replay performance or attribution evidence can be produced.",
+        "decision_reason_code": "no_replay_decisions",
+        "agent_review_recommendation": "failed",
+        "replay_freeze_status": "frozen",
+        "guardrail_status": "failed",
+        "fold_stack_status": "complete_m01_m05_replay_no_decisions",
+        "metric_refs": [],
+        "guardrail_refs": [str(replay_receipt_path)],
+        "first_model_bootstrap": False,
+        "bootstrap_baseline_ref": "",
+        "source_fold_state_path": str(source_fold_state_path) if source_fold_state_path is not None else "",
+        "created_at_utc": created_at_utc,
+    }
+    decision_path.write_text(json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return decision_path
+
+
+def _jsonl_has_any_object(path: Path) -> bool:
+    for _row in _load_jsonl_objects(path):
+        return True
+    return False
+
+
+def _existing_no_decision_promotion_rejection_for_replay(
+    *,
+    dataset_root: Path,
+    replay_receipt: Mapping[str, Any],
+) -> Path | None:
+    replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "").strip()
+    if not replay_run_id:
+        return None
+    replay_receipt_path = dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json"
+    if not replay_receipt_path.exists():
+        return None
+    return _existing_no_decision_promotion_rejection(
+        dataset_root,
+        replay_validation_ref=str(replay_receipt_path),
+    )
+
+
+def _existing_no_decision_promotion_rejection(dataset_root: Path, *, replay_validation_ref: str) -> Path | None:
+    review_root = dataset_root / "promotion_review_runs"
+    if not review_root.exists():
+        return None
+    candidates: list[Path] = []
+    for decision_path in sorted(review_root.glob("*/promotion_eligibility_decision.json")):
+        decision = _load_optional_json_object(decision_path)
+        if decision is None:
+            continue
+        if str(decision.get("contract_type") or "") != "promotion_eligibility_decision":
+            continue
+        if str(decision.get("replay_validation_ref") or "") != replay_validation_ref:
+            continue
+        if str(decision.get("decision_status") or "") != "rejected":
+            continue
+        if str(decision.get("decision_reason_code") or "") != "no_replay_decisions":
+            continue
+        candidates.append(decision_path)
+    return max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
+
+
+def _matching_fold_state_path(
+    *,
+    storage_root: Path,
+    candidate_fold_id: str,
+    candidate_training_target: str,
+) -> Path | None:
+    parts = candidate_fold_id.split("_")
+    if len(parts) != 3 or parts[0] != "fold":
+        return None
+    start_month, end_month = parts[1], parts[2]
+    runtime_root = storage_root / "runtime"
+    if not runtime_root.exists():
+        return None
+    for path in sorted(runtime_root.glob(f"model_training_fold_state_*_{start_month}_{end_month}.json")):
+        payload = _load_optional_json_object(path)
+        if payload is None:
+            continue
+        target = str(
+            payload.get("target_symbol")
+            or payload.get("selected_target_symbol")
+            or payload.get("target_ref")
+            or ""
+        ).strip().upper()
+        if candidate_training_target and target and target != candidate_training_target:
+            continue
+        return path
+    return None
+
+
+def _stable_token(*parts: Any) -> str:
+    raw = "\x1f".join(str(part) for part in parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
 def _build_review_rows(decision_rows_path: Path, *, max_rows: int | None) -> Iterable[dict[str, Any]]:
