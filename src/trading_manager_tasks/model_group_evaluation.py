@@ -132,6 +132,9 @@ def run_model_group_evaluation_if_ready(
         replay_result_ref=str(replay_receipt_path),
         residual_event_governance_receipt_ref=str(attribution_receipt_path),
         residual_event_governance_event_focus_proposals_ref=str(event_focus_proposals_path),
+        fold_id=str(training_fold["fold_id"]),
+        target_symbol=str(training_fold.get("target_symbol") or ""),
+        candidate_model_ref=str(training_fold["candidate_model_ref"]),
         minimum_mtime=_state_mtime(training_fold),
     ) is not None:
         return None
@@ -230,6 +233,9 @@ def run_model_group_evaluation_if_ready(
             "stage_id": "model_group.evaluation",
             "run_id": run_id,
             "contract_id": contract_id,
+            "fold_id": str(training_fold["fold_id"]),
+            "target_symbol": str(training_fold.get("target_symbol") or ""),
+            "candidate_model_ref": str(training_fold["candidate_model_ref"]),
             "created_at_utc": now.isoformat(),
             "completed_at_utc": now.isoformat(),
             "evaluation_checks": check_summary["checks"],
@@ -2362,6 +2368,9 @@ def _candidate_model_ref_target_part(target_symbol: str | None) -> str:
 def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
     candidate_model_ref = str(replay_receipt.get("candidate_model_ref") or "")
     target_refs = _string_set(replay_receipt.get("pre_replay_target_refs") or replay_receipt.get("target_refs") or replay_receipt.get("candidate_target_refs"))
+    receipt_target_symbol = str(replay_receipt.get("target_symbol") or "").strip().upper()
+    training_target_symbol = str(training_fold.get("target_symbol") or "").strip().upper()
+    training_candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
     receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "").strip()
     training_fold_id = str(training_fold.get("fold_id") or "").strip()
     receipt_fold_window = _candidate_model_ref_fold_window(candidate_model_ref)
@@ -2370,6 +2379,27 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         return {
             "compatible": False,
             "reason": "replay receipt used deterministic crypto placeholder policy instead of completed fold model artifacts",
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+        }
+    if training_candidate_model_ref and candidate_model_ref != training_candidate_model_ref:
+        return {
+            "compatible": False,
+            "reason": "replay receipt candidate_model_ref does not match completed training fold candidate_model_ref",
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+        }
+    if training_target_symbol and not receipt_target_symbol:
+        return {
+            "compatible": False,
+            "reason": "replay receipt does not declare target_symbol for completed training fold",
+            "candidate_model_ref": candidate_model_ref,
+            "receipt_target_refs": sorted(target_refs),
+        }
+    if training_target_symbol and receipt_target_symbol != training_target_symbol:
+        return {
+            "compatible": False,
+            "reason": f"replay receipt target {receipt_target_symbol} does not match completed training target {training_target_symbol}",
             "candidate_model_ref": candidate_model_ref,
             "receipt_target_refs": sorted(target_refs),
         }
@@ -2598,6 +2628,9 @@ def _latest_promotion_review_artifacts(
     replay_result_ref: str,
     residual_event_governance_receipt_ref: str,
     residual_event_governance_event_focus_proposals_ref: str,
+    fold_id: str,
+    target_symbol: str,
+    candidate_model_ref: str,
     minimum_mtime: float | None = None,
 ) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
@@ -2615,7 +2648,14 @@ def _latest_promotion_review_artifacts(
         if str(receipt.get("residual_event_governance_event_focus_proposals_ref") or "") != residual_event_governance_event_focus_proposals_ref:
             continue
         decision_path = receipt_path.parent / "promotion_eligibility_decision.json"
-        if not decision_path.exists():
+        decision = _load_optional_json_object(decision_path)
+        if decision is None:
+            continue
+        if str(receipt.get("fold_id") or decision.get("fold_id") or "") != fold_id:
+            continue
+        if str(receipt.get("target_symbol") or decision.get("target_symbol") or "").strip().upper() != target_symbol.strip().upper():
+            continue
+        if str(receipt.get("candidate_model_ref") or decision.get("candidate_model_ref") or "") != candidate_model_ref:
             continue
         newest_artifact_mtime = max(receipt_path.stat().st_mtime, decision_path.stat().st_mtime)
         if minimum_mtime is not None and newest_artifact_mtime < minimum_mtime:
