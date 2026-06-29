@@ -744,7 +744,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 )
             )
 
-    def test_no_supervised_fit_alpha_artifact_blocks_replay(self):
+    def test_current_entry_utility_policy_bundle_allows_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -762,6 +762,55 @@ class ModelGroupReplayTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "current_replay_entry_utility_model_bundle",
+                        "model_type": "replay_entry_utility_policy_bundle",
+                        "score_policy": "derive_from_current_m02_m03_state",
+                        "training_summary": {
+                            "training_mode": "policy_bundle_no_supervised_fit",
+                            "sample_count": None,
+                        },
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_replay_executed")
+            self.assertEqual(
+                decision.execution_summary["model_artifact_status"]["reason"],
+                "after-cost alpha artifact is the accepted replay entry-utility policy bundle",
+            )
+
+    def test_incomplete_alpha_artifact_without_accepted_policy_bundle_blocks_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            alpha_model_path = (
+                storage_root.parent
+                / "03_model_artifacts"
+                / "runtime"
+                / "model_05_alpha_confidence"
+                / "after_cost_alpha_model_2016-01_2016-06.json"
+            )
+            alpha_model_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "unexpected_alpha_bundle",
                         "training_summary": {
                             "training_mode": "policy_bundle_no_supervised_fit",
                             "sample_count": None,
@@ -786,7 +835,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_model_not_trained")
-            self.assertIn("no-supervised-fit", decision.reason)
+            self.assertIn("not an accepted replay policy bundle", decision.reason)
 
     def test_explicit_training_target_handoff_does_not_run_canonical_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

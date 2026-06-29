@@ -688,6 +688,7 @@ def run_model_group_replay_if_ready(
             "ready_replay_months_after": len(refreshed_ready_months),
             "option_feature_database_configured": bool(option_feature_database_url),
             "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+            "model_artifact_status": model_artifact_status,
             "candidate_universe_path": str(resolved_candidate_universe_path),
             "fixed_candidate_universe_symbol_count": len(fixed_candidate_universe_symbols),
             "fixed_equity_candidate_symbol_count": len(fixed_equity_universe_symbols),
@@ -923,18 +924,40 @@ def _after_cost_alpha_training_bounds(training_fold: Mapping[str, Any]) -> tuple
 
 def _after_cost_alpha_model_status(path: Path) -> dict[str, Any]:
     artifact = _load_json_object(path)
+    contract_type = str(artifact.get("contract_type") or "").strip()
+    model_type = str(artifact.get("model_type") or "").strip()
+    score_policy = str(artifact.get("score_policy") or "").strip()
     training_summary = artifact.get("training_summary")
     if not isinstance(training_summary, Mapping):
         training_summary = {}
     training_mode = str(training_summary.get("training_mode") or "").strip()
     sample_count = _int_value(training_summary.get("sample_count"))
-    if training_mode == "policy_bundle_no_supervised_fit" or sample_count <= 0:
+    if (
+        contract_type == "current_replay_entry_utility_model_bundle"
+        and training_mode == "policy_bundle_no_supervised_fit"
+        and model_type == "replay_entry_utility_policy_bundle"
+        and score_policy == "derive_from_current_m02_m03_state"
+    ):
+        return {
+            "compatible": True,
+            "reason": "after-cost alpha artifact is the accepted replay entry-utility policy bundle",
+            "after_cost_alpha_model_ref": str(path),
+            "training_mode": training_mode,
+            "sample_count": sample_count,
+            "contract_type": contract_type,
+            "model_type": model_type,
+            "score_policy": score_policy,
+        }
+    if sample_count <= 0:
         return {
             "compatible": False,
-            "reason": "after-cost alpha artifact is a no-supervised-fit policy bundle, not a trained fold-specific model",
+            "reason": "after-cost alpha artifact lacks supervised training evidence and is not an accepted replay policy bundle",
             "after_cost_alpha_model_ref": str(path),
             "training_mode": training_mode or None,
             "sample_count": sample_count,
+            "contract_type": contract_type or None,
+            "model_type": model_type or None,
+            "score_policy": score_policy or None,
         }
     return {
         "compatible": True,
@@ -942,6 +965,9 @@ def _after_cost_alpha_model_status(path: Path) -> dict[str, Any]:
         "after_cost_alpha_model_ref": str(path),
         "training_mode": training_mode or None,
         "sample_count": sample_count,
+        "contract_type": contract_type or None,
+        "model_type": model_type or None,
+        "score_policy": score_policy or None,
     }
 
 
