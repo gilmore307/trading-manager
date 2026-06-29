@@ -74,7 +74,11 @@ def run_model_group_replay_if_ready(
     if not _dataset_is_frozen_and_complete(manifest, freeze_receipt):
         return None
 
-    training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
+    training_fold = _next_training_fold_needing_replay(
+        storage_root=storage_root,
+        dataset_root=dataset_root,
+        selected_target_symbol=selected_target_symbol,
+    )
     if training_fold is None:
         return None
 
@@ -111,7 +115,7 @@ def run_model_group_replay_if_ready(
     run_id = "model_group_replay_" + now.strftime("%Y%m%dT%H%M%SZ")
     progress_path = dataset_root / "replay_progress.jsonl"
     runner_progress_path = _candidate_replay_progress_path(dataset_root, run_id)
-    resume_checkpoint_path = _latest_replay_resume_checkpoint(dataset_root)
+    resume_checkpoint_path = _latest_replay_resume_checkpoint(dataset_root, training_fold=training_fold)
     candidate_model_ref = str(training_fold.get("candidate_model_ref") or "")
     option_feature_database_url = _database_url()
     resolved_python = python_executable or _python_executable()
@@ -877,7 +881,7 @@ def _candidate_replay_progress_path(dataset_root: Path, run_id: str) -> Path:
     return dataset_root / "replay_execution_runs" / run_id / "candidate_replay_progress.jsonl"
 
 
-def _latest_replay_resume_checkpoint(dataset_root: Path) -> Path | None:
+def _latest_replay_resume_checkpoint(dataset_root: Path, *, training_fold: Mapping[str, Any]) -> Path | None:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
         return None
@@ -891,6 +895,13 @@ def _latest_replay_resume_checkpoint(dataset_root: Path) -> Path | None:
             continue
         replay_time_pointer = str(checkpoint.get("replay_time_pointer") or "").strip()
         if not replay_time_pointer:
+            continue
+        receipt_path = checkpoint_path.parent / "replay_execution_receipt.json"
+        try:
+            receipt = _load_json_object(receipt_path)
+        except (OSError, json.JSONDecodeError, ValueError):
+            continue
+        if not _replay_receipt_scope_status(replay_receipt=receipt, training_fold=training_fold)["compatible"]:
             continue
         if selected is None or replay_time_pointer > selected[0]:
             selected = (replay_time_pointer, checkpoint_path)
@@ -1414,10 +1425,10 @@ def _dataset_is_frozen_and_complete(manifest: Mapping[str, Any], freeze_receipt:
     )
 
 
-def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str | None) -> dict[str, Any] | None:
+def _completed_training_folds(*, storage_root: Path, selected_target_symbol: str | None) -> list[dict[str, Any]]:
     runtime_root = storage_root / "runtime"
     if not runtime_root.exists():
-        return None
+        return []
     selected = str(selected_target_symbol or "").strip().lower()
     candidates: list[dict[str, Any]] = []
     for path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
@@ -1455,7 +1466,37 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
                 "fold_stack_evidence_ref": str(path),
             }
         )
-    return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))[-1] if candidates else None
+    return sorted(candidates, key=lambda row: (row["start_month"], row["end_month"], row["state_path"]))
+
+
+def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str | None) -> dict[str, Any] | None:
+    candidates = _completed_training_folds(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
+    return candidates[-1] if candidates else None
+
+
+def _next_training_fold_needing_replay(
+    *,
+    storage_root: Path,
+    dataset_root: Path,
+    selected_target_symbol: str | None,
+) -> dict[str, Any] | None:
+    expected_months = _expected_replay_months(dataset_root)
+    plan_months = set(_replay_plan_months(dataset_root))
+    fallback: dict[str, Any] | None = None
+    for training_fold in _completed_training_folds(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    ):
+        fallback = training_fold
+        compatible_run_months = _compatible_replay_run_months(dataset_root=dataset_root, training_fold=training_fold)
+        compatible_months = set().union(*compatible_run_months.values()) if compatible_run_months else set()
+        if expected_months > 0 and plan_months and len(compatible_months) >= expected_months and plan_months <= compatible_months:
+            continue
+        ready_months = _ready_replay_months(dataset_root, replay_run_months=compatible_run_months) if compatible_run_months else set()
+        if expected_months > 0 and len(ready_months) >= expected_months:
+            continue
+        return training_fold
+    return None if fallback is not None else None
 
 
 def _pre_replay_stages_terminal(stages: list[Any]) -> bool:
@@ -1493,16 +1534,12 @@ def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, A
     fold_id = str(training_fold.get("fold_id") or "")
     manifest_fold_id = str(manifest.get("candidate_fold_id") or manifest.get("fold_id") or "").strip()
     target_refs = _replay_dataset_target_refs(dataset_root=dataset_root, manifest=manifest)
-    if manifest_fold_id and fold_id and manifest_fold_id != fold_id:
-        return {
-            "compatible": False,
-            "reason": f"replay dataset fold {manifest_fold_id} does not match completed training fold {fold_id}",
-            "dataset_target_refs": sorted(target_refs),
-        }
     return {
         "compatible": True,
-        "reason": "replay dataset is eligible for fold-bound execution-component-graph replay",
+        "reason": "replay dataset is fold-agnostic; replay receipts carry candidate fold identity",
         "dataset_target_refs": sorted(target_refs),
+        "dataset_candidate_fold_id": manifest_fold_id or None,
+        "training_fold_id": fold_id or None,
     }
 
 

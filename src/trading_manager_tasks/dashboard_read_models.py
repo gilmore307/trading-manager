@@ -4414,20 +4414,11 @@ def _replay_dataset_scope_status(
 ) -> dict[str, Any]:
     target_refs = _replay_dataset_target_refs(dataset_root=dataset_root, manifest=manifest or {})
     manifest_fold_id = str((manifest or {}).get("candidate_fold_id") or (manifest or {}).get("fold_id") or "").strip()
-    if completed_training_fold is not None:
-        start_month, end_month, _target = completed_training_fold
-        expected_fold_id = _fold_period_label(start_month, end_month)
-        expected_fold_range = _fold_period_range(start_month, end_month)
-        if manifest_fold_id and manifest_fold_id not in {expected_fold_id, expected_fold_range, f"{start_month}_{end_month}", f"fold_{start_month}_{end_month}"}:
-            return {
-                "compatible": False,
-                "reason": f"Replay dataset fold {manifest_fold_id} does not match completed training fold {expected_fold_id}.",
-                "dataset_target_refs": sorted(target_refs),
-            }
     return {
         "compatible": True,
-        "reason": "Replay dataset is eligible for fold-bound execution-component-graph replay.",
+        "reason": "Replay dataset is fold-agnostic; replay receipts carry candidate fold identity.",
         "dataset_target_refs": sorted(target_refs),
+        "dataset_candidate_fold_id": manifest_fold_id or None,
     }
 
 
@@ -4475,7 +4466,56 @@ def _string_set(value: Any) -> set[str]:
     return set()
 
 
-def _compatible_replay_run_ids(*, dataset_root: Path) -> set[str]:
+def _model_group_candidate_model_ref_for_fold(
+    *,
+    start_month: str | None,
+    end_month: str | None,
+    selected_target_symbol: str | None,
+) -> str | None:
+    if not start_month or not end_month:
+        return None
+    target = str(selected_target_symbol or "").strip().lower()
+    if not target:
+        return None
+    return f"storage://trading-manager/model_group/{target}/{start_month}_{end_month}"
+
+
+def _model_group_artifact_matches_fold(
+    artifact: Mapping[str, Any],
+    *,
+    start_month: str | None,
+    end_month: str | None,
+    selected_target_symbol: str | None,
+) -> bool:
+    if not start_month or not end_month:
+        return True
+    expected_fold_ids = {
+        f"fold_{start_month}_{end_month}",
+        f"{start_month}_{end_month}",
+        _fold_period_label(start_month, end_month),
+        _fold_period_range(start_month, end_month),
+    }
+    fold_id = str(artifact.get("candidate_fold_id") or artifact.get("fold_id") or "").strip()
+    if fold_id and fold_id in expected_fold_ids:
+        return True
+    expected_model_ref = _model_group_candidate_model_ref_for_fold(
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
+    model_ref = str(artifact.get("candidate_model_ref") or "").strip()
+    if expected_model_ref and model_ref == expected_model_ref:
+        return True
+    return model_ref.endswith(f"/{start_month}_{end_month}")
+
+
+def _compatible_replay_run_ids(
+    *,
+    dataset_root: Path,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> set[str]:
     replay_root = dataset_root / "replay_execution_runs"
     run_ids: set[str] = set()
     if not replay_root.exists():
@@ -4485,6 +4525,13 @@ def _compatible_replay_run_ids(*, dataset_root: Path) -> set[str]:
         if receipt is None:
             continue
         if not _replay_receipt_is_dashboard_compatible(receipt):
+            continue
+        if not _model_group_artifact_matches_fold(
+            receipt,
+            start_month=training_start_month,
+            end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        ):
             continue
         run_id = str(receipt.get("replay_execution_run_id") or receipt_path.parent.name).strip()
         if run_id:
@@ -4510,9 +4557,21 @@ def _replay_execution_has_started(dataset_root: Path) -> bool:
     return False
 
 
-def _replay_ready_months(dataset_root: Path, replay_run_ids: set[str] | None = None) -> set[str]:
+def _replay_ready_months(
+    dataset_root: Path,
+    replay_run_ids: set[str] | None = None,
+    *,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> set[str]:
     expected = _replay_window_month_count(dataset_root)
-    receipt = _latest_replay_execution_receipt(dataset_root)
+    receipt = _latest_replay_execution_receipt(
+        dataset_root,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     if (
         receipt is not None
         and expected > 0
@@ -4682,17 +4741,45 @@ def _replay_month_operation_detail(dataset_root: Path) -> dict[str, Any] | None:
     }
 
 
-def _latest_replay_execution_receipt(dataset_root: Path) -> dict[str, Any] | None:
-    latest = _latest_replay_execution_receipt_artifact(dataset_root)
+def _latest_replay_execution_receipt(
+    dataset_root: Path,
+    *,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> dict[str, Any] | None:
+    latest = _latest_replay_execution_receipt_artifact(
+        dataset_root,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     return latest[1] if latest is not None else None
 
 
-def _latest_replay_execution_receipt_path(dataset_root: Path) -> Path | None:
-    latest = _latest_replay_execution_receipt_artifact(dataset_root)
+def _latest_replay_execution_receipt_path(
+    dataset_root: Path,
+    *,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> Path | None:
+    latest = _latest_replay_execution_receipt_artifact(
+        dataset_root,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     return latest[0] if latest is not None else None
 
 
-def _latest_replay_execution_receipt_artifact(dataset_root: Path) -> tuple[Path, dict[str, Any]] | None:
+def _latest_replay_execution_receipt_artifact(
+    dataset_root: Path,
+    *,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> tuple[Path, dict[str, Any]] | None:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
         return None
@@ -4704,6 +4791,13 @@ def _latest_replay_execution_receipt_artifact(dataset_root: Path) -> tuple[Path,
         if str(receipt.get("validation_status") or "") not in {"", "passed", "succeeded"}:
             continue
         if not _replay_receipt_is_dashboard_compatible(receipt):
+            continue
+        if not _model_group_artifact_matches_fold(
+            receipt,
+            start_month=training_start_month,
+            end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        ):
             continue
         created = str(receipt.get("generated_at_utc") or receipt_path.parent.name)
         candidates.append((created, receipt_path, receipt))
@@ -4755,8 +4849,19 @@ def _replay_receipt_is_dashboard_compatible(receipt: Mapping[str, Any]) -> bool:
     return _replay_receipt_has_full_completion_scope(receipt) and _replay_receipt_uses_current_candidate_handoff(receipt)
 
 
-def _latest_replay_decision_rows_path(dataset_root: Path) -> Path | None:
-    receipt = _latest_replay_execution_receipt(dataset_root)
+def _latest_replay_decision_rows_path(
+    dataset_root: Path,
+    *,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> Path | None:
+    receipt = _latest_replay_execution_receipt(
+        dataset_root,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     if receipt is None:
         return None
     decision_rows_ref = str(receipt.get("decision_rows_ref") or "")
@@ -4790,8 +4895,19 @@ def _replay_row_needs_residual_event_governance(row: Mapping[str, Any]) -> bool:
     return False
 
 
-def _residual_event_governance_expected_count(dataset_root: Path) -> int:
-    decision_rows_path = _latest_replay_decision_rows_path(dataset_root)
+def _residual_event_governance_expected_count(
+    dataset_root: Path,
+    *,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> int:
+    decision_rows_path = _latest_replay_decision_rows_path(
+        dataset_root,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     if decision_rows_path is None:
         return 0
     return sum(1 for row in _load_jsonl_objects(decision_rows_path) if _replay_row_needs_residual_event_governance(row))
@@ -4821,8 +4937,20 @@ def _replay_review_progress(
     dataset_root: Path,
     review_artifacts: Mapping[str, Any] | None,
     replay_complete: bool,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
 ) -> dict[str, Any]:
-    expected = _residual_event_governance_expected_count(dataset_root) if replay_complete else 0
+    expected = (
+        _residual_event_governance_expected_count(
+            dataset_root,
+            training_start_month=training_start_month,
+            training_end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
+        if replay_complete
+        else 0
+    )
     ready = _replay_review_ready_count(review_artifacts, expected_count=expected)
     pending = max(expected - ready, 0)
     complete = review_artifacts is not None and (expected == 0 or ready >= expected)
@@ -4872,8 +5000,20 @@ def _residual_event_governance_progress(
     dataset_root: Path,
     attribution_artifacts: Mapping[str, Any] | None,
     review_complete: bool,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
 ) -> dict[str, Any]:
-    expected = _residual_event_governance_expected_count(dataset_root) if review_complete else 0
+    expected = (
+        _residual_event_governance_expected_count(
+            dataset_root,
+            training_start_month=training_start_month,
+            training_end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
+        if review_complete
+        else 0
+    )
     ready = _attribution_ready_count(attribution_artifacts, expected_count=expected)
     pending = max(expected - ready, 0)
     complete = expected > 0 and ready >= expected
@@ -5011,6 +5151,9 @@ def _latest_promotion_review_artifacts(
     residual_event_governance_receipt_ref: str | None,
     residual_event_governance_event_focus_proposals_ref: str | None = None,
     replay_validation_ref: str | None = None,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
 ) -> dict[str, Any] | None:
     review_root = dataset_root / "promotion_review_runs"
     if not review_root.exists():
@@ -5022,6 +5165,14 @@ def _latest_promotion_review_artifacts(
             continue
         receipt_path = decision_path.parent / "model_group_evaluation_receipt.json"
         receipt = _load_optional_json_object(receipt_path)
+        scope_artifact: Mapping[str, Any] = receipt if receipt is not None else decision
+        if not _model_group_artifact_matches_fold(
+            scope_artifact,
+            start_month=training_start_month,
+            end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        ):
+            continue
         if residual_event_governance_receipt_ref is not None:
             if receipt is None:
                 continue
@@ -5058,15 +5209,33 @@ def _latest_promotion_review_artifacts(
     return {"decision": dict(decision), "review": dict(review or {}), "receipt_refs": refs}
 
 
-def _latest_post_replay_review_artifacts(dataset_root: Path) -> dict[str, Any] | None:
+def _latest_post_replay_review_artifacts(
+    dataset_root: Path,
+    *,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> dict[str, Any] | None:
     review_root = dataset_root / "post_replay_review_runs"
     if not review_root.exists():
         return None
-    decision_rows_path = _latest_replay_decision_rows_path(dataset_root)
+    decision_rows_path = _latest_replay_decision_rows_path(
+        dataset_root,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
     for receipt_path in sorted(review_root.glob("*/post_replay_review_receipt.json")):
         receipt = _load_optional_json_object(receipt_path)
         if receipt is None:
+            continue
+        if not _model_group_artifact_matches_fold(
+            receipt,
+            start_month=training_start_month,
+            end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        ):
             continue
         status = str(receipt.get("status") or receipt.get("review_status") or "")
         if status not in {"succeeded", "complete", "completed"}:
@@ -5153,7 +5322,13 @@ def _round_replay_review_metric(value: float) -> float:
     return round(value, 10)
 
 
-def _latest_post_replay_attribution_artifacts(dataset_root: Path) -> dict[str, Any] | None:
+def _latest_post_replay_attribution_artifacts(
+    dataset_root: Path,
+    *,
+    training_start_month: str | None = None,
+    training_end_month: str | None = None,
+    selected_target_symbol: str | None = None,
+) -> dict[str, Any] | None:
     attribution_root = dataset_root / "post_replay_attribution_runs"
     if not attribution_root.exists():
         return None
@@ -5161,6 +5336,13 @@ def _latest_post_replay_attribution_artifacts(dataset_root: Path) -> dict[str, A
     for receipt_path in sorted(attribution_root.glob("*/post_replay_attribution_receipt.json")):
         receipt = _load_optional_json_object(receipt_path)
         if receipt is None:
+            continue
+        if not _model_group_artifact_matches_fold(
+            receipt,
+            start_month=training_start_month,
+            end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        ):
             continue
         status = str(receipt.get("status") or receipt.get("attribution_status") or "")
         if status not in {"succeeded", "complete", "completed"}:
@@ -5376,12 +5558,23 @@ def _model_group_replay_timeline_tasks(
     freeze_status = str((manifest or {}).get("freeze_status") or "not_frozen")
     freeze_ready = coverage_complete and freeze_status == "frozen"
     compatible_replay_run_ids = (
-        _compatible_replay_run_ids(dataset_root=dataset_root)
+        _compatible_replay_run_ids(
+            dataset_root=dataset_root,
+            training_start_month=training_start_month,
+            training_end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
         if lifecycle_artifacts_allowed
         else set()
     )
     replay_ready_months = (
-        _replay_ready_months(dataset_root, replay_run_ids=compatible_replay_run_ids)
+        _replay_ready_months(
+            dataset_root,
+            replay_run_ids=compatible_replay_run_ids,
+            training_start_month=training_start_month,
+            training_end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
         if lifecycle_artifacts_allowed and compatible_replay_run_ids
         else set()
     )
@@ -5400,7 +5593,16 @@ def _model_group_replay_timeline_tasks(
         lifecycle_artifacts_allowed and _replay_execution_has_started(dataset_root)
     )
     replay_complete = bool(replay_progress["can_unlock_downstream"])
-    review_artifacts = _latest_post_replay_review_artifacts(dataset_root) if lifecycle_artifacts_allowed and replay_complete else None
+    review_artifacts = (
+        _latest_post_replay_review_artifacts(
+            dataset_root,
+            training_start_month=training_start_month,
+            training_end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
+        if lifecycle_artifacts_allowed and replay_complete
+        else None
+    )
     replay_review_complete = review_artifacts is not None
     replay_review_diagnostic_summary = (
         review_artifacts.get("diagnostic_summary")
@@ -5411,9 +5613,17 @@ def _model_group_replay_timeline_tasks(
         dataset_root=dataset_root,
         review_artifacts=review_artifacts,
         replay_complete=replay_complete,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
     )
     attribution_artifacts = (
-        _latest_post_replay_attribution_artifacts(dataset_root)
+        _latest_post_replay_attribution_artifacts(
+            dataset_root,
+            training_start_month=training_start_month,
+            training_end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
         if lifecycle_artifacts_allowed and replay_review_complete
         else None
     )
@@ -5431,6 +5641,9 @@ def _model_group_replay_timeline_tasks(
         dataset_root=dataset_root,
         attribution_artifacts=attribution_artifacts,
         review_complete=replay_review_complete,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
     )
     if attribution_rows_complete and not event_focus_complete:
         attribution_progress = {
@@ -5445,13 +5658,21 @@ def _model_group_replay_timeline_tasks(
         if attribution_artifacts and attribution_artifacts.get("receipt_refs")
         else None
     )
-    latest_replay_receipt_path = _latest_replay_execution_receipt_path(dataset_root)
+    latest_replay_receipt_path = _latest_replay_execution_receipt_path(
+        dataset_root,
+        training_start_month=training_start_month,
+        training_end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
+    )
     latest_replay_receipt_ref = str(latest_replay_receipt_path) if latest_replay_receipt_path is not None else None
     promotion_artifacts = (
         _latest_promotion_review_artifacts(
             dataset_root,
             residual_event_governance_receipt_ref=residual_event_governance_receipt_ref,
             residual_event_governance_event_focus_proposals_ref=residual_event_governance_event_focus_proposals_ref,
+            training_start_month=training_start_month,
+            training_end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
         )
         if lifecycle_artifacts_allowed and event_focus_complete
         else None
@@ -5461,6 +5682,9 @@ def _model_group_replay_timeline_tasks(
             dataset_root,
             residual_event_governance_receipt_ref=None,
             replay_validation_ref=latest_replay_receipt_ref,
+            training_start_month=training_start_month,
+            training_end_month=training_end_month,
+            selected_target_symbol=selected_target_symbol,
         )
     promotion_decision = promotion_artifacts["decision"] if promotion_artifacts else None
     promotion_review = promotion_artifacts["review"] if promotion_artifacts else {}
@@ -5779,23 +6003,9 @@ def _model_group_lifecycle_tasks_for_visible_folds(
             selected_target_symbol=selected_target_symbol,
         )
 
-    completed_fold = _completed_model_group_training_fold(
-        storage_root=storage_root,
-        selected_target_symbol=selected_target_symbol,
-    )
-    artifact_fold = _replay_manifest_fold_window(manifest)
-    if artifact_fold is not None and artifact_fold not in seen_windows:
-        artifact_fold = None
-    if artifact_fold is None and completed_fold is not None:
-        artifact_fold = (completed_fold[0], completed_fold[1])
-    if artifact_fold is None and visible_periods and dataset_root.exists():
-        _period, start_month, end_month = visible_periods[0]
-        artifact_fold = (start_month, end_month)
     rendered_periods = list(visible_periods)
-    rendered_fallback_for_mismatch = False
     if not rendered_periods:
         rendered_periods = visible_periods
-        rendered_fallback_for_mismatch = True
 
     tasks: list[dict[str, Any]] = []
     for _period, start_month, end_month in rendered_periods:
@@ -5805,8 +6015,6 @@ def _model_group_lifecycle_tasks_for_visible_folds(
             end_month=end_month,
             selected_target_symbol=selected_target_symbol,
         )
-        fold_window = (start_month, end_month)
-        use_lifecycle_artifacts = artifact_fold == fold_window or rendered_fallback_for_mismatch
         fold_tasks = _model_group_replay_timeline_tasks(
             storage_root=storage_root,
             generated_at_utc=generated_at_utc,
@@ -5815,13 +6023,8 @@ def _model_group_lifecycle_tasks_for_visible_folds(
             training_start_month=start_month,
             training_end_month=end_month,
             pre_replay_complete=pre_replay_complete,
-            use_lifecycle_artifacts=use_lifecycle_artifacts,
+            use_lifecycle_artifacts=pre_replay_complete,
         )
-        if artifact_fold is not None and fold_window < artifact_fold and not use_lifecycle_artifacts:
-            fold_tasks = _mark_historical_unattached_model_group_tasks(
-                fold_tasks,
-                artifact_period=_fold_period_label(*artifact_fold),
-            )
         tasks.extend(fold_tasks)
     return tasks
 

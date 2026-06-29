@@ -349,7 +349,14 @@ class ModelGroupReplayTests(unittest.TestCase):
                 + "\n"
             )
 
-    def _write_completed_continuous_replay(self, dataset_root: Path, *, run_id: str = "continuous_run") -> None:
+    def _write_completed_continuous_replay(
+        self,
+        dataset_root: Path,
+        *,
+        run_id: str = "continuous_run",
+        start_month: str = "2016-01",
+        end_month: str = "2016-06",
+    ) -> None:
         receipt_root = dataset_root / "replay_execution_runs" / run_id
         receipt_root.mkdir(parents=True, exist_ok=True)
         decision_rows_path = receipt_root / "decision_rows.jsonl"
@@ -369,8 +376,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": run_id,
                     "decision_rows_ref": str(decision_rows_path),
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_model_ref": f"storage://trading-manager/model_group/aapl/{start_month}_{end_month}",
+                    "candidate_fold_id": f"fold_{start_month}_{end_month}",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
@@ -490,6 +497,39 @@ class ModelGroupReplayTests(unittest.TestCase):
             self._write_completed_fold(storage_root)
             checkpoint_path = dataset_root / "replay_execution_runs" / "previous_run" / "replay_resume_checkpoint.json"
             checkpoint_path.parent.mkdir(parents=True)
+            decision_rows_path = checkpoint_path.parent / "decision_rows.jsonl"
+            decision_rows_path.write_text(
+                json.dumps({"decision_id": "decision_2021_01", "timestamp": "2021-01-05T16:00:00-05:00"}) + "\n",
+                encoding="utf-8",
+            )
+            (checkpoint_path.parent / "replay_execution_receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_execution_run",
+                        "replay_execution_run_id": "previous_run",
+                        "decision_rows_ref": str(decision_rows_path),
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "target_refs": ["AAPL"],
+                        "asset_class_counts": {"us_equity": 1},
+                        "candidate_handoff_status": "available",
+                        "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "portfolio_replay_policy": {
+                            "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                            "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                            "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                            "max_positions": 5,
+                            "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                            "switch_threshold_policy": "score_scale_aware_absolute_rank_delta",
+                        },
+                        "max_decision_rows": None,
+                        "replay_completion_scope": "full_candidate_universe",
+                        "replay_continuity_policy": "continuous_cross_month_portfolio_path",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             checkpoint_path.write_text(
                 json.dumps(
                     {
@@ -523,7 +563,127 @@ class ModelGroupReplayTests(unittest.TestCase):
                 decision.command[decision.command.index("--resume-checkpoint-path") + 1],
                 str(checkpoint_path),
             )
-            self.assertEqual(decision.execution_summary["resume_checkpoint_ref"], str(checkpoint_path))
+
+    def test_replay_selects_earliest_completed_fold_without_valid_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            self._write_completed_fold(
+                storage_root,
+                start_month="2016-07",
+                end_month="2016-12",
+                parent_start_month="2016-01",
+                parent_end_month="2016-06",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=tmp / "runner.py",
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.reason_code, "model_group_replay_ready")
+            self.assertEqual(
+                decision.execution_summary["training_fold"]["candidate_model_ref"],
+                "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+            )
+
+    def test_replay_selects_next_fold_after_previous_fold_has_valid_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            self._write_completed_fold(
+                storage_root,
+                start_month="2016-07",
+                end_month="2016-12",
+                parent_start_month="2016-01",
+                parent_end_month="2016-06",
+            )
+            self._write_completed_continuous_replay(dataset_root, run_id="fold1_run")
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=tmp / "runner.py",
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.reason_code, "model_group_replay_ready")
+            self.assertEqual(
+                decision.execution_summary["training_fold"]["candidate_model_ref"],
+                "storage://trading-manager/model_group/aapl/2016-07_2016-12",
+            )
+
+    def test_replay_resume_checkpoint_is_fold_scoped(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            self._write_completed_fold(
+                storage_root,
+                start_month="2016-07",
+                end_month="2016-12",
+                parent_start_month="2016-01",
+                parent_end_month="2016-06",
+            )
+            self._write_completed_continuous_replay(
+                dataset_root,
+                run_id="fold2_run",
+                start_month="2016-07",
+                end_month="2016-12",
+            )
+            checkpoint_path = dataset_root / "replay_execution_runs" / "fold2_run" / "replay_resume_checkpoint.json"
+            checkpoint_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_resume_checkpoint",
+                        "replay_execution_run_id": "fold2_run",
+                        "replay_month": "2021-02",
+                        "replay_time_pointer": "2021-02-17T16:00:00-05:00",
+                        "cash_after": 20000.0,
+                        "portfolio_state_after": {"cash": 20000.0, "positions": {}},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=tmp / "runner.py",
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+                execute=False,
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(
+                decision.execution_summary["training_fold"]["candidate_model_ref"],
+                "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+            )
+            self.assertNotIn("--resume-checkpoint-path", decision.command)
 
     def test_replay_command_ignores_legacy_month_shard_completion(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -804,9 +964,10 @@ class ModelGroupReplayTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
-            self._write_dataset(storage_root)
+            dataset_root = self._write_dataset(storage_root)
             self._write_completed_fold(storage_root)
             self._write_completed_fold(storage_root, start_month="2016-07", end_month="2016-12")
+            self._write_completed_continuous_replay(dataset_root, run_id="fold1_run")
 
             decision = run_model_group_replay_if_ready(
                 storage_root=storage_root,
@@ -1310,7 +1471,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.decision_status, "executed")
             self.assertEqual(decision.reason_code, "model_group_replay_executed")
 
-    def test_replay_scope_mismatch_blocks_wrong_fold_dataset(self):
+    def test_replay_dataset_manifest_fold_id_does_not_block_missing_fold_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -1333,9 +1494,12 @@ class ModelGroupReplayTests(unittest.TestCase):
 
             self.assertIsNotNone(decision)
             assert decision is not None
-            self.assertEqual(decision.decision_status, "backoff")
-            self.assertEqual(decision.reason_code, "model_group_replay_scope_mismatch")
-            self.assertIn("does not match completed training fold", decision.reason)
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_replay_executed")
+            self.assertEqual(
+                decision.execution_summary["training_fold"]["candidate_model_ref"],
+                "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+            )
 
     def test_runner_failure_returns_backoff_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -588,6 +588,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "contract_type": "post_replay_residual_event_governance_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-22T12:49:00Z",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_fold_id": "fold_2016-01_2016-06",
                     "event_evidence_consumed": True,
                     "event_observation_count": 1,
                     "event_candidate_count": 1,
@@ -634,6 +636,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "stage_id": "model_group.replay_review",
                     "created_at_utc": "2026-05-22T12:45:00Z",
                     "completed_at_utc": "2026-05-22T12:45:00Z",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_fold_id": "fold_2016-01_2016-06",
                     "decision_rows_ref": decision_rows_ref,
                     "review_rows_ref": str(review_rows_path),
                     "expected_review_count": 1,
@@ -2361,7 +2365,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["task_state"], "current")
         self.assertEqual(replay_task["detail"]["blockers"], ["replay_dataset_preparation_manifest"])
 
-    def test_task_timeline_keeps_lifecycle_rows_visible_for_folds_before_current_artifact_fold(self):
+    def test_task_timeline_attaches_lifecycle_rows_for_each_completed_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -2450,14 +2454,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "model_group.maintenance",
             ],
         )
-        self.assertTrue(all(task["task_state"] == "skipped" for task in fold1_lifecycle_tasks))
-        self.assertTrue(all(task["status"] == "not_applicable" for task in fold1_lifecycle_tasks))
-        self.assertTrue(
-            all(
-                task["detail"]["historical_lifecycle_scope_status"] == "not_attached_to_current_replay_artifact"
-                for task in fold1_lifecycle_tasks
-            )
-        )
+        self.assertFalse(any(task["task_state"] == "skipped" for task in fold1_lifecycle_tasks))
+        self.assertFalse(any(task["status"] == "not_applicable" for task in fold1_lifecycle_tasks))
+        self.assertFalse(any("historical_lifecycle_scope_status" in task["detail"] for task in fold1_lifecycle_tasks))
         self.assertTrue(
             any(
                 task["month"] == "2016-fold2" and task["task_id"] == "model_group.replay" and task["status"] != "not_applicable"
@@ -2612,7 +2611,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
         self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
 
-    def test_wrong_fold_replay_dataset_does_not_unlock_model_group_replay(self):
+    def test_replay_dataset_manifest_fold_id_does_not_block_model_group_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -2679,9 +2678,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-22T12:21:00Z")
 
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
-        self.assertEqual(replay_task["status"], "blocked")
-        self.assertEqual(replay_task["detail"]["blockers"], ["replay_dataset_scope_matches_training_fold"])
-        self.assertIn("does not match completed training fold", replay_task["reason"])
+        self.assertEqual(replay_task["status"], "running")
+        self.assertNotIn("replay_dataset_scope_matches_training_fold", replay_task["detail"]["blockers"])
+        self.assertNotIn("does not match completed training fold", replay_task["reason"])
 
     def test_replay_completion_surfaces_residual_event_governance_ready_despite_internal_lifecycle_hold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3576,6 +3575,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "model_group_evaluation_receipt",
                         "status": "succeeded",
                         "created_at_utc": "2026-05-22T12:50:00Z",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
                         "residual_event_governance_receipt_ref": str(attribution_receipt_path),
                         "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
@@ -3707,6 +3708,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "model_group_evaluation_receipt",
                         "status": "succeeded",
                         "created_at_utc": "2026-05-22T12:50:00Z",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
                     }
                 )
@@ -3836,6 +3839,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "model_group_evaluation_receipt",
                         "status": "succeeded",
                         "created_at_utc": "2026-05-22T12:50:00Z",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
                         "residual_event_governance_receipt_ref": str(attribution_receipt_path),
                         "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
