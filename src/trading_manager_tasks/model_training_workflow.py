@@ -54,6 +54,7 @@ MODEL_SIX_EVENT_FEED_COVERAGE_BLOCKER = "model_06_event_feed_coverage_ready"
 MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER = "model_02_target_local_feed_artifacts_ready"
 MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID = "model_05_option_expression.option_chain_data_acquisition"
 MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER = f"{MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID}_complete"
+MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID = "model_05_alpha_confidence.model_generation.checkpoint"
 NO_LISTED_OPTION_STATUSES = {"confirmed_no_listed_options", "no_listed_options", "no_listed_options_or_unverified"}
 NO_OPTION_ASSET_CLASSES = {"crypto_spot", "spot_crypto", "crypto"}
 
@@ -649,6 +650,60 @@ def _exclusive_month_start_et(month: str) -> str:
     return f"{_add_months(month, 1)}-01T00:00:00-05:00"
 
 
+def _after_cost_alpha_checkpoint_path(*, storage_root: Path, start_month: str, end_month: str) -> Path:
+    filename = f"after_cost_alpha_model_{start_month}_{end_month}.json"
+    return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / filename
+
+
+def _previous_after_cost_alpha_checkpoint_path(*, storage_root: Path, start_month: str) -> Path | None:
+    if start_month == "2016-01":
+        return None
+    previous_start_month = _add_months(start_month, -6)
+    previous_end_month = _add_months(start_month, -1)
+    return _after_cost_alpha_checkpoint_path(
+        storage_root=storage_root,
+        start_month=previous_start_month,
+        end_month=previous_end_month,
+    )
+
+
+def _after_cost_alpha_checkpoint_command(
+    *,
+    storage_root: Path,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> list[str]:
+    target = _normalize_selected_target_symbol(selected_target_symbol) or "UNSELECTED_TARGET"
+    output_path = _after_cost_alpha_checkpoint_path(
+        storage_root=storage_root,
+        start_month=start_month,
+        end_month=end_month,
+    )
+    source_end_month = _add_months(start_month, ROLLING_FOLD_TRAIN_MONTHS)
+    command = [
+        "PYTHONPATH=/root/projects/trading-model/src",
+        "python3",
+        "/root/projects/trading-model/scripts/models/model_05_alpha_confidence/train_model_05_alpha_confidence.py",
+        "--from-database",
+        "--all-horizons",
+        "--source-start",
+        _month_start_et(start_month),
+        "--source-end",
+        _month_start_et(source_end_month),
+        "--target-symbol",
+        target,
+        "--fold-id",
+        f"fold_{start_month}_{end_month}",
+        "--output-json",
+        str(output_path),
+    ]
+    parent_path = _previous_after_cost_alpha_checkpoint_path(storage_root=storage_root, start_month=start_month)
+    if parent_path is not None:
+        command.extend(["--parent-checkpoint-ref", str(parent_path)])
+    return command
+
+
 def _rolling_fold_dataset_splits(start_month: str, end_month: str) -> tuple[dict[str, Any], ...]:
     """Return the accepted chronological 4/1/1 split contract for a six-month fold."""
 
@@ -716,6 +771,7 @@ def _model_two_target_local_feed_blockers(
 def _build_layer_workflow(
     meta: dict[str, Any],
     *,
+    storage_root: Path,
     layer_one_task_key_count: int,
     layer_two_task_key_count: int,
     start_month: str,
@@ -999,6 +1055,30 @@ def _build_layer_workflow(
                 )
             )
             split_blockers = (f"{key}.model_generation.{split_name}_complete",)
+        if layer == 5:
+            stages.append(
+                WorkflowStage(
+                    stage_id=MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
+                    layer=layer,
+                    layer_key="model_05_alpha_confidence",
+                    stage_type="model_generation",
+                    description="Train the fold-scoped replay entry utility checkpoint by continuing from the previous fold checkpoint when one exists.",
+                    status="blocked",
+                    command=_after_cost_alpha_checkpoint_command(
+                        storage_root=storage_root,
+                        start_month=start_month,
+                        end_month=end_month,
+                        selected_target_symbol=selected_target_symbol,
+                    ),
+                    dataset_unit=dataset_unit,
+                    blockers=_with_target_blocker(
+                        (f"{key}.model_generation.test_complete",),
+                        layer=layer,
+                        selected_target_symbol=selected_target_symbol,
+                        stage_type="model_generation",
+                    ),
+                )
+            )
     else:
         stages.append(
             WorkflowStage(
@@ -1063,6 +1143,7 @@ def build_model_training_workflow_plan(
     layers = tuple(
         _build_layer_workflow(
             meta,
+            storage_root=storage_root,
             layer_one_task_key_count=task_key_count,
             layer_two_task_key_count=layer_two_task_key_count,
             start_month=start_month,
@@ -1149,6 +1230,7 @@ __all__ = [
     "MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER",
     "MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID",
     "MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER",
+    "MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID",
     "MODEL_SIX_EVENT_FEED_COVERAGE_BLOCKER",
     "POST_MODEL_GENERATION_REBUILD_BLOCKER",
     "LayerWorkflow",

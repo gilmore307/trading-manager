@@ -172,8 +172,10 @@ other target-scoped source/feature rows only when a downstream run needs them.
 Target-substrate checkpoints are data-preparation state, not parallel public
 task lanes; they do not force replay to trade that target.
 
-Fold progression is serial. After a fold finishes M01-M06 model work, the
-scheduler holds the fold lane until model replay, replay review,
+Fold progression is serial. Pre-replay model work includes the fold-scoped
+replay entry utility checkpoint; after the first fold, that checkpoint must be
+continued from the previous fold's checkpoint before replay can start. After a
+fold finishes M01-M06 model work, the scheduler holds the fold lane until model replay, replay review,
 residual-event governance attribution, model evaluation, model promotion, and maintenance/readiness
 handoff complete. It must not start the next fold or rotate to another target
 while that model-group lifecycle is still open.

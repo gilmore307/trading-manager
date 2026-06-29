@@ -50,6 +50,7 @@ from trading_manager_tasks.scheduler_daemon import (
     _active_replay_option_feature_lock_decision,
     _run_model_worker_decision,
     _pending_replay_option_feature_backoff_decision,
+    _workflow_payload_pre_replay_complete,
     _run_replay_contract_path_requirement_handoff,
     _run_m06_event_input_requirement_handoff,
     _run_replay_review_data_requirement_handoff,
@@ -1828,6 +1829,44 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertIsNone(selection)
         self.assertEqual(blocked.reason_code, "model_group_lifecycle_holds_fold_lane")
         self.assertEqual(blocked.blocked_fold_state_path, str(state_path))
+
+    def test_cumulative_checkpoint_stage_is_required_before_replay_lifecycle(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            state_path = model_worker_fold_state_path(
+                "2016-07",
+                "2016-12",
+                root=storage_root / "runtime",
+                selected_target_symbol="AAPL",
+            )
+            plan = build_model_training_workflow_plan(
+                start_month="2016-07",
+                end_month="2016-12",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            completed_without_checkpoint = [
+                stage.stage_id
+                for layer in plan.layers
+                for stage in layer.stages
+                if stage.stage_id != "model_05_alpha_confidence.model_generation.checkpoint"
+            ]
+            advance_workflow_state(
+                start_month="2016-07",
+                end_month="2016-12",
+                storage_root=storage_root,
+                state_path=state_path,
+                completed_stage_ids=completed_without_checkpoint,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+            payload = json.loads(state_path.read_text(encoding="utf-8"))
+
+        self.assertFalse(_workflow_payload_pre_replay_complete(payload))
+        checkpoint_stage = next(stage for stage in payload["stages"] if stage["stage_id"] == "model_05_alpha_confidence.model_generation.checkpoint")
+        self.assertNotEqual(checkpoint_stage["status"], "succeeded")
 
     def test_model_worker_open_fold_waits_for_monthly_foundation_after_layer_two_reset(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

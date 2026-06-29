@@ -24,6 +24,7 @@ from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
 from .storage_paths import projects_root
 from .model_training_workflow import (
+    MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
     PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT,
     base_stack_model_generation_splits_complete,
 )
@@ -1026,6 +1027,17 @@ def _previous_after_cost_alpha_model_path(*, storage_root: Path, training_fold: 
     return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / filename
 
 
+def _pre_replay_cumulative_checkpoint_stage_complete(stages: list[Any]) -> bool:
+    checkpoint_stages = [
+        stage
+        for stage in stages
+        if isinstance(stage, Mapping) and str(stage.get("stage_id") or "") == MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID
+    ]
+    if not checkpoint_stages:
+        return True
+    return all(str(stage.get("status") or "") == "succeeded" for stage in checkpoint_stages)
+
+
 def _after_cost_alpha_training_command(
     *,
     python_executable: str,
@@ -1442,6 +1454,8 @@ def _completed_training_folds(*, storage_root: Path, selected_target_symbol: str
         if not isinstance(stages, list) or not stages:
             continue
         if not base_stack_model_generation_splits_complete(stages):
+            continue
+        if not _pre_replay_cumulative_checkpoint_stage_complete(stages):
             continue
         if not _pre_replay_stages_terminal(stages):
             continue

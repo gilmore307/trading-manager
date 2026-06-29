@@ -39,6 +39,7 @@ from .model_group_replay import DEFAULT_REPLAY_CONTRACT_ID, run_model_group_repl
 from .model_training_state import advance_workflow_state
 from .model_training_workflow import (
     FOUNDATION_CATCH_UP_STAGE_TYPES,
+    MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
     MONTHLY_SUBSTRATE_LAYERS,
     base_stack_model_generation_splits_complete,
     build_model_training_workflow_plan,
@@ -618,7 +619,16 @@ def _workflow_payload_pre_replay_complete(payload: dict[str, Any]) -> bool:
     """Return whether the fold has enough model evidence to enter replay lifecycle."""
 
     stages = payload.get("stages")
-    return isinstance(stages, list) and base_stack_model_generation_splits_complete(stages)
+    if not isinstance(stages, list) or not base_stack_model_generation_splits_complete(stages):
+        return False
+    checkpoint_stages = [
+        stage
+        for stage in stages
+        if isinstance(stage, dict) and str(stage.get("stage_id") or "") == MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID
+    ]
+    if checkpoint_stages:
+        return all(str(stage.get("status") or "") == "succeeded" for stage in checkpoint_stages)
+    return True
 
 
 def _workflow_payload_missing_model_generation_splits(payload: dict[str, Any]) -> bool:

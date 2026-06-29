@@ -12,6 +12,7 @@ from trading_manager_tasks.model_training_workflow import (
     LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS,
     MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,
     MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID,
+    MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
     MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
     build_model_training_workflow_plan,
@@ -87,6 +88,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertTrue(
             all(
                 any(stage.stage_id.startswith(f"{layer_key}.") for layer_key in current_layer_keys)
+                or stage.stage_id == MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID
                 for layer in plan.layers
                 for stage in layer.stages
             )
@@ -241,6 +243,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             "model_05_option_expression.model_generation.train",
             "model_05_option_expression.model_generation.validation",
             "model_05_option_expression.model_generation.test",
+            MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
         ])
 
     def test_m05_crypto_target_skips_option_source_but_keeps_model_generation(self) -> None:
@@ -268,6 +271,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             "model_05_option_expression.model_generation.train",
             "model_05_option_expression.model_generation.validation",
             "model_05_option_expression.model_generation.test",
+            MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
         ])
         self.assertTrue(
             all(MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER not in stage.blockers for stage in plan.layers[4].stages)
@@ -294,6 +298,29 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual([stage.dataset_split["split_months"] for stage in split_stages], [4, 1, 1])
         self.assertEqual(split_stages[1].blockers, ("model_04_unified_decision.model_generation.train_complete",))
         self.assertEqual(split_stages[2].blockers, ("model_04_unified_decision.model_generation.validation_complete",))
+
+    def test_model_group_fold_includes_cumulative_checkpoint_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp) / "storage" / "02_control_plane"
+            plan = build_model_training_workflow_plan(
+                storage_root=root,
+                trading_storage_root=Path(raw_tmp),
+                start_month="2016-07",
+                end_month="2016-12",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        stage = next(stage for layer in plan.layers for stage in layer.stages if stage.stage_id == MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID)
+        self.assertEqual(stage.stage_type, "model_generation")
+        self.assertEqual(stage.layer_key, "model_05_alpha_confidence")
+        self.assertEqual(stage.blockers, ("model_05_option_expression.model_generation.test_complete",))
+        self.assertTrue(any(token.endswith("train_model_05_alpha_confidence.py") for token in stage.command))
+        self.assertIn("--parent-checkpoint-ref", stage.command)
+        self.assertTrue(any(token.endswith("after_cost_alpha_model_2016-01_2016-06.json") for token in stage.command))
+        self.assertTrue(any(token.endswith("after_cost_alpha_model_2016-07_2016-12.json") for token in stage.command))
+        self.assertIn("--source-end", stage.command)
+        self.assertIn("2016-11-01T00:00:00-05:00", stage.command)
 
     def test_dataset_units_are_model_aware_and_target_visible(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
