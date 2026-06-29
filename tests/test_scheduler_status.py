@@ -111,12 +111,13 @@ class SchedulerStatusTests(unittest.TestCase):
                 json.dumps({
                     "contract_type": "manager_historical_workflow_transition",
                     "transition_id": "hwf-test",
-                    "task_status": "ready",
-                    "event_type": "task_ready",
-                    "selected_work": "model_01_market_context.data_acquisition",
-                    "target_symbol": None,
-                    "start_month": "2016-04",
-                    "end_month": "2016-04",
+                        "task_status": "ready",
+                        "event_type": "task_ready",
+                        "selected_work": "model_01_market_context.data_acquisition",
+                        "next_internal_stage": "autonomous_historical_provider_acquisition",
+                        "target_symbol": None,
+                        "start_month": "2016-04",
+                        "end_month": "2016-04",
                 }) + "\n",
                 encoding="utf-8",
             )
@@ -144,6 +145,84 @@ class SchedulerStatusTests(unittest.TestCase):
             row["lock_plan"]["required_lock_scopes"],
             ["daemon", "month_stage", "reconcile", "provider_partition"],
         )
+
+    def test_status_uses_workflow_transition_as_current_owner(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            service, env, wrapper = self._write_service_files(tmp)
+            plan = build_model_training_workflow_plan(start_month="2019-01", end_month="2019-01", storage_root=storage_root)
+            all_stage_ids = [stage.stage_id for layer in plan.layers for stage in layer.stages]
+            advance_workflow_state(
+                start_month="2019-01",
+                end_month="2019-01",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2019-01", root=storage_root / "runtime"),
+                completed_stage_ids=all_stage_ids,
+                write=True,
+            )
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_daemon_state",
+                        "start_month": "2019-01",
+                        "end_month": "2019-01",
+                        "last_next_internal_stage": "old_provider_gate",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "executed",
+                        "start_month": "2019-01",
+                        "selected_work": "old_stage",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            latest_transition_path = tmp / "runtime" / "historical_workflow_transition_latest.json"
+            latest_transition_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_historical_workflow_transition",
+                        "transition_id": "hwf-current",
+                        "task_status": "selected",
+                        "event_type": "task_selected",
+                        "selected_work": "model_worker.fold",
+                        "next_internal_stage": "model_worker_1",
+                        "target_symbol": "AAPL",
+                        "start_month": "2016-07",
+                        "end_month": "2016-12",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = collect_historical_scheduler_status(
+                storage_root=storage_root,
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+                latest_transition_path=latest_transition_path,
+            )
+
+        row = status.summary_row()
+        self.assertEqual(row["current_month"], "2016-07")
+        self.assertEqual(row["current_stage"], "model_worker.fold")
+        self.assertEqual(row["latest_workflow_transition"]["transition_id"], "hwf-current")
+        self.assertEqual(row["provider_status"]["reason_code"], None)
 
     def test_status_treats_foundation_complete_with_target_queue_as_model_worker_wait(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

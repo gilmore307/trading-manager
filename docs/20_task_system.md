@@ -57,6 +57,21 @@ blocked stages remain internal workflow dependencies and must not appear as
 independent Tasks rows. When the current task is fold-scoped, its month
 coverage remains child partition evidence under that one task.
 
+The historical workflow transition ledger is the task system's current-owner
+surface. Scheduler lane selection, stage readiness, execution, waits, terminal
+outcomes, and failures all flow through
+`runtime/historical_workflow_transitions.jsonl`; the latest row replaces
+`runtime/historical_workflow_transition_latest.json`. Dashboard, status, and
+repair consumers read that latest transition before consulting detailed
+workflow checkpoints, decision logs, receipts, or read-model projections.
+Checkpoint files own stage detail, but they do not own the current task.
+
+Autonomous model-worker training is target-scoped. It may select only reviewed
+optionable equity targets from the runtime target queue; structurally
+non-optionable assets such as crypto spot may remain in replay/context universes
+but do not open M02-M06 training folds. When no legal target is available, the
+model-worker lane has no owner instead of falling back to a targetless fold.
+
 1. Foundation substrate. Build reusable M01 background-context source/feature
    evidence and fold-scoped M03 event-state observation inputs. M03 event
    substrate is collected per fold because M06-governed event-family attributes

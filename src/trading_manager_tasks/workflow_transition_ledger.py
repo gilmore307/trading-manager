@@ -150,6 +150,136 @@ def _transition_id(row: Mapping[str, Any], recorded_at_utc: str) -> str:
     return f"hwf-{digest[:16]}"
 
 
+def _selection_status(reason_code: str | None) -> tuple[str, str]:
+    reason = _string(reason_code)
+    if reason.startswith("waiting_") or reason.startswith("blocked_") or "holds_" in reason:
+        return "task_waiting", "waiting"
+    return "task_selected", "selected"
+
+
+def _selection_work(reason_code: str | None) -> tuple[str, str]:
+    reason = _string(reason_code)
+    if reason.startswith("model_group_lifecycle") or "lifecycle_holds" in reason:
+        return "model_group.lifecycle", "model_group_lifecycle"
+    if "model_worker_fold" in reason or reason in {"complete_foundation_fold_ready", "resume_open_model_worker_fold"}:
+        return "model_worker.fold", "model_worker_1"
+    if reason.startswith("waiting_"):
+        return "historical_scheduler.wait", "historical_scheduler"
+    return "single_month_work_loop", "historical_training_work_loop"
+
+
+def _task_id_for(selected_work: str | None) -> str | None:
+    work = _string(selected_work)
+    if not work:
+        return None
+    if work.startswith("model_group."):
+        return work
+    if "." in work:
+        return work.split(".", 1)[0]
+    return work
+
+
+def _timeline_fields(
+    *,
+    recorded_at_utc: str,
+    task_status: str,
+    source_started_at: Any = None,
+    source_ended_at: Any = None,
+    source_updated_at: Any = None,
+) -> dict[str, str | None]:
+    """Return stable task-clock fields for every ledger transition.
+
+    Upstream scheduler decisions historically omitted start/end clocks for
+    many route-level observations.  The ledger is the current task contract,
+    so it must still provide a usable clock to dashboard and repair surfaces
+    instead of leaking "Runtime Not started".
+    """
+
+    started = _first_string(source_started_at)
+    ended = _first_string(source_ended_at)
+    updated = _first_string(source_updated_at, recorded_at_utc) or recorded_at_utc
+    status = _string(task_status)
+    if status in {"completed", "failed"}:
+        ended = ended or updated
+        started = started or ended
+    elif status in {"selected", "ready", "waiting", "observed"}:
+        started = started or updated
+    return {
+        "created_at": recorded_at_utc,
+        "created_at_utc": recorded_at_utc,
+        "started_at": started,
+        "ended_at": ended,
+        "status_updated_at": updated,
+        "status_updated_at_utc": updated,
+    }
+
+
+def transition_from_work_selection(
+    selection: Mapping[str, Any],
+    *,
+    selected_target_symbol: str | None = None,
+    recorded_at_utc: str | None = None,
+) -> dict[str, Any]:
+    """Build the canonical transition row from a lane/fold selection.
+
+    Scheduler decisions record work that was evaluated or executed.  The
+    resident task system also needs a current owner before a stage decision
+    exists, otherwise status surfaces start inferring active work from old
+    decisions.  This transition type records the selected lane directly.
+    """
+
+    recorded = recorded_at_utc or utc_now_iso()
+    reason_code = _first_string(selection.get("reason_code"))
+    event_type, task_status = _selection_status(reason_code)
+    selected_work, next_internal_stage = _selection_work(reason_code)
+    start_month = _first_string(selection.get("start_month"), selection.get("blocked_fold_start_month"))
+    end_month = _first_string(selection.get("end_month"), selection.get("blocked_fold_end_month"))
+    target_symbol = _first_string(selected_target_symbol, selection.get("blocked_target_symbol"))
+    if target_symbol:
+        target_symbol = target_symbol.upper()
+    fold_id = _first_string(selection.get("fold_id"))
+    if not fold_id and start_month and end_month:
+        fold_id = f"fold_{start_month}_{end_month}"
+    row = {
+        "now_utc": recorded,
+        "selected_work": selected_work,
+        "reason_code": reason_code,
+        "decision_status": task_status,
+        "worker_id": "scheduler_lane",
+    }
+    transition = {
+        "contract_type": "manager_historical_workflow_transition",
+        "schema_version": 1,
+        "transition_id": _transition_id(row, recorded),
+        "recorded_at_utc": recorded,
+        "source": "historical_work_selection",
+        "source_decision_utc": None,
+        "now_utc": recorded,
+        "event_type": event_type,
+        "task_status": task_status,
+        "task_id": _task_id_for(selected_work),
+        "selected_work": selected_work,
+        "worker_id": "scheduler_lane",
+        "decision_status": task_status,
+        "reason_code": reason_code,
+        "reason": _first_string(selection.get("reason"), reason_code),
+        "next_internal_stage": next_internal_stage,
+        "next_action": next_internal_stage,
+        "start_month": start_month,
+        "end_month": end_month,
+        "fold_id": fold_id,
+        "target_symbol": target_symbol,
+        "provider_calls": 0,
+        "dispatch_performed": False,
+        "model_activation_performed": False,
+        "broker_execution_performed": False,
+        "storage_lifecycle_mutation_performed": False,
+        "repair_error_ref": None,
+    }
+    transition.update(_timeline_fields(recorded_at_utc=recorded, task_status=task_status))
+    return transition
+
+
 def transition_from_decision_row(row: Mapping[str, Any], *, recorded_at_utc: str | None = None) -> dict[str, Any]:
     """Build the canonical transition row from a scheduler decision row."""
 
@@ -158,6 +288,7 @@ def transition_from_decision_row(row: Mapping[str, Any], *, recorded_at_utc: str
     selected_work = _first_string(row.get("selected_work"), row.get("next_internal_stage")) or "historical_scheduler"
     decision_status = _string(row.get("decision_status")) or None
     reason_code = _string(row.get("reason_code")) or None
+    task_status = _task_status(row)
     transition = {
         "contract_type": "manager_historical_workflow_transition",
         "schema_version": 1,
@@ -167,7 +298,8 @@ def transition_from_decision_row(row: Mapping[str, Any], *, recorded_at_utc: str
         "source_decision_utc": _first_string(row.get("now_utc"), row.get("generated_at_utc")),
         "now_utc": _first_string(row.get("now_utc"), row.get("generated_at_utc"), recorded),
         "event_type": _event_type(row),
-        "task_status": _task_status(row),
+        "task_status": task_status,
+        "task_id": _task_id_for(selected_work),
         "selected_work": selected_work,
         "worker_id": _first_string(row.get("worker_id")),
         "decision_status": decision_status,
@@ -186,6 +318,27 @@ def transition_from_decision_row(row: Mapping[str, Any], *, recorded_at_utc: str
         "storage_lifecycle_mutation_performed": bool(row.get("storage_lifecycle_mutation_performed", False)),
         "repair_error_ref": _first_string(row.get("error_ref"), row.get("agent_error_ref")),
     }
+    transition.update(
+        _timeline_fields(
+            recorded_at_utc=recorded,
+            task_status=task_status,
+            source_started_at=_first_string(
+                row.get("started_at"),
+                row.get("started_at_utc"),
+                row.get("stage_started_at"),
+                row.get("stage_started_at_utc"),
+            ),
+            source_ended_at=_first_string(
+                row.get("ended_at"),
+                row.get("ended_at_utc"),
+                row.get("completed_at"),
+                row.get("completed_at_utc"),
+                row.get("stage_completed_at"),
+                row.get("stage_completed_at_utc"),
+            ),
+            source_updated_at=_first_string(row.get("now_utc"), row.get("generated_at_utc")),
+        )
+    )
     return transition
 
 
@@ -217,6 +370,31 @@ def append_transition(
     return transition
 
 
+def append_work_selection_transition(
+    selection: Mapping[str, Any],
+    *,
+    selected_target_symbol: str | None = None,
+    log_path: Path = DEFAULT_TRANSITION_LOG_PATH,
+    latest_path: Path = DEFAULT_LATEST_TRANSITION_PATH,
+    recorded_at_utc: str | None = None,
+    max_bytes: int = DEFAULT_TRANSITION_LOG_MAX_BYTES,
+) -> dict[str, Any]:
+    transition = transition_from_work_selection(
+        selection,
+        selected_target_symbol=selected_target_symbol,
+        recorded_at_utc=recorded_at_utc,
+    )
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(transition, sort_keys=True) + "\n")
+    latest_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = latest_path.with_suffix(latest_path.suffix + ".tmp")
+    tmp.write_text(json.dumps(transition, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(latest_path)
+    compact_transition_log_tail(log_path, max_bytes=max_bytes)
+    return transition
+
+
 def compact_transition_log_tail(path: Path, *, max_bytes: int = DEFAULT_TRANSITION_LOG_MAX_BYTES) -> None:
     if max_bytes <= 0 or not path.exists() or path.stat().st_size <= max_bytes:
         return
@@ -235,7 +413,9 @@ __all__ = [
     "DEFAULT_LATEST_TRANSITION_PATH",
     "DEFAULT_TRANSITION_LOG_PATH",
     "append_transition",
+    "append_work_selection_transition",
     "compact_transition_log_tail",
     "read_latest_transition",
     "transition_from_decision_row",
+    "transition_from_work_selection",
 ]

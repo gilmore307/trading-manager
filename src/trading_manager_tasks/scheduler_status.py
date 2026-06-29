@@ -397,14 +397,16 @@ def collect_historical_scheduler_status(
     daemon_state = _read_json_object(state_path)
     latest_decision, decision_log_rows = _latest_jsonl_object(decision_log_path)
     latest_transition = read_latest_transition(latest_transition_path)
+    transition_current = latest_transition if isinstance(latest_transition, Mapping) else None
     auto_work_selection = select_next_historical_work(
         storage_root=storage_root,
         target_queue_path=target_queue_path,
     ).summary_row()
     lifecycle_holds_fold_lane = auto_work_selection.get("reason_code") == "model_group_lifecycle_holds_fold_lane"
     stale_completed_decision = _is_stale_completed_decision(latest_decision, auto_work_selection)
-    current_decision = None if stale_completed_decision or lifecycle_holds_fold_lane else latest_decision
+    current_decision = transition_current or (None if stale_completed_decision or lifecycle_holds_fold_lane else latest_decision)
     state_month = str((daemon_state or {}).get("start_month") or "")
+    transition_month = str((transition_current or {}).get("start_month") or "")
     selected_month = str(auto_work_selection.get("start_month") or "")
     stale_completed_state = bool(
         (
@@ -417,9 +419,10 @@ def collect_historical_scheduler_status(
     )
     if stale_completed_state:
         state_month = ""
-        current_decision = None
+        current_decision = transition_current
     current_month = str(
-        state_month
+        transition_month
+        or state_month
         or (current_decision or {}).get("start_month")
         or selected_month
         or ""
@@ -434,7 +437,11 @@ def collect_historical_scheduler_status(
     provider_status = _provider_status(current_decision, current_daemon_state)
     target_queue_ready = bool(load_model_worker_target_queue(storage_root / "runtime" / "model_training_target_queue.json"))
     blocked_reason = None
-    if current_decision and current_decision.get("decision_status") == "backoff":
+    if transition_current and str(transition_current.get("task_status") or "") in {"waiting", "failed"}:
+        blocked_reason = str(
+            transition_current.get("reason") or transition_current.get("reason_code") or ""
+        ) or None
+    elif current_decision and current_decision.get("decision_status") == "backoff":
         blocked_reason = str(current_decision.get("reason") or current_decision.get("reason_code") or "") or None
     if (
         blocked_reason
@@ -448,15 +455,15 @@ def collect_historical_scheduler_status(
         )
     ):
         blocked_reason = None
-    current_stage = workflow.next_stage_id or str((current_decision or {}).get("selected_work") or "") or None
-    if lifecycle_holds_fold_lane:
+    current_stage = str((transition_current or {}).get("selected_work") or "") or workflow.next_stage_id or str((current_decision or {}).get("selected_work") or "") or None
+    if lifecycle_holds_fold_lane and transition_current is None:
         current_stage = "model_group.replay"
         if blocked_reason is None:
             blocked_reason = "waiting_for_model_group_lifecycle_tasks"
     if current_stage is None and current_month:
         current_stage = "prepare_layer_one_historical_training_batch" if not workflow.exists else "historical_work_selected"
-    current_next_internal_stage = str((current_decision or {}).get("next_internal_stage") or workflow.next_stage_type or "") or None
-    if lifecycle_holds_fold_lane:
+    current_next_internal_stage = str((transition_current or {}).get("next_internal_stage") or (current_decision or {}).get("next_internal_stage") or workflow.next_stage_type or "") or None
+    if lifecycle_holds_fold_lane and transition_current is None:
         current_next_internal_stage = "model_group_replay"
     current_lock_plan = (current_decision or {}).get("lock_plan")
     if not isinstance(current_lock_plan, Mapping):
@@ -493,9 +500,8 @@ def collect_historical_scheduler_status(
         reported_daemon_state = dict(daemon_state)
         reported_daemon_state.pop("last_next_internal_stage", None)
         reported_daemon_state["superseded_by_auto_work_selection"] = True
-    if stale_completed_decision or lifecycle_holds_fold_lane:
+    if transition_current is None and (stale_completed_decision or lifecycle_holds_fold_lane):
         latest_decision = None
-        latest_transition = None
     elif latest_decision is not None:
         latest_decision = dict(latest_decision)
         latest_decision["decision_log_row_count"] = decision_log_rows

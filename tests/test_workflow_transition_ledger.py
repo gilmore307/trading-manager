@@ -5,7 +5,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from trading_manager_tasks.workflow_transition_ledger import append_transition, transition_from_decision_row
+from trading_manager_tasks.workflow_transition_ledger import (
+    append_transition,
+    append_work_selection_transition,
+    transition_from_decision_row,
+    transition_from_work_selection,
+)
 
 
 class WorkflowTransitionLedgerTests(unittest.TestCase):
@@ -35,6 +40,11 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
         self.assertEqual(transition["start_month"], "2016-01")
         self.assertEqual(transition["end_month"], "2016-06")
         self.assertEqual(transition["fold_id"], "fold_2016-01_2016-06")
+        self.assertEqual(transition["task_id"], "model_02_target_state")
+        self.assertEqual(transition["created_at"], "2026-06-29T01:00:00+00:00")
+        self.assertEqual(transition["started_at"], "2026-06-29T01:00:00+00:00")
+        self.assertEqual(transition["ended_at"], "2026-06-29T01:00:00+00:00")
+        self.assertEqual(transition["status_updated_at"], "2026-06-29T01:00:00+00:00")
 
     def test_append_transition_writes_log_and_latest(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -76,6 +86,55 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
 
         self.assertEqual(transition["event_type"], "task_failed")
         self.assertEqual(transition["task_status"], "failed")
+
+    def test_work_selection_transition_records_lane_owner(self) -> None:
+        transition = transition_from_work_selection(
+            {
+                "reason_code": "resume_open_model_worker_fold",
+                "start_month": "2016-07",
+                "end_month": "2016-12",
+            },
+            selected_target_symbol="AAPL",
+            recorded_at_utc="2026-06-29T02:00:00+00:00",
+        )
+
+        self.assertEqual(transition["source"], "historical_work_selection")
+        self.assertEqual(transition["event_type"], "task_selected")
+        self.assertEqual(transition["task_status"], "selected")
+        self.assertEqual(transition["selected_work"], "model_worker.fold")
+        self.assertEqual(transition["next_internal_stage"], "model_worker_1")
+        self.assertEqual(transition["target_symbol"], "AAPL")
+        self.assertEqual(transition["fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["task_id"], "model_worker")
+        self.assertEqual(transition["created_at"], "2026-06-29T02:00:00+00:00")
+        self.assertEqual(transition["started_at"], "2026-06-29T02:00:00+00:00")
+        self.assertIsNone(transition["ended_at"])
+        self.assertEqual(transition["status_updated_at"], "2026-06-29T02:00:00+00:00")
+
+    def test_append_work_selection_transition_writes_log_and_latest(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            log_path = tmp / "historical_workflow_transitions.jsonl"
+            latest_path = tmp / "historical_workflow_transition_latest.json"
+
+            transition = append_work_selection_transition(
+                {
+                    "reason_code": "blocked_model_worker_fold_holds_target_lane",
+                    "start_month": "2016-07",
+                    "end_month": "2016-12",
+                    "blocked_target_symbol": "AAPL",
+                },
+                log_path=log_path,
+                latest_path=latest_path,
+                recorded_at_utc="2026-06-29T02:05:00+00:00",
+            )
+
+            rows = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+            latest = json.loads(latest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(rows, [transition])
+        self.assertEqual(latest["task_status"], "waiting")
+        self.assertEqual(latest["target_symbol"], "AAPL")
 
 
 if __name__ == "__main__":

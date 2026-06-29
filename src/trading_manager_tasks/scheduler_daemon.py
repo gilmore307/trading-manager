@@ -57,7 +57,7 @@ from .scheduler import (
     run_scheduler_once,
 )
 from .agent_error_handler import _env_truthy, handle_server_error
-from .workflow_transition_ledger import append_transition
+from .workflow_transition_ledger import append_transition, append_work_selection_transition
 
 DEFAULT_RUNTIME_DIR = manager_storage_root() / "runtime"
 DEFAULT_STATE_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_state.json"
@@ -318,9 +318,13 @@ def select_next_historical_work(
         requested_target_symbol=selected_target_symbol,
         target_queue_path=target_queue_path,
     )
-    open_target_fold = _open_model_worker_fold_for_target(
-        storage_root=storage_root,
-        selected_target_symbol=active_target_symbol,
+    open_target_fold = (
+        _open_model_worker_fold_for_target(
+            storage_root=storage_root,
+            selected_target_symbol=active_target_symbol,
+        )
+        if active_target_symbol
+        else None
     )
     if open_target_fold is not None:
         fold_ready, _ = _model_worker_fold_is_ready(storage_root, open_target_fold.start_month)
@@ -342,9 +346,41 @@ def select_next_historical_work(
                 ),
                 blocked_target_symbol=active_target_symbol if open_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None,
             )
-    lifecycle_block = _first_incomplete_model_group_lifecycle_fold(
-        storage_root=storage_root,
-        selected_target_symbol=active_target_symbol,
+    ready_target_fold = (
+        select_model_worker_fold(
+            storage_root=storage_root,
+            default_start_month=default_start_month,
+            max_month=max_month,
+            selected_target_symbol=active_target_symbol,
+        )
+        if active_target_symbol
+        else None
+    )
+    if ready_target_fold is not None:
+        return HistoricalWorkSelection(
+            start_month=ready_target_fold.start_month,
+            end_month=ready_target_fold.end_month,
+            reason_code=ready_target_fold.reason_code,
+            completed_months=completed_tuple,
+            open_months=open_tuple,
+            blocked_fold_start_month=(
+                ready_target_fold.start_month if ready_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None
+            ),
+            blocked_fold_end_month=(
+                ready_target_fold.end_month if ready_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None
+            ),
+            blocked_fold_state_path=(
+                ready_target_fold.state_path if ready_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None
+            ),
+            blocked_target_symbol=active_target_symbol if ready_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None,
+        )
+    lifecycle_block = (
+        _first_incomplete_model_group_lifecycle_fold(
+            storage_root=storage_root,
+            selected_target_symbol=active_target_symbol,
+        )
+        if active_target_symbol
+        else None
     )
     if lifecycle_block is not None:
         return HistoricalWorkSelection(
@@ -423,15 +459,26 @@ def select_month_ingest_worker_months(
     """
 
     max_month = _eligible_historical_fold_cutoff(max_month)
-    if target_has_open_model_worker_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol, max_month=max_month):
+    active_target_symbol = active_model_worker_target_symbol(
+        requested_target_symbol=selected_target_symbol,
+        target_queue_path=storage_root / "runtime" / "model_training_target_queue.json",
+    )
+    if active_target_symbol and target_has_open_model_worker_fold(
+        storage_root=storage_root,
+        selected_target_symbol=active_target_symbol,
+        max_month=max_month,
+    ):
         return ()
-    if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
+    if active_target_symbol and model_group_lifecycle_blocks_next_fold(
+        storage_root=storage_root,
+        selected_target_symbol=active_target_symbol,
+    ):
         return ()
-    if select_model_worker_fold(
+    if active_target_symbol and select_model_worker_fold(
         storage_root=storage_root,
         default_start_month=default_start_month,
         max_month=max_month,
-        selected_target_symbol=selected_target_symbol,
+        selected_target_symbol=active_target_symbol,
     ):
         return ()
 
@@ -997,28 +1044,6 @@ def target_has_open_model_worker_fold(
             is None
         ) and _model_worker_fold_is_ready(storage_root, selection.start_month)[0]:
             return True
-    runtime_root = storage_root / "runtime"
-    if not runtime_root.exists():
-        return False
-    for path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not _workflow_payload_all_stages_complete(payload) and _fold_payload_has_open_model_worker_stage(payload):
-            start_month = str(payload.get("start_month") or "")
-            end_month = str(payload.get("end_month") or "")
-            if end_month and end_month > max_month:
-                continue
-            if start_month and _first_missing_workflow_month(
-                storage_root=storage_root,
-                default_start_month="2016-01",
-                limit_month=previous_month(start_month),
-            ):
-                continue
-            if start_month and not _model_worker_fold_is_ready(storage_root, start_month)[0]:
-                continue
-            return True
     return False
 
 
@@ -1047,6 +1072,8 @@ def select_model_worker_fold(
 ) -> ModelWorkerFoldSelection | None:
     """Select the earliest complete non-overlapping six-month fold with open Model Worker work."""
 
+    if not selected_target_symbol:
+        return None
     max_month = _eligible_historical_fold_cutoff(max_month)
     runtime_root = storage_root / "runtime"
     if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol):
@@ -1189,9 +1216,75 @@ def active_model_worker_target_symbol(
 
     target_queue = load_model_worker_target_queue(target_queue_path)
     requested = str(requested_target_symbol or "").strip().upper()
-    if requested and (not target_queue or requested in target_queue):
+    if requested and requested in target_queue:
         return requested
     return target_queue[0] if target_queue else None
+
+
+def _append_selection_transition_if_needed(
+    *,
+    selection: HistoricalWorkSelection,
+    selected_target_symbol: str | None,
+    decision_log_path: Path,
+    previous_state: SchedulerDaemonState,
+    next_state: SchedulerDaemonState,
+) -> None:
+    """Record lane selection in the canonical workflow ledger when it changes."""
+
+    scope_changed = previous_state.start_month != next_state.start_month or previous_state.end_month != next_state.end_month
+    selection_changed = (
+        previous_state.last_work_selection_reason != next_state.last_work_selection_reason
+        or previous_state.selected_target_symbol != next_state.selected_target_symbol
+        or previous_state.last_completed_months != next_state.last_completed_months
+        or previous_state.last_open_months != next_state.last_open_months
+    )
+    if not scope_changed and not selection_changed:
+        return
+    append_work_selection_transition(
+        selection.summary_row(),
+        selected_target_symbol=selected_target_symbol or next_state.selected_target_symbol,
+        log_path=decision_log_path.with_name(DEFAULT_WORKFLOW_TRANSITION_LOG_PATH.name),
+        latest_path=decision_log_path.with_name(DEFAULT_WORKFLOW_TRANSITION_LATEST_PATH.name),
+    )
+
+
+def apply_auto_work_selection_with_ledger(
+    state: SchedulerDaemonState,
+    *,
+    storage_root: Path,
+    default_start_month: str,
+    default_end_month: str,
+    target_queue_path: Path,
+    decision_log_path: Path,
+) -> SchedulerDaemonState:
+    """Align daemon scope and persist the resulting lane selection transition."""
+
+    legal_target = active_model_worker_target_symbol(
+        requested_target_symbol=state.selected_target_symbol,
+        target_queue_path=target_queue_path,
+    )
+    selection = select_next_historical_work(
+        storage_root=storage_root,
+        default_start_month=default_start_month,
+        default_end_month=default_end_month,
+        selected_target_symbol=legal_target,
+        target_queue_path=target_queue_path,
+    )
+    next_state = apply_auto_work_selection(
+        replace(state, selected_target_symbol=legal_target),
+        storage_root=storage_root,
+        default_start_month=default_start_month,
+        default_end_month=default_end_month,
+        target_queue_path=target_queue_path,
+    )
+    _append_selection_transition_if_needed(
+        selection=selection,
+        selected_target_symbol=legal_target or selection.blocked_target_symbol,
+        decision_log_path=decision_log_path,
+        previous_state=state,
+        next_state=next_state,
+    )
+    return next_state
 
 
 def select_model_worker_target(
@@ -1221,27 +1314,12 @@ def select_model_worker_target(
         )
     target_queue = (pinned,) if pinned else queued_targets
     if not target_queue:
-        if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=None):
-            return ModelWorkerTargetSelection(
-                selected_target_symbol=None,
-                target_queue=(),
-                reason_code="model_group_lifecycle_holds_fold_lane",
-                fold_selection=None,
-            )
-        fold_selection = select_model_worker_fold(
-            storage_root=storage_root,
-            default_start_month=default_start_month,
-            max_month=max_month,
+        return ModelWorkerTargetSelection(
             selected_target_symbol=None,
+            target_queue=(),
+            reason_code="no_model_worker_target_queue_available",
+            fold_selection=None,
         )
-        if fold_selection is not None:
-            return ModelWorkerTargetSelection(
-                selected_target_symbol=None,
-                target_queue=(),
-                reason_code="foundation_fold_has_open_model_worker_stage",
-                fold_selection=fold_selection,
-            )
-        return None
     for symbol in target_queue:
         if model_group_lifecycle_blocks_next_fold(storage_root=storage_root, selected_target_symbol=symbol):
             return ModelWorkerTargetSelection(
@@ -1459,11 +1537,15 @@ def apply_auto_work_selection(
     walking one already-complete month per interval.
     """
 
+    active_target_symbol = active_model_worker_target_symbol(
+        requested_target_symbol=state.selected_target_symbol,
+        target_queue_path=target_queue_path,
+    )
     selection = select_next_historical_work(
         storage_root=storage_root,
         default_start_month=default_start_month,
         default_end_month=default_end_month,
-        selected_target_symbol=state.selected_target_symbol,
+        selected_target_symbol=active_target_symbol,
         target_queue_path=target_queue_path,
     )
     scope_changed = state.start_month != selection.start_month or state.end_month != selection.end_month
@@ -1471,6 +1553,7 @@ def apply_auto_work_selection(
         state.last_work_selection_reason != selection.reason_code
         or state.last_completed_months != selection.completed_months
         or state.last_open_months != selection.open_months
+        or state.selected_target_symbol != active_target_symbol
     )
     if not scope_changed and not selection_changed:
         return state
@@ -1482,7 +1565,7 @@ def apply_auto_work_selection(
         last_work_selection_reason=selection.reason_code,
         last_completed_months=selection.completed_months,
         last_open_months=selection.open_months,
-        selected_target_symbol=selection.blocked_target_symbol,
+        selected_target_symbol=active_target_symbol or selection.blocked_target_symbol,
         updated_utc=utc_now_iso(),
     )
 
@@ -2492,12 +2575,13 @@ def run_daemon_loop(
         resume_month_cursor=advance_month_on_complete,
     )
     if auto_select_next_work:
-        state = apply_auto_work_selection(
+        state = apply_auto_work_selection_with_ledger(
             state,
             storage_root=storage_root,
             default_start_month=start_month,
             default_end_month=end_month,
             target_queue_path=target_queue_path,
+            decision_log_path=decision_log_path,
         )
     if source_existing_bootstrap:
         run_source_existing_bootstrap(
@@ -2509,12 +2593,13 @@ def run_daemon_loop(
             write=True,
         )
     if auto_select_next_work:
-        state = apply_auto_work_selection(
+        state = apply_auto_work_selection_with_ledger(
             state,
             storage_root=storage_root,
             default_start_month=start_month,
             default_end_month=end_month,
             target_queue_path=target_queue_path,
+            decision_log_path=decision_log_path,
         )
     active_start_month = state.start_month
     active_end_month = state.end_month

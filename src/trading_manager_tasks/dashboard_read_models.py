@@ -1485,7 +1485,7 @@ def _scheduler_decision_runtime_activity(latest_decision: Mapping[str, Any]) -> 
     selected_work = str(latest_decision.get("selected_work") or "").strip()
     reason = str(latest_decision.get("reason") or "").strip()
     reason_code = str(latest_decision.get("reason_code") or "").strip()
-    decision_status = str(latest_decision.get("decision_status") or "").strip()
+    decision_status = str(latest_decision.get("decision_status") or latest_decision.get("task_status") or "").strip()
     execution_summary = latest_decision.get("execution_summary")
     execution_summary = execution_summary if isinstance(execution_summary, Mapping) else {}
     label = _scheduler_work_activity_label(selected_work, latest_decision.get("next_internal_stage"))
@@ -1730,6 +1730,13 @@ def _mark_active_task_running(
         return task_timeline, public_active_task
     public_status = str(public_active_task.get("status") or "")
     if public_status != "ready" and not (public_status == "blocked" and isinstance(runtime_activity, Mapping)):
+        return task_timeline, public_active_task
+    if (
+        public_status == "blocked"
+        and isinstance(runtime_activity, Mapping)
+        and runtime_activity.get("activity_type") == "scheduler_decision"
+        and str(runtime_activity.get("decision_status") or "").lower() in {"backoff", "selected", "waiting"}
+    ):
         return task_timeline, public_active_task
     active_key = _public_task_identity(public_active_task)
     def with_running_activity(task: dict[str, Any]) -> dict[str, Any]:
@@ -3557,10 +3564,16 @@ def _task_timeline(
             if not raw_stages:
                 continue
             fold_target_symbol = _target_symbol_from_fold_stages(raw_stages)
-            if selected_target_symbol and fold_target_symbol and fold_target_symbol != selected_target_symbol:
-                continue
             fold_start = str(fold_payload.get("start_month") or "")
             fold_end = str(fold_payload.get("end_month") or "")
+            if selected_target_symbol:
+                selected_symbol = selected_target_symbol.upper()
+                target_scoped_path = runtime_root / f"model_training_fold_state_{selected_symbol.lower()}_{fold_start}_{fold_end}.json"
+                if fold_target_symbol:
+                    if fold_target_symbol != selected_symbol:
+                        continue
+                elif target_scoped_path.exists() and target_scoped_path != fold_path:
+                    continue
             fold_key = _fold_period_label(fold_start, fold_end) if fold_start and fold_end else fold_path.stem
             if fold_end and not _month_visible_by_completed_cutoff(fold_end, max_month=max_dashboard_month):
                 continue

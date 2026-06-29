@@ -561,17 +561,33 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 )
         fold_state.write_text(
             json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "target_symbol": symbol,
+                        "stages": stages,
+                    }
+                )
+            + "\n",
+            encoding="utf-8",
+        )
+        return fold_state
+
+    def _write_target_queue(self, runtime: Path, symbols: list[str] | None = None) -> Path:
+        queue_path = runtime / "model_training_target_queue.json"
+        queue_path.parent.mkdir(parents=True, exist_ok=True)
+        queue_path.write_text(
+            json.dumps(
                 {
-                    "contract_type": "manager_model_training_workflow_state",
-                    "start_month": "2016-01",
-                    "end_month": "2016-06",
-                    "stages": stages,
+                    "contract_type": "manager_model_training_target_queue",
+                    "targets": [{"symbol": symbol} for symbol in (symbols or ["AAPL"])],
                 }
             )
             + "\n",
             encoding="utf-8",
         )
-        return fold_state
+        return queue_path
 
     def test_builds_historical_task_progress_summary_payload(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -861,7 +877,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
-                        "target_symbol": "AAPL",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.data_acquisition",
@@ -1124,6 +1139,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
+                        "target_symbol": "AAPL",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.model_evaluation",
@@ -1289,7 +1305,27 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         )
                     )
             (replay_root / "feed_acquisition_plan.csv").write_text("\n".join(feed_rows) + "\n", encoding="utf-8")
-            self._write_completed_pre_replay_fold(tmp / "storage" / "02_control_plane" / "runtime", symbol="AAPL")
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            self._write_target_queue(runtime, ["AAPL"])
+            (runtime / "historical_workflow_transition_latest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_historical_workflow_transition",
+                        "transition_id": "hwf-replay-waiting",
+                        "task_status": "waiting",
+                        "event_type": "task_waiting",
+                        "selected_work": "model_group.replay",
+                        "next_internal_stage": "model_group_replay",
+                        "target_symbol": "AAPL",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "reason_code": "waiting_for_model_group_lifecycle_tasks",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
@@ -1364,6 +1400,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            self._write_target_queue(runtime, ["AAPL"])
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
                 state_path=tmp / "runtime" / "historical_scheduler_state.json",
@@ -2492,6 +2529,25 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            self._write_target_queue(runtime, ["AAPL"])
+            (runtime / "historical_workflow_transition_latest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_historical_workflow_transition",
+                        "transition_id": "hwf-replay-complete",
+                        "task_status": "waiting",
+                        "event_type": "task_waiting",
+                        "selected_work": "model_group.replay",
+                        "next_internal_stage": "model_group_replay",
+                        "target_symbol": "AAPL",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "reason_code": "waiting_for_model_group_lifecycle_tasks",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             state_path = tmp / "runtime" / "historical_scheduler_state.json"
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_text(json.dumps({"current_month": "2020-07", "start_month": "2020-07"}) + "\n", encoding="utf-8")
@@ -2594,6 +2650,25 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
+            self._write_target_queue(runtime, ["AAPL"])
+            (runtime / "historical_workflow_transition_latest.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_historical_workflow_transition",
+                        "transition_id": "hwf-replay-complete",
+                        "task_status": "waiting",
+                        "event_type": "task_waiting",
+                        "selected_work": "model_group.replay",
+                        "next_internal_stage": "model_group_replay",
+                        "target_symbol": "AAPL",
+                        "start_month": "2016-01",
+                        "end_month": "2016-06",
+                        "reason_code": "waiting_for_model_group_lifecycle_tasks",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             state_path = tmp / "runtime" / "historical_scheduler_state.json"
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_text(json.dumps({"current_month": "2020-07", "start_month": "2020-07"}) + "\n", encoding="utf-8")
@@ -2620,7 +2695,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertEqual(replay_task["status"], "succeeded")
         self.assertEqual(replay_task["task_state"], "completed")
-        self.assertEqual(replay_review_task["status"], "ready")
+        self.assertEqual(replay_review_task["status"], "running")
         self.assertEqual(replay_review_task["task_state"], "current")
         self.assertEqual(replay_review_task["detail"]["progress"]["unit_label"], "review rows")
         self.assertEqual(replay_review_task["detail"]["progress"]["expected_count"], 2)
@@ -2684,6 +2759,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
+                        "target_symbol": "AAPL",
                         "stages": [
                             {
                                 "stage_id": f"model_{layer:02d}_fixture.model_generation",
@@ -2755,6 +2831,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
+                        "target_symbol": "AAPL",
                         "stages": [
                             {
                                 "stage_id": "model_01_market_context.data_acquisition",
@@ -5247,6 +5324,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
+            self._write_target_queue(runtime, ["AAPL"])
             (runtime / "model_training_fold_state_2016-01_2016-06.json").write_text(
                 json.dumps(
                     {
@@ -5395,12 +5473,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
+            self._write_target_queue(runtime, ["AAPL"])
             (runtime / "model_training_fold_state_2016-01_2016-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
                         "end_month": "2016-06",
+                        "target_symbol": "AAPL",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.feature_generation",
@@ -5893,6 +5973,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-07",
                         "end_month": "2016-12",
+                        "target_symbol": "AAOI",
                         "stages": [
                             {
                                 "stage_id": "model_06_residual_event_governance.model_generation",
@@ -6023,6 +6104,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
+            self._write_target_queue(runtime, ["AAPL"])
             (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
                 json.dumps(
                     {
@@ -6054,6 +6136,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-07",
                         "end_month": "2016-12",
+                        "target_symbol": "AAPL",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.feature_generation",

@@ -176,20 +176,24 @@ The resident service triggers the storage-owned dashboard read-model refresh whe
 
 ## Workflow Transition Ledger
 
-Every scheduler decision writes one `manager_historical_workflow_transition`
-row to `runtime/historical_workflow_transitions.jsonl` and replaces
-`runtime/historical_workflow_transition_latest.json`.  This ledger is the
+Every scheduler lane selection and stage decision writes one
+`manager_historical_workflow_transition` row to
+`runtime/historical_workflow_transitions.jsonl` and replaces
+`runtime/historical_workflow_transition_latest.json`. This ledger is the
 canonical current-transition contract for the historical task system. Scheduler
-state, workflow checkpoint files, stage receipts, and dashboard read models may
-carry specialized detail, but they must not independently invent the current
-task, terminal state, failure state, target, fold, or next action when the
-transition ledger has a current row.
+state, workflow checkpoint files, decision logs, stage receipts, and dashboard
+read models may carry specialized detail, but they must not independently
+invent the current task, terminal state, failure state, target, fold, or next
+action when the transition ledger has a current row.
 
-Dashboard and repair/status tooling read the latest transition first and then
-fall back to decision-log tails only when the ledger has not yet been created.
-Scheduler iteration errors and progress stalls also write transitions before
-agent repair handoff, so failure is part of the same task stream as normal
-progress.
+Dashboard, status, and repair tooling read the latest transition first and fall
+back to decision-log tails only when the ledger has not yet been created.
+Normal lane selection, ready work, executed work, waits, terminal outcomes,
+scheduler iteration errors, and progress stalls are all represented in the same
+transition stream before any agent-repair handoff. The accepted invariant is
+simple: completed work advances to the next ledger owner, failed work writes a
+failed transition and routes through automatic repair, and status surfaces do
+not infer active work from older checkpoints.
 
 ## Progress Stall Guard
 
