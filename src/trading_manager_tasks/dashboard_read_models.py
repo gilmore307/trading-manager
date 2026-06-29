@@ -1654,6 +1654,7 @@ def _public_active_task_summary(task: Mapping[str, Any] | None) -> dict[str, Any
         "task_id": task.get("task_id"),
         "task_label": task.get("task_label"),
         "month": task.get("month"),
+        "period_label": task.get("period_label"),
         "status": task.get("status"),
         "task_state": task.get("task_state"),
         "stage_type": task.get("stage_type"),
@@ -3263,6 +3264,16 @@ def _public_task_period(period: str | None) -> str | None:
     return _fold_label_for_month(str(period)) or str(period)
 
 
+def _display_period_label(period: str | None) -> str | None:
+    fold_start = _fold_start_month(period)
+    if fold_start:
+        return fold_start[:4]
+    if _is_month_key(period):
+        assert period is not None
+        return period[:4]
+    return str(period) if period else None
+
+
 def _child_partitions_for_period(period: str | None) -> list[str]:
     fold_start = _fold_start_month(period)
     if fold_start:
@@ -3838,6 +3849,7 @@ def _task_timeline(
     }
     runtime_root = storage_root / "runtime"
     selected_target_symbol = _selected_target_symbol(status)
+    has_persisted_fold_state = False
     if runtime_root.exists():
         fold_entries: list[tuple[str, list[Any], str | None, Path]] = []
         for fold_path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
@@ -3886,6 +3898,7 @@ def _task_timeline(
                 continue
             month_stage_sets.append((fold_key, raw_stages, True))
             included_months.add(fold_key)
+        has_persisted_fold_state = bool(fold_entries)
     durable_months: list[str] = []
     seen_durable_months: set[str] = set()
     for month in [
@@ -3901,7 +3914,10 @@ def _task_timeline(
             continue
         raw_stages = payload.get("stages")
         if isinstance(raw_stages, list):
-            month_key = _public_task_period(str(payload.get("start_month") or month))
+            raw_month = str(payload.get("start_month") or month)
+            month_key = _public_task_period(raw_month)
+            if has_persisted_fold_state and month_key != raw_month:
+                continue
             if month_key and month_key not in included_months and _public_period_visible_by_completed_cutoff(month_key, max_month=max_dashboard_month):
                 month_stage_sets.append((month_key, raw_stages, month_key in active_public_periods))
                 included_months.add(month_key)
@@ -3913,7 +3929,10 @@ def _task_timeline(
             continue
         raw_stages = payload.get("stages") if payload is not None else _planned_stage_rows(status, month=month)
         if isinstance(raw_stages, list):
-            month_key = _public_task_period(str(payload.get("start_month") or month) if payload is not None else month)
+            raw_month = str(payload.get("start_month") or month) if payload is not None else month
+            month_key = _public_task_period(raw_month)
+            if has_persisted_fold_state and month_key != raw_month:
+                continue
             if month_key and month_key not in included_months and _public_period_visible_by_completed_cutoff(month_key, max_month=max_dashboard_month):
                 month_stage_sets.append((month_key, raw_stages, True))
                 included_months.add(month_key)
@@ -4153,6 +4172,7 @@ def _task_timeline(
                     "task_uid": task_uid,
                     "month": task_month,
                     "period": task_month,
+                    "period_label": _display_period_label(task_month),
                     "fold_label": task_month if task_month and FOLD_LABEL_RE.fullmatch(task_month) else None,
                     "task_id": stage_id,
                     "task_label": str(dashboard_stage.get("task_label") or _public_stage_name(stage_id, dashboard_stage.get("stage_type"))),
@@ -4439,6 +4459,8 @@ def _block_task_timeline_after_first_open_fold(tasks: list[dict[str, Any]]) -> l
 
 def _strip_task_timeline_internal_fields(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for task in tasks:
+        if not task.get("period_label"):
+            task["period_label"] = _display_period_label(str(task.get("month") or task.get("period") or ""))
         task.pop("_period_source", None)
     return tasks
 
@@ -6285,8 +6307,10 @@ def build_historical_task_progress_summary(
         terminal_outcome_task=terminal_outcome_task if public_active_task is None else None,
     )
     active_blocker = _active_blocker(status, public_active_task)
+    current_period = _public_current_period(status, public_active_task)
     chart_payload: dict[str, Any] = {
-        "current_month": _public_current_period(status, public_active_task),
+        "current_month": current_period,
+        "current_period_label": _display_period_label(current_period),
         "active_stage": public_active_task.get("task_id") if public_active_task else None,
         "active_task": _public_active_task_summary(public_active_task),
         "terminal_outcome_task": _public_active_task_summary(terminal_outcome_task),
