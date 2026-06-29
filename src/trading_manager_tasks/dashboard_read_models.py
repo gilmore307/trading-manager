@@ -1466,6 +1466,9 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
 
 
 def _runtime_activity_decision(status: HistoricalSchedulerStatus) -> dict[str, Any]:
+    latest_transition = getattr(status, "latest_workflow_transition", None)
+    if isinstance(latest_transition, Mapping):
+        return dict(latest_transition)
     if isinstance(status.latest_decision, Mapping):
         return dict(status.latest_decision)
     decision_log_path = str(status.decision_log_file.path or "").strip()

@@ -177,6 +177,23 @@ normal model state rather than ad hoc scheduler rules.
 
 The resident service triggers the storage-owned dashboard read-model refresh whenever it writes workflow-state progress, including stage-start transitions. The storage refresh timer remains a fallback calibration route; it is not the primary dashboard progress path.
 
+## Workflow Transition Ledger
+
+Every scheduler decision writes one `manager_historical_workflow_transition`
+row to `runtime/historical_workflow_transitions.jsonl` and replaces
+`runtime/historical_workflow_transition_latest.json`.  This ledger is the
+canonical current-transition contract for the historical task system. Scheduler
+state, workflow checkpoint files, stage receipts, and dashboard read models may
+carry specialized detail, but they must not independently invent the current
+task, terminal state, failure state, target, fold, or next action when the
+transition ledger has a current row.
+
+Dashboard and repair/status tooling read the latest transition first and then
+fall back to decision-log tails only when the ledger has not yet been created.
+Scheduler iteration errors and progress stalls also write transitions before
+agent repair handoff, so failure is part of the same task stream as normal
+progress.
+
 ## Progress Stall Guard
 
 Historical automation must not sit in an apparently running but non-advancing state. The resident daemon treats ten minutes without scheduler progress as `scheduler_progress_stalled` and opens a server-wide agent error handoff for diagnosis/repair. Executed scheduler decisions count as progress; bounded replay option-feature repair batches that remain in `backoff` while performing provider/source/feature work also count as progress. When another bounded replay option-feature drain owns the narrow replay option-feature lock, the daemon records a wait/backoff decision instead of treating the coordination lock as a scheduler error. Stage execution has the same ten-minute active-progress guard: if a running child process stops updating its task-progress file, the executor terminates the stage, records `stage_progress_stalled`, and routes it through the agent repair path. Waiting for a future incomplete calendar fold and documented lifecycle waits are normal no-progress exceptions.

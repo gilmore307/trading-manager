@@ -106,6 +106,20 @@ class SchedulerStatusTests(unittest.TestCase):
                 }) + "\n",
                 encoding="utf-8",
             )
+            latest_transition_path = tmp / "runtime" / "historical_workflow_transition_latest.json"
+            latest_transition_path.write_text(
+                json.dumps({
+                    "contract_type": "manager_historical_workflow_transition",
+                    "transition_id": "hwf-test",
+                    "task_status": "ready",
+                    "event_type": "task_ready",
+                    "selected_work": "model_01_market_context.data_acquisition",
+                    "target_symbol": None,
+                    "start_month": "2016-04",
+                    "end_month": "2016-04",
+                }) + "\n",
+                encoding="utf-8",
+            )
 
             status = collect_historical_scheduler_status(
                 storage_root=storage_root,
@@ -115,6 +129,7 @@ class SchedulerStatusTests(unittest.TestCase):
                 service_template_path=service,
                 service_env_path=env,
                 daemon_wrapper_path=wrapper,
+                latest_transition_path=latest_transition_path,
             )
 
         row = status.summary_row()
@@ -123,6 +138,7 @@ class SchedulerStatusTests(unittest.TestCase):
         self.assertEqual(row["provider_status"]["status"], "provider_stage_autonomous_ready")
         self.assertIsNone(row["blocked_reason"])
         self.assertEqual(row["latest_decision"]["decision_log_row_count"], 1)
+        self.assertEqual(row["latest_workflow_transition"]["transition_id"], "hwf-test")
         self.assertEqual(row["lock_plan"]["contract_type"], "scheduler_lock_plan")
         self.assertEqual(
             row["lock_plan"]["required_lock_scopes"],

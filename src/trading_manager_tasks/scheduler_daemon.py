@@ -57,11 +57,14 @@ from .scheduler import (
     run_scheduler_once,
 )
 from .agent_error_handler import _env_truthy, handle_server_error
+from .workflow_transition_ledger import append_transition
 
 DEFAULT_RUNTIME_DIR = manager_storage_root() / "runtime"
 DEFAULT_STATE_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_state.json"
 DEFAULT_LOCK_PATH = DEFAULT_DAEMON_LOCK_PATH
 DEFAULT_DECISION_LOG_PATH = DEFAULT_RUNTIME_DIR / "historical_scheduler_decisions.jsonl"
+DEFAULT_WORKFLOW_TRANSITION_LOG_PATH = DEFAULT_RUNTIME_DIR / "historical_workflow_transitions.jsonl"
+DEFAULT_WORKFLOW_TRANSITION_LATEST_PATH = DEFAULT_RUNTIME_DIR / "historical_workflow_transition_latest.json"
 DEFAULT_REPLAY_OPTION_FEATURE_DRAIN_STATUS_JSONL_PATH = DEFAULT_RUNTIME_DIR / "replay_option_feature_drain_status.jsonl"
 DEFAULT_REPLAY_OPTION_FEATURE_DRAIN_LATEST_JSON_PATH = DEFAULT_RUNTIME_DIR / "replay_option_feature_drain_latest.json"
 DEFAULT_INTERVAL_SECONDS = 300.0
@@ -1437,6 +1440,11 @@ def append_decision_log(path: Path, decision: SchedulerDecision, extra_row: dict
         row.update(extra_row)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, sort_keys=True) + "\n")
+    append_transition(
+        row,
+        log_path=path.with_name(DEFAULT_WORKFLOW_TRANSITION_LOG_PATH.name),
+        latest_path=path.with_name(DEFAULT_WORKFLOW_TRANSITION_LATEST_PATH.name),
+    )
     compact_decision_log_tail(path)
 
 
@@ -1595,6 +1603,25 @@ def handle_scheduler_progress_stall(
         output_root=storage_root / "runtime" / "agent_error_handling",
         call_agent=_env_truthy("MANAGER_AGENT_ERROR_AUTOCALL"),
         catalog_storage=os.environ.get("MANAGER_AGENT_ERROR_CATALOG_STORAGE", "sql"),
+    )
+    append_transition(
+        {
+            "decision_status": "error",
+            "reason_code": "scheduler_progress_stalled",
+            "reason": (
+                f"historical scheduler made no progress for {int(stalled_for_seconds)} seconds; "
+                f"last_decision_status={state.last_decision_status} reason={state.last_reason_code}"
+            ),
+            "selected_work": state.last_next_internal_stage or "historical_scheduler",
+            "next_internal_stage": "server_error_repair",
+            "start_month": state.start_month,
+            "end_month": state.end_month,
+            "selected_target_symbol": state.selected_target_symbol,
+            "error_ref": str(result.get("error_ref") or "") or None,
+        },
+        log_path=decision_log_path.with_name(DEFAULT_WORKFLOW_TRANSITION_LOG_PATH.name),
+        latest_path=decision_log_path.with_name(DEFAULT_WORKFLOW_TRANSITION_LATEST_PATH.name),
+        recorded_at_utc=now_text,
     )
     return replace(
         state,
@@ -2242,6 +2269,28 @@ def update_state_from_error(
     )
 
 
+def apply_model_worker_selection_to_state(
+    state: SchedulerDaemonState,
+    *,
+    selection: ModelWorkerFoldSelection,
+    selected_target_symbol: str | None,
+    selection_reason_code: str,
+    updated_utc: str,
+) -> SchedulerDaemonState:
+    """Align daemon checkpoint scope with the selected model-worker fold."""
+
+    return replace(
+        state,
+        start_month=selection.start_month,
+        end_month=selection.end_month,
+        last_next_internal_stage="model_worker_1",
+        last_work_selection_reason=selection_reason_code,
+        last_open_months=selection.fold_months,
+        selected_target_symbol=selected_target_symbol,
+        updated_utc=updated_utc,
+    )
+
+
 
 def _run_model_worker_decision(
     *,
@@ -2549,13 +2598,11 @@ def run_daemon_loop(
                             )
                             completed = utc_now_iso()
                             state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=model_decision)
-                            state = replace(
+                            state = apply_model_worker_selection_to_state(
                                 state,
-                                start_month=active_start_month,
-                                end_month=active_end_month,
-                                last_next_internal_stage="model_worker_1",
-                                last_work_selection_reason=target_selection.reason_code,
+                                selection=model_selection,
                                 selected_target_symbol=target_selection.selected_target_symbol,
+                                selection_reason_code=target_selection.reason_code,
                                 updated_utc=completed,
                             )
                             refresh_needed = refresh_needed or model_decision.decision_status == "executed"
@@ -3240,6 +3287,21 @@ def run_daemon_loop(
                 except Exception as exc:  # pragma: no cover - exercised via direct state helper tests.
                     completed = utc_now_iso()
                     state = update_state_from_error(state, started_utc=started, completed_utc=completed, error=exc)
+                    append_transition(
+                        {
+                            "decision_status": "error",
+                            "reason_code": "scheduler_iteration_error",
+                            "reason": f"{type(exc).__name__}: {exc}",
+                            "selected_work": state.last_next_internal_stage or "historical_scheduler",
+                            "next_internal_stage": "server_error_repair",
+                            "start_month": state.start_month,
+                            "end_month": state.end_month,
+                            "selected_target_symbol": state.selected_target_symbol,
+                        },
+                        log_path=decision_log_path.with_name(DEFAULT_WORKFLOW_TRANSITION_LOG_PATH.name),
+                        latest_path=decision_log_path.with_name(DEFAULT_WORKFLOW_TRANSITION_LATEST_PATH.name),
+                        recorded_at_utc=completed,
+                    )
                     decisions_this_cycle = 1
                     if output is not None:
                         output.write(json.dumps(state.summary_row(), sort_keys=True) + "\n")
@@ -3395,6 +3457,7 @@ __all__ = [
     "SchedulerDaemonState",
     "acquire_daemon_lock",
     "apply_auto_work_selection",
+    "apply_model_worker_selection_to_state",
     "append_decision_log",
     "compact_decision_log_tail",
     "completed_historical_fold_cutoff",

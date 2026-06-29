@@ -25,6 +25,7 @@ from .scheduler_daemon import (
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_locks import inspect_scheduler_lock, scheduler_lock_plan
+from .workflow_transition_ledger import DEFAULT_LATEST_TRANSITION_PATH, read_latest_transition
 
 DEFAULT_SERVICE_TEMPLATE_PATH = Path("deploy/systemd/trading-manager-historical-scheduler.service")
 DEFAULT_SERVICE_ENV_PATH = Path("deploy/systemd/trading-manager-historical-scheduler.env")
@@ -112,6 +113,7 @@ class HistoricalSchedulerStatus:
     provider_status: dict[str, Any]
     gated_scope_status: dict[str, Any]
     open_operational_items: tuple[str, ...]
+    latest_workflow_transition: dict[str, Any] | None = None
 
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
@@ -382,6 +384,7 @@ def collect_historical_scheduler_status(
     service_template_path: Path = DEFAULT_SERVICE_TEMPLATE_PATH,
     service_env_path: Path = DEFAULT_SERVICE_ENV_PATH,
     daemon_wrapper_path: Path = DEFAULT_DAEMON_WRAPPER_PATH,
+    latest_transition_path: Path = DEFAULT_LATEST_TRANSITION_PATH,
 ) -> HistoricalSchedulerStatus:
     """Collect a read-only status snapshot for service operation review."""
 
@@ -389,6 +392,7 @@ def collect_historical_scheduler_status(
     decision_log_file = _file_status(decision_log_path)
     daemon_state = _read_json_object(state_path)
     latest_decision, decision_log_rows = _latest_jsonl_object(decision_log_path)
+    latest_transition = read_latest_transition(latest_transition_path)
     auto_work_selection = select_next_historical_work(storage_root=storage_root).summary_row()
     lifecycle_holds_fold_lane = auto_work_selection.get("reason_code") == "model_group_lifecycle_holds_fold_lane"
     stale_completed_decision = _is_stale_completed_decision(latest_decision, auto_work_selection)
@@ -484,6 +488,7 @@ def collect_historical_scheduler_status(
         reported_daemon_state["superseded_by_auto_work_selection"] = True
     if stale_completed_decision or lifecycle_holds_fold_lane:
         latest_decision = None
+        latest_transition = None
     elif latest_decision is not None:
         latest_decision = dict(latest_decision)
         latest_decision["decision_log_row_count"] = decision_log_rows
@@ -512,6 +517,7 @@ def collect_historical_scheduler_status(
         provider_status=provider_status,
         gated_scope_status=_gated_scope_status(),
         open_operational_items=operational_items,
+        latest_workflow_transition=latest_transition,
     )
 
 
@@ -529,6 +535,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--service-template-path", type=Path, default=DEFAULT_SERVICE_TEMPLATE_PATH)
     parser.add_argument("--service-env-path", type=Path, default=DEFAULT_SERVICE_ENV_PATH)
     parser.add_argument("--daemon-wrapper-path", type=Path, default=DEFAULT_DAEMON_WRAPPER_PATH)
+    parser.add_argument("--latest-transition-path", type=Path, default=DEFAULT_LATEST_TRANSITION_PATH)
     args = parser.parse_args(argv)
     status = collect_historical_scheduler_status(
         storage_root=args.storage_root,
@@ -538,6 +545,7 @@ def main(argv: list[str] | None = None) -> int:
         service_template_path=args.service_template_path,
         service_env_path=args.service_env_path,
         daemon_wrapper_path=args.daemon_wrapper_path,
+        latest_transition_path=args.latest_transition_path,
     )
     write_historical_scheduler_status(status, output=sys.stdout)
     return 0

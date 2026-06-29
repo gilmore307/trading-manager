@@ -19,7 +19,9 @@ from trading_manager_tasks.scheduler_daemon import (
     ModelWorkerFoldSelection,
     SchedulerDaemonState,
     acquire_daemon_lock,
+    append_decision_log,
     apply_auto_work_selection,
+    apply_model_worker_selection_to_state,
     compact_decision_log_tail,
     completed_historical_fold_cutoff,
     completed_historical_fold_cutoff_month,
@@ -55,6 +57,64 @@ from trading_manager_tasks.scheduler_daemon import (
 
 
 class SchedulerDaemonTests(unittest.TestCase):
+
+    def test_append_decision_log_writes_transition_ledger(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            decision_log = tmp / "historical_scheduler_decisions.jsonl"
+            decision = SchedulerDecision(
+                contract_type="manager_scheduler_decision",
+                now_utc="2026-06-29T01:10:00+00:00",
+                now_et="2026-06-28T21:10:00-04:00",
+                decision_status="executed",
+                reason_code="target_local_provider_stage_executed",
+                reason="executed one ready workflow stage",
+                market_protection_active=False,
+                resource_pressure_active=False,
+                selected_work="model_02_target_state.data_acquisition",
+                command=[],
+                next_internal_stage="autonomous_target_local_provider_acquisition",
+                execution_summary={"workflow_plan": {"start_month": "2016-01", "end_month": "2016-06"}},
+            )
+
+            append_decision_log(
+                decision_log,
+                decision,
+                extra_row={"worker_id": "model_worker_1", "selected_target_symbol": "BTC", "fold_id": "fold_2016-01_2016-06"},
+            )
+
+            transitions = [
+                json.loads(line)
+                for line in (tmp / "historical_workflow_transitions.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            latest = json.loads((tmp / "historical_workflow_transition_latest.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(len(transitions), 1)
+        self.assertEqual(transitions[0]["selected_work"], "model_02_target_state.data_acquisition")
+        self.assertEqual(transitions[0]["target_symbol"], "BTC")
+        self.assertEqual(latest["transition_id"], transitions[0]["transition_id"])
+
+    def test_model_worker_selection_updates_daemon_scope_to_selected_fold(self):
+        updated = apply_model_worker_selection_to_state(
+            SchedulerDaemonState(start_month="2016-07", end_month="2016-07"),
+            selection=ModelWorkerFoldSelection(
+                fold_id="fold_2016-01_2016-06",
+                start_month="2016-01",
+                end_month="2016-06",
+                fold_months=("2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"),
+                reason_code="resume_existing_open_model_worker_fold_outside_target_queue",
+                state_path="/tmp/model_training_fold_state_btc_2016-01_2016-06.json",
+            ),
+            selected_target_symbol="BTC",
+            selection_reason_code="resume_existing_open_model_worker_fold_outside_target_queue",
+            updated_utc="2026-06-29T01:12:00+00:00",
+        )
+
+        self.assertEqual(updated.start_month, "2016-01")
+        self.assertEqual(updated.end_month, "2016-06")
+        self.assertEqual(updated.last_open_months, ("2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"))
+        self.assertEqual(updated.selected_target_symbol, "BTC")
+        self.assertEqual(updated.last_next_internal_stage, "model_worker_1")
 
     def test_decision_log_compaction_keeps_valid_bounded_jsonl_tail(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

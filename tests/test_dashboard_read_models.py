@@ -85,6 +85,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             status = SimpleNamespace(
+                latest_workflow_transition=None,
                 latest_decision=None,
                 decision_log_file=SimpleNamespace(path=str(decision_log_path)),
             )
@@ -93,6 +94,26 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         self.assertEqual(decision["selected_work"], "model_group.residual_event_governance")
         self.assertEqual(decision["reason_code"], "model_group_residual_event_evidence_missing")
+
+    def test_runtime_activity_decision_prefers_workflow_transition_ledger(self):
+        status = SimpleNamespace(
+            latest_workflow_transition={
+                "contract_type": "manager_historical_workflow_transition",
+                "selected_work": "model_02_target_state.data_acquisition",
+                "reason_code": "target_local_provider_stage_executed",
+                "task_status": "completed",
+            },
+            latest_decision={
+                "selected_work": "model_group.promotion",
+                "reason_code": "stale_promotion_decision",
+            },
+            decision_log_file=SimpleNamespace(path=""),
+        )
+
+        decision = _runtime_activity_decision(status)
+
+        self.assertEqual(decision["selected_work"], "model_02_target_state.data_acquisition")
+        self.assertEqual(decision["reason_code"], "target_local_provider_stage_executed")
 
     def test_task_error_intervention_prioritizes_open_diagnosis_over_awaiting_retry(self):
         status = _task_error_intervention_status(

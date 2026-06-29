@@ -89,7 +89,13 @@ Provider calls require manager request scope, coverage/resource checks, and the 
 
 ## D014 - Runtime state is resumable and local by default
 
-Service locks, scheduler state, workflow checkpoints, decision logs, and status summaries live under ignored runtime paths unless intentionally promoted into durable storage. They are operational state, not source docs.
+Service locks, scheduler state, workflow checkpoints, decision logs, workflow transition ledgers, and status summaries live under ignored runtime paths unless intentionally promoted into durable storage. They are operational state, not source docs.
+
+The scheduler's workflow transition ledger is the canonical current-transition
+surface for dashboard/status/repair consumers. Decision logs remain audit tails;
+workflow checkpoint files remain detailed state for scheduler execution; neither
+should override a current transition row when reporting active work, terminal
+state, failure, target/fold scope, or next action.
 
 ## D015 - Documentation favors current contracts
 
