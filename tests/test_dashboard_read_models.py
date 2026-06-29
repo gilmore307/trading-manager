@@ -1151,7 +1151,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(
             live_activity["activity_summary"],
-            "Generating AAPL 2016-03-01 target-state features · 2016-02-25 to 2016-03-03 · examples AAPL, BTC, MSFT, NVDA",
+            "Generating AAPL 2016-03-01 target-state features · 2016-02-25 to 2016-03-03 · targets AAPL, BTC, MSFT, NVDA",
         )
         self.assertEqual(live_activity["progress_label"], "8/26 feature months")
         self.assertEqual(live_activity["sample_targets"], ["AAPL", "BTC", "MSFT", "NVDA"])
@@ -1846,7 +1846,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(runtime_activity["requirement_count"], 2)
         self.assertIn("2 total frontier requirements", runtime_activity["activity_summary"])
         self.assertIn("42 source-gap candidates in current repair slice", runtime_activity["activity_summary"])
-        self.assertIn("examples AAPL, MSFT", runtime_activity["activity_summary"])
+        self.assertIn("targets AAPL, MSFT", runtime_activity["activity_summary"])
         self.assertNotIn("source gaps remain", runtime_activity["activity_summary"])
         self.assertNotIn("sample AAPL", runtime_activity["activity_summary"])
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")

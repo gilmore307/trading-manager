@@ -1402,7 +1402,7 @@ def _replay_option_feature_drain_activity(storage_root: Path) -> dict[str, Any] 
     if isinstance(source_ready_count, int) and source_ready_count > 0:
         activity_parts.append(f"{source_ready_count} source-ready repairs")
     if sample_targets:
-        activity_parts.append("examples " + ", ".join(sample_targets[:4]))
+        activity_parts.append("targets " + ", ".join(sample_targets))
     return {
         "activity_type": "replay_option_feature_drain",
         "activity_label": "Replay option feature drain",
@@ -2446,11 +2446,11 @@ def _task_runtime_activity_from_worker(
     if current_activity:
         node_label = current_activity
     window_label = _worker_window_label(extra)
-    sample_targets = _worker_sample_targets(extra)
+    sample_targets = _worker_target_candidates(extra)
     if window_label and window_label not in node_label:
         node_label = f"{node_label} · {window_label}"
     if sample_targets:
-        node_label = f"{node_label} · examples {', '.join(sample_targets[:4])}"
+        node_label = f"{node_label} · targets {', '.join(sample_targets)}"
     row_count_label = _worker_rows_written_label(extra)
     if row_count_label and row_count_label not in node_label:
         node_label = f"{node_label} · {row_count_label}"
@@ -2499,11 +2499,11 @@ def _short_date(value: object) -> str | None:
     return text.split("T", 1)[0]
 
 
-def _worker_sample_targets(extra: Mapping[str, Any]) -> list[str]:
+def _worker_target_candidates(extra: Mapping[str, Any]) -> list[str]:
     raw = extra.get("sample_targets") or extra.get("target_examples")
     if not isinstance(raw, list):
         return []
-    return [str(item).strip().upper() for item in raw if str(item).strip()][:6]
+    return [str(item).strip().upper() for item in raw if str(item).strip()]
 
 
 def _worker_candidate_label(extra: Mapping[str, Any]) -> str | None:
