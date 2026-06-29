@@ -3484,7 +3484,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("all layer-internal", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
 
-    def test_active_model_generation_progress_preserves_split_total(self):
+    def test_stage_started_model_generation_uses_parent_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -3558,21 +3558,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
-        self.assertEqual(progress["status"], "running")
-        self.assertEqual(progress["progress_source"], "active_progress_file")
-        self.assertEqual(progress["progress_scope"], "active_stage")
-        self.assertEqual(progress["unit_label"], "model rows")
-        self.assertEqual(progress["expected_count"], 1)
-        self.assertEqual(progress["ready_count"], 0)
-        self.assertEqual(progress["pending_count"], 1)
-        self.assertEqual(progress["parent_task_progress"]["progress_source"], "model_task_internal_stages")
-        self.assertEqual(progress["parent_task_progress"]["expected_count"], 18)
-        self.assertEqual(progress["parent_task_progress"]["ready_count"], 12)
-        self.assertEqual(progress["stage_id"], "model_02_target_state.model_generation.validation")
-        self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
+        self.assertEqual(progress["progress_source"], "model_task_internal_stages")
+        self.assertEqual(progress["unit_label"], "task units")
+        self.assertEqual(progress["expected_count"], 18)
+        self.assertEqual(progress["ready_count"], 12)
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(live_activity["activity_summary"], "Stage process started")
-        self.assertEqual(live_activity["progress_label"], "0/1 model rows")
+        self.assertEqual(live_activity["progress_label"], "12/18 task units")
+        self.assertFalse(any("Worker completed" in line for line in live_activity["activity_details"]))
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

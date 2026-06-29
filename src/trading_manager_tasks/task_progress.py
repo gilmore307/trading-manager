@@ -309,27 +309,25 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
                 "stage_id": row.get("stage_id"),
                 "status": row.get("status") or "running",
                 "unit_label": _default_unit_label_for_stage(row, "stage-step"),
-                "expected_count": 1,
-                "ready_count": 0,
-                "pending_count": 1,
-                "failed_count": 0,
-                "accepted_failed_count": 0,
-                "can_unlock_downstream": False,
                 "progress_source": "active_progress_file",
             })
-        meaningful_nodes = [
+        measurable_nodes = [
             node
             for node in node_rows
-            if str(node.get("node_id") or "") != "stage_started"
-            or node.get("processed_count") is not None
+            if node.get("processed_count") is not None
             or node.get("expected_count") is not None
             or node.get("elapsed_seconds") is not None
             or node.get("expected_seconds") is not None
             or str(node.get("status") or "").lower() in {"succeeded", "success", "completed", "complete", "ready", "failed", "error"}
         ]
-        if not meaningful_nodes:
-            return None
-        node_rows = meaningful_nodes
+        if not measurable_nodes:
+            return _with_progress_contract(row, {
+                "stage_id": row.get("stage_id"),
+                "status": row.get("status") or "running",
+                "unit_label": _default_unit_label_for_stage(row, "stage-step"),
+                "progress_source": "active_progress_file",
+            })
+        node_rows = measurable_nodes
         completed_nodes = [
             node
             for node in node_rows

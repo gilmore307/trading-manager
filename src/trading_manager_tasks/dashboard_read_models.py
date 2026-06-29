@@ -2374,6 +2374,8 @@ def _worker_facing_progress(progress: Mapping[str, Any] | None) -> Mapping[str, 
 def _worker_completed_progress_label(progress: Mapping[str, Any] | None) -> str | None:
     if not isinstance(progress, Mapping):
         return None
+    if not _active_progress_has_counter(progress):
+        return None
     try:
         expected = max(0, int(progress.get("expected_count") or 0))
         processed = max(0, int(progress.get("processed_count") or progress.get("ready_count") or 0))
@@ -2458,7 +2460,7 @@ def _task_runtime_activity_from_worker(
     if row_count_label and row_count_label not in node_label:
         node_label = f"{node_label} · {row_count_label}"
     progress_label = _progress_display_label(task_progress)
-    worker_progress_label = _worker_completed_progress_label(active_progress) or _progress_display_label(worker_progress)
+    worker_progress_label = _worker_completed_progress_label(active_progress)
     explicit_details = active_progress.get("activity_details")
     explicit_details = [str(line) for line in explicit_details] if isinstance(explicit_details, list) else []
     activity_details = [

@@ -31,7 +31,7 @@ class TaskProgressTests(unittest.TestCase):
             self.assertEqual(len(payloads), 1)
             self.assertFalse(list(progress_root.glob("*.tmp")))
 
-    def test_stage_started_node_reports_stage_level_running_progress(self):
+    def test_stage_started_node_reports_activity_without_counter(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             progress_root = Path(raw_tmp) / "progress"
             write_task_progress_node(
@@ -48,11 +48,35 @@ class TaskProgressTests(unittest.TestCase):
             payloads = load_active_task_progress(progress_root)
 
         progress = payloads["2016-01..2016-06:model_05_option_expression.model_generation"]
-        self.assertEqual(progress["expected_count"], 1)
-        self.assertEqual(progress["ready_count"], 0)
-        self.assertEqual(progress["pending_count"], 1)
+        self.assertNotIn("expected_count", progress)
+        self.assertNotIn("ready_count", progress)
+        self.assertNotIn("pending_count", progress)
         self.assertEqual(progress["unit_label"], "model job")
         self.assertEqual(progress["progress_source"], "active_progress_file")
+
+    def test_running_activity_node_reports_activity_without_counter(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            progress_root = Path(raw_tmp) / "progress"
+            write_task_progress_node(
+                progress_root=progress_root,
+                worker_id="model_worker_1",
+                task_uid="2016-01..2017-06:model_02_target_state.model_generation.train",
+                stage_id="model_02_target_state.model_generation.train",
+                status="running",
+                unit_label="model operation",
+                node_id="fetch_database_input_rows",
+                node_label="Fetch database input rows",
+                current_activity="Fetching M02 target-state feature rows",
+            )
+
+            payloads = load_active_task_progress(progress_root)
+
+        progress = payloads["2016-01..2017-06:model_02_target_state.model_generation.train"]
+        self.assertNotIn("expected_count", progress)
+        self.assertNotIn("ready_count", progress)
+        self.assertNotIn("pending_count", progress)
+        self.assertEqual(progress["current_activity"], "Fetching M02 target-state feature rows")
+        self.assertEqual(progress["nodes"][0]["node_id"], "fetch_database_input_rows")
 
     def test_write_task_progress_from_env_uses_stage_progress_contract(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
