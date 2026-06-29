@@ -39,7 +39,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = {
             "task_id": "model_group.replay",
             "task_label": "Model Replay",
-            "month": "2016-fold2",
+            "month": "2017-01..2018-06",
             "status": "ready",
             "task_state": "current",
             "stage_type": "replay",
@@ -398,7 +398,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "request_ref": "erragent_aaoi_stale",
                         "agent_ref": "trader",
                         "status": "completed",
-                        "root_cause": "For AAOI 2016-01..2016-06, stale model worker provider keys were generated.",
+                        "root_cause": "For AAOI 2016-01..2017-06, stale model worker provider keys were generated.",
                     }
                 )
                 + "\n",
@@ -420,7 +420,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.provider_stage_failure_register",
                         "error_kind": "provider_stage_requests_failed",
                         "severity": "warning",
-                        "summary": "For AAOI 2016-01..2016-06, provider stage generated stale task locks.",
+                        "summary": "For AAOI 2016-01..2017-06, provider stage generated stale task locks.",
                         "occurred_at_utc": "2026-06-05T10:33:32Z",
                         "created_at_utc": "2026-06-05T10:33:32Z",
                     }
@@ -502,7 +502,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "legacy": {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": "legacy",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "validation_status": "passed",
@@ -510,7 +510,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "bounded": {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": "bounded",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
@@ -522,7 +522,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "canonical": {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": "canonical",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                     "target_refs": ["AAPL", "MSFT"],
                     "asset_class_counts": {"us_equity": 2},
                     "candidate_handoff_status": "available",
@@ -541,7 +541,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "layer2_handoff": {
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": "layer2_handoff",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
@@ -588,8 +588,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "contract_type": "post_replay_residual_event_governance_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-22T12:49:00Z",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                    "candidate_fold_id": "fold_2016-01_2017-06",
                     "event_evidence_consumed": True,
                     "event_observation_count": 1,
                     "event_candidate_count": 1,
@@ -636,8 +636,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "stage_id": "model_group.replay_review",
                     "created_at_utc": "2026-05-22T12:45:00Z",
                     "completed_at_utc": "2026-05-22T12:45:00Z",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                    "candidate_fold_id": "fold_2016-01_2017-06",
                     "decision_rows_ref": decision_rows_ref,
                     "review_rows_ref": str(review_rows_path),
                     "expected_review_count": 1,
@@ -651,7 +651,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         return receipt_path
 
     def _write_completed_pre_replay_fold(self, runtime: Path, *, symbol: str = "AAPL") -> Path:
-        fold_state = runtime / f"model_training_fold_state_{symbol.lower()}_2016-01_2016-06.json"
+        fold_state = runtime / f"model_training_fold_state_{symbol.lower()}_2016-01_2017-06.json"
         fold_state.parent.mkdir(parents=True, exist_ok=True)
         stages = []
         for layer in range(1, 7):
@@ -669,9 +669,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         },
                         "dataset_unit": {
                             "unit_kind": "twelve_month_target_fold",
-                            "unit_months": 6,
+                            "unit_months": 18,
                             "start_month": "2016-01",
-                            "end_month": "2016-06",
+                            "end_month": "2017-06",
                             "target_required": layer >= 3,
                             "target_symbol": symbol if layer >= 3 else None,
                         },
@@ -682,7 +682,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "target_symbol": symbol,
                         "stages": stages,
                     }
@@ -842,8 +842,30 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual([task["task_state"] for task in model_tasks], ["completed", "failed"])
         self.assertEqual(lifecycle_tasks, [])
         self.assertEqual(task_timeline[1]["task_label"], "M02 Target State Vector Model")
-        self.assertEqual(task_timeline[1]["month"], "2019-fold1")
-        self.assertEqual(task_timeline[1]["detail"]["child_partitions"], ["2019-01", "2019-02", "2019-03", "2019-04", "2019-05", "2019-06"])
+        self.assertEqual(task_timeline[1]["month"], "2019-01..2020-06")
+        self.assertEqual(
+            task_timeline[1]["detail"]["child_partitions"],
+            [
+                "2019-01",
+                "2019-02",
+                "2019-03",
+                "2019-04",
+                "2019-05",
+                "2019-06",
+                "2019-07",
+                "2019-08",
+                "2019-09",
+                "2019-10",
+                "2019-11",
+                "2019-12",
+                "2020-01",
+                "2020-02",
+                "2020-03",
+                "2020-04",
+                "2020-05",
+                "2020-06",
+            ],
+        )
         self.assertEqual(task_timeline[1]["detail"]["last_execution"]["return_code"], 1)
         self.assertEqual(task_timeline[0]["worker_id"], "model_worker_1")
         self.assertEqual(task_timeline[0]["detail"]["worker"]["worker_label"], "Model Worker 1")
@@ -855,8 +877,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task_timeline[0]["status_updated_at_utc"], "2026-05-12T10:00:00Z")
         self.assertEqual(task_timeline[0]["detail"]["progress"]["ready_count"], 3)
         self.assertEqual(task_timeline[1]["detail"]["progress"]["unit_label"], "source-month requests")
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["expected_count"], 6)
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["pending_count"], 6)
+        self.assertEqual(task_timeline[1]["detail"]["progress"]["expected_count"], 18)
+        self.assertEqual(task_timeline[1]["detail"]["progress"]["pending_count"], 18)
         self.assertIn("M02 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
         self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))
@@ -963,12 +985,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["blocker_count"], 0)
         self.assertEqual(task["detail"]["blockers"], [])
-        self.assertEqual(task["detail"]["progress"]["expected_count"], 1)
+        self.assertEqual(task["detail"]["progress"]["expected_count"], 18)
         self.assertEqual(task["detail"]["progress"]["ready_count"], 0)
-        self.assertEqual(task["detail"]["progress"]["active_count"], 1)
-        self.assertEqual(task["detail"]["progress"]["pending_count"], 0)
-        self.assertEqual(task["detail"]["progress"]["unit_label"], "task units")
-        self.assertEqual(task["detail"]["runtime_activity"]["activity_summary"], "Stage process started")
+        self.assertEqual(task["detail"]["progress"]["unit_label"], "source-month requests")
 
     def test_model_task_aggregate_shows_started_internal_stage_as_running(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -989,12 +1008,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.data_acquisition",
@@ -1049,7 +1068,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             write_task_progress_node(
                 progress_root=runtime / "task_progress",
                 worker_id="model_worker_1",
-                task_uid="2016-01..2016-06:model_02_target_state.feature_generation",
+                task_uid="2016-01..2017-06:model_02_target_state.feature_generation",
                 stage_id="model_02_target_state.feature_generation",
                 processed_count=8,
                 expected_count=26,
@@ -1085,13 +1104,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["unit_label"], "task units")
         self.assertEqual(progress["ready_count"], 1)
         self.assertEqual(progress["active_count"], 2)
-        self.assertEqual(progress["expected_count"], 14)
+        self.assertEqual(progress["expected_count"], 20)
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(
             live_activity["activity_summary"],
             "Generating feature window 9 of 26 · 2016-02-25 to 2016-03-03 · examples AAPL, BTC, MSFT, NVDA",
         )
-        self.assertEqual(live_activity["progress_label"], "1/14 task units")
+        self.assertEqual(live_activity["progress_label"], "1/20 task units")
         self.assertEqual(live_activity["sample_targets"], ["AAPL", "BTC", "MSFT", "NVDA"])
         self.assertIn("Candidate symbols 50", live_activity["activity_details"])
 
@@ -1124,12 +1143,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 receipts[stage_name] = receipt
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "target_symbol": "AAPL",
                         "stages": [
                             {
@@ -1249,14 +1268,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
-            workflow_state = tmp / "storage" / "02_control_plane" / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            workflow_state = tmp / "storage" / "02_control_plane" / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
             workflow_state.parent.mkdir(parents=True, exist_ok=True)
             workflow_state.write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "target_symbol": "AAPL",
                         "stages": [
                             {
@@ -1267,8 +1286,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                 },
                             }
                         ],
@@ -1437,7 +1456,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "next_internal_stage": "model_group_replay",
                         "target_symbol": "AAPL",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "reason_code": "waiting_for_model_group_lifecycle_tasks",
                     }
                 )
@@ -1478,12 +1497,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
-        self.assertTrue(all(task["month"] == "2016-fold1" for task in evaluation_tasks))
+        self.assertTrue(all(task["month"] == "2016-01..2017-06" for task in evaluation_tasks))
         self.assertTrue(all(task["dataset_unit_kind"] == "model_group_training_fold" for task in evaluation_tasks))
-        self.assertTrue(all(task["dataset_unit_months"] == 6 for task in evaluation_tasks))
+        self.assertTrue(all(task["dataset_unit_months"] == 18 for task in evaluation_tasks))
         self.assertEqual(evaluation_tasks[0]["detail"]["dataset_unit"]["start_month"], "2016-01")
-        self.assertEqual(evaluation_tasks[0]["detail"]["dataset_unit"]["end_month"], "2016-06")
-        self.assertEqual(evaluation_tasks[0]["detail"]["dataset_unit"]["unit_months"], 6)
+        self.assertEqual(evaluation_tasks[0]["detail"]["dataset_unit"]["end_month"], "2017-06")
+        self.assertEqual(evaluation_tasks[0]["detail"]["dataset_unit"]["unit_months"], 18)
         self.assertEqual(evaluation_tasks[0]["detail"]["replay_window"]["start_month"], "2021-01")
         self.assertEqual(evaluation_tasks[0]["detail"]["replay_window"]["end_month"], "2026-01")
         self.assertEqual(evaluation_tasks[0]["detail"]["replay_window"]["unit_months"], 60)
@@ -1504,7 +1523,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertEqual(payload["status"], "blocked")
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
-        self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
+        self.assertEqual(payload["chart_payload"]["current_month"], "2016-01..2017-06")
         self.assertEqual(payload["chart_payload"]["active_task"]["worker_id"], "evaluation_worker_1")
         self.assertEqual(payload["chart_payload"]["internal_active_stage"], payload["chart_payload"]["active_stage"])
 
@@ -2293,13 +2312,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             self._write_completed_pre_replay_fold(runtime, symbol="AAPL")
-            fold2 = runtime / "model_training_fold_state_aapl_2016-07_2016-12.json"
+            fold2 = runtime / "model_training_fold_state_aapl_2017-01_2018-06.json"
             fold2.write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
-                        "start_month": "2016-07",
-                        "end_month": "2016-12",
+                        "start_month": "2017-01",
+                        "end_month": "2018-06",
                         "stages": [
                             {
                                 "stage_id": f"model_{layer:02d}_fixture.model_generation",
@@ -2310,9 +2329,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "last_reason": "waiting for pre-replay input" if layer > 2 else "stage complete",
                                 "dataset_unit": {
                                     "unit_kind": "twelve_month_target_fold",
-                                    "unit_months": 6,
-                                    "start_month": "2016-07",
-                                    "end_month": "2016-12",
+                                    "unit_months": 18,
+                                    "start_month": "2017-01",
+                                    "end_month": "2018-06",
                                     "target_required": layer >= 3,
                                     "target_symbol": "AAPL" if layer >= 3 else None,
                                 },
@@ -2336,8 +2355,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T09:20:00Z")
 
-        fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
-        fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold2"]
+        fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2017-06"]
+        fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2017-01..2018-06"]
         self.assertEqual(len(fold1_tasks), 11)
         self.assertEqual(
             [task["task_label"] for task in fold1_tasks],
@@ -2359,7 +2378,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         blocked_fold2_tasks = [task for task in fold2_tasks if task["task_state"] == "blocked"]
         self.assertTrue(blocked_fold2_tasks)
         self.assertEqual(blocked_fold2_tasks[0]["status"], "blocked")
-        self.assertIn("previous_fold_complete:2016-fold1", blocked_fold2_tasks[0]["detail"]["blockers"])
+        self.assertIn("previous_fold_complete:2016-01..2017-06", blocked_fold2_tasks[0]["detail"]["blockers"])
         self.assertTrue(blocked_fold2_tasks[0]["detail"]["single_fold_lane_blocked"])
         replay_task = next(task for task in fold1_tasks if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["task_state"], "current")
@@ -2386,7 +2405,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "dataset_split": {"split_name": split_name},
                                 "dataset_unit": {
                                     "unit_kind": "twelve_month_target_fold",
-                                    "unit_months": 6,
+                                    "unit_months": 18,
                                     "start_month": start,
                                     "end_month": end,
                                     "target_required": layer >= 3,
@@ -2407,8 +2426,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     encoding="utf-8",
                 )
 
-            write_completed_fold("2016-01", "2016-06")
-            write_completed_fold("2016-07", "2016-12")
+            write_completed_fold("2016-01", "2017-06")
+            write_completed_fold("2017-01", "2018-06")
             replay_root = tmp / "storage" / "05_replay_datasets" / "promotion_replay_candidate_policy"
             replay_root.mkdir(parents=True, exist_ok=True)
             (replay_root / "dataset_manifest.json").write_text(
@@ -2416,8 +2435,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "replay_dataset_preparation_manifest",
                         "contract_id": "promotion_replay_candidate_policy",
-                        "candidate_fold_id": "fold_2016-07_2016-12",
-                        "fold_id": "fold_2016-07_2016-12",
+                        "candidate_fold_id": "fold_2017-01_2018-06",
+                        "fold_id": "fold_2017-01_2018-06",
                         "freeze_status": "not_frozen",
                         "feed_acquisition_count": 1,
                         "available_feed_acquisition_count": 1,
@@ -2441,7 +2460,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-21T09:20:00Z")
 
-        fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
+        fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2017-06"]
         fold1_lifecycle_tasks = [task for task in fold1_tasks if str(task["task_id"]).startswith("model_group.")]
         self.assertEqual(
             [task["task_id"] for task in fold1_lifecycle_tasks],
@@ -2459,7 +2478,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertFalse(any("historical_lifecycle_scope_status" in task["detail"] for task in fold1_lifecycle_tasks))
         self.assertTrue(
             any(
-                task["month"] == "2016-fold2" and task["task_id"] == "model_group.replay" and task["status"] != "not_applicable"
+                task["month"] == "2017-01..2018-06" and task["task_id"] == "model_group.replay" and task["status"] != "not_applicable"
                 for task in payload["chart_payload"]["task_timeline"]
             )
         )
@@ -2474,8 +2493,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "replay_dataset_preparation_manifest",
                         "contract_id": "promotion_replay_candidate_policy",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
-                        "fold_id": "fold_2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
+                        "fold_id": "fold_2016-01_2017-06",
                         "freeze_status": "frozen",
                         "feed_acquisition_count": 180,
                         "available_feed_acquisition_count": 180,
@@ -2518,8 +2537,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 generated_at_utc="2026-06-11T15:45:00Z",
                 starting_sequence=0,
                 selected_target_symbol="AAPL",
-                training_start_month="2016-07",
-                training_end_month="2016-12",
+                training_start_month="2017-01",
+                training_end_month="2018-06",
                 pre_replay_complete=False,
                 use_lifecycle_artifacts=False,
             )
@@ -2609,7 +2628,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_task["task_state"], "current")
         self.assertEqual(replay_task["detail"]["blockers"], [])
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay")
-        self.assertEqual(payload["chart_payload"]["current_month"], "2016-fold1")
+        self.assertEqual(payload["chart_payload"]["current_month"], "2016-01..2017-06")
 
     def test_replay_dataset_manifest_fold_id_does_not_block_model_group_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2622,7 +2641,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "replay_dataset_preparation_manifest",
                         "contract_id": "promotion_replay_candidate_policy",
-                        "candidate_fold_id": "2016-fold2",
+                        "candidate_fold_id": "2017-01..2018-06",
                         "freeze_status": "frozen",
                         "feed_acquisition_count": 60,
                         "available_feed_acquisition_count": 60,
@@ -2654,7 +2673,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "next_internal_stage": "model_group_replay",
                         "target_symbol": "AAPL",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "reason_code": "waiting_for_model_group_lifecycle_tasks",
                     }
                 )
@@ -2737,7 +2756,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -2775,7 +2794,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "next_internal_stage": "model_group_replay",
                         "target_symbol": "AAPL",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "reason_code": "waiting_for_model_group_lifecycle_tasks",
                     }
                 )
@@ -2866,12 +2885,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             self._write_post_replay_attribution_receipt(replay_root)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "target_symbol": "AAPL",
                         "stages": [
                             {
@@ -2882,9 +2901,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "twelve_month_target_fold",
-                                    "unit_months": 6,
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_symbol": "AAPL" if layer >= 3 else None,
                                 },
                             }
@@ -2937,13 +2956,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            fold_state = runtime / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            fold_state = runtime / "model_training_fold_state_aapl_2016-01_2017-06.json"
             fold_state.write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "target_symbol": "AAPL",
                         "stages": [
                             {
@@ -2954,9 +2973,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "twelve_month_panel",
-                                    "unit_months": 6,
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": False,
                                 },
                             },
@@ -3020,7 +3039,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["ready_count"], 8)
         self.assertEqual(progress["pending_count"], 22)
         self.assertEqual(progress["covered_partition_count"], 3)
-        self.assertEqual(progress["expected_partition_count"], 6)
+        self.assertEqual(progress["expected_partition_count"], 18)
 
     def test_feature_generation_progress_uses_fold_month_partitions(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3028,12 +3047,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.data_acquisition",
@@ -3042,10 +3061,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_symbol": "AAPL",
                                 },
                             },
@@ -3077,10 +3096,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "fold_feature_generation_partitions")
         self.assertEqual(progress["unit_label"], "feature months")
-        self.assertEqual(progress["expected_count"], 6)
+        self.assertEqual(progress["expected_count"], 18)
         self.assertEqual(progress["ready_count"], 0)
-        self.assertEqual(progress["pending_count"], 6)
-        self.assertIn("twelve-month fold", progress["progress_basis"])
+        self.assertEqual(progress["pending_count"], 18)
+        self.assertIn("12+3+3 walk-forward fold", progress["progress_basis"])
 
     def test_reset_fold_waits_for_monthly_foundation_instead_of_showing_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3092,12 +3111,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_01_sector_context.data_acquisition",
@@ -3111,9 +3130,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 ),
                                 "dataset_unit": {
                                     "unit_kind": "twelve_month_panel",
-                                    "unit_months": 6,
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": False,
                                 },
                             },
@@ -3144,7 +3163,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         self.assertFalse(
             any(
-                task["month"] == "2016-fold1"
+                task["month"] == "2016-01..2017-06"
                 and task["task_id"] == "model_01_sector_context"
                 and task["task_state"] == "future"
                 for task in payload["chart_payload"]["task_timeline"]
@@ -3169,12 +3188,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_01_market_context.model_task",
@@ -3184,9 +3203,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "twelve_month_panel",
-                                    "unit_months": 6,
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": False,
                                     "target_symbol": None,
                                 },
@@ -3198,10 +3217,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_06_residual_event_governance",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": True,
                                     "target_symbol": "AAPL",
                                 },
@@ -3213,10 +3232,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_05_option_expression",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": True,
                                     "target_symbol": "AAPL",
                                 },
@@ -3255,12 +3274,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.data_acquisition",
@@ -3269,10 +3288,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_symbol": "AAPL",
                                 },
                             },
@@ -3329,10 +3348,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
         self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["expected_count"], 14)
-        self.assertEqual(progress["ready_count"], 10)
-        self.assertEqual(progress["active_count"], 12)
-        self.assertEqual(progress["pending_count"], 2)
+        self.assertEqual(progress["expected_count"], 20)
+        self.assertEqual(progress["ready_count"], 14)
+        self.assertEqual(progress["active_count"], 17)
+        self.assertEqual(progress["pending_count"], 3)
         self.assertIn("all layer-internal", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
 
@@ -3342,12 +3361,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.model_generation.train",
@@ -3357,10 +3376,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "train"},
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_symbol": "AAPL",
                                 },
                             },
@@ -3390,7 +3409,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             write_task_progress_node(
                 progress_root=runtime / "task_progress",
                 worker_id="model_worker_1",
-                task_uid="2016-01..2016-06:model_02_target_state.model_generation.validation",
+                task_uid="2016-01..2017-06:model_02_target_state.model_generation.validation",
                 stage_id="model_02_target_state.model_generation.validation",
                 unit_label="model rows",
                 expected_count=1,
@@ -3413,15 +3432,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["status"], "running")
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
         self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["expected_count"], 12)
-        self.assertEqual(progress["ready_count"], 8)
-        self.assertEqual(progress["active_count"], 10)
-        self.assertEqual(progress["pending_count"], 2)
+        self.assertEqual(progress["expected_count"], 18)
+        self.assertEqual(progress["ready_count"], 12)
+        self.assertEqual(progress["active_count"], 15)
+        self.assertEqual(progress["pending_count"], 3)
         self.assertEqual(progress["stage_id"], "model_02_target_state.model_generation.validation")
         self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(live_activity["activity_summary"], "Stage process started")
-        self.assertEqual(live_activity["progress_label"], "8/12 task units")
+        self.assertEqual(live_activity["progress_label"], "12/18 task units")
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3429,12 +3448,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2018-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.model_generation.train",
@@ -3444,10 +3463,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "train"},
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": True,
                                     "target_symbol": "AAPL",
                                 },
@@ -3468,10 +3487,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "test"},
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": True,
                                     "target_symbol": "AAPL",
                                 },
@@ -3497,8 +3516,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
         self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["expected_count"], 12)
-        self.assertEqual(progress["ready_count"], 12)
+        self.assertEqual(progress["expected_count"], 18)
+        self.assertEqual(progress["ready_count"], 18)
         self.assertEqual(progress["pending_count"], 0)
         self.assertNotIn("artifact_count", progress)
 
@@ -3535,7 +3554,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -3575,8 +3594,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "model_group_evaluation_receipt",
                         "status": "succeeded",
                         "created_at_utc": "2026-05-22T12:50:00Z",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
                         "residual_event_governance_receipt_ref": str(attribution_receipt_path),
                         "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
@@ -3671,7 +3690,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -3708,8 +3727,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "model_group_evaluation_receipt",
                         "status": "succeeded",
                         "created_at_utc": "2026-05-22T12:50:00Z",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
                     }
                 )
@@ -3799,7 +3818,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "model_group_replay_fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "pre_replay_target_refs": ["AAPL"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -3839,8 +3858,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "model_group_evaluation_receipt",
                         "status": "succeeded",
                         "created_at_utc": "2026-05-22T12:50:00Z",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
                         "residual_event_governance_receipt_ref": str(attribution_receipt_path),
                         "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
@@ -4009,12 +4028,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2018-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.option_chain_data_acquisition",
@@ -4024,9 +4043,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "twelve_month_target_fold",
-                                    "unit_months": 6,
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": True,
                                     "target_symbol": "AAPL",
                                 },
@@ -4045,7 +4064,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_stage_coverage",
                         "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2018-06",
                         "status": "partial_ready",
                         "expected_count": 10,
                         "ready_count": 0,
@@ -4070,7 +4089,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "source_id": "option_chain_state_source",
                         "symbol": "AAPL",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "failure_status": "auto_repair_required",
                         "failure_kind": "unclassified_provider_failure",
                         "observed_status": "failed",
@@ -4158,12 +4177,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.option_chain_data_acquisition",
@@ -4173,9 +4192,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "unit_kind": "twelve_month_target_fold",
-                                    "unit_months": 6,
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": True,
                                     "target_symbol": "AAPL",
                                 },
@@ -4194,7 +4213,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_stage_coverage",
                         "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "status": "partial_ready",
                         "expected_count": 10,
                         "ready_count": 1,
@@ -4219,7 +4238,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "source_id": "option_chain_state_source",
                         "symbol": "AAPL",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "failure_status": "retry_required",
                         "failure_kind": "provider_service_unavailable",
                         "observed_status": "failed",
@@ -4282,12 +4301,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_01_market_context.data_acquisition",
@@ -4324,10 +4343,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_05_option_expression",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": True,
                                     "target_symbol": "AAPL",
                                 },
@@ -4339,10 +4358,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                     "start_month": "2016-01",
-                                    "end_month": "2016-06",
+                                    "end_month": "2017-06",
                                     "target_required": True,
                                     "target_symbol": "AAPL",
                                 },
@@ -4361,7 +4380,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_stage_coverage",
                         "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "status": "partial_ready",
                         "expected_count": 77837,
                         "ready_count": 12,
@@ -5085,7 +5104,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_06_residual_event_governance.data_acquisition",
@@ -5293,7 +5312,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
-        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2019-fold1")
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2019-01..2020-06")
         self.assertEqual(task["task_state"], "completed")
         self.assertIsNone(task["created_at_utc"])
         self.assertIsNone(task["started_at_utc"])
@@ -5373,7 +5392,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         task_timeline = payload["chart_payload"]["task_timeline"]
-        self.assertEqual({task["month"] for task in task_timeline}, {"2019-fold1"})
+        self.assertEqual({task["month"] for task in task_timeline}, {"2019-01..2020-06"})
         model_tasks = [task for task in task_timeline if task["stage_type"] == "model_task"]
         self.assertEqual([task["task_state"] for task in model_tasks], ["completed"])
         self.assertEqual(len([task for task in task_timeline if str(task["task_id"]).startswith("model_group.")]), 0)
@@ -5432,10 +5451,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         tasks = payload["chart_payload"]["task_timeline"]
-        durable_task = next(task for task in tasks if task["month"] == "2018-fold1")
+        durable_task = next(task for task in tasks if task["month"] == "2018-01..2019-06")
         self.assertEqual(durable_task["task_number"], durable_task["sequence"])
         self.assertEqual(durable_task["task_number"], 1)
-        self.assertEqual(durable_task["task_uid"], "2018-01..2018-06:model_01_market_context")
+        self.assertEqual(durable_task["task_uid"], "2018-01..2019-06:model_01_market_context")
 
     def test_task_timeline_shows_fold_target_chain_prep_rows(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -5444,12 +5463,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             self._write_target_queue(runtime, ["AAPL"])
-            (runtime / "model_training_fold_state_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_01_market_context.data_acquisition",
@@ -5490,7 +5509,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-06",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_01_market_context.data_acquisition",
@@ -5511,7 +5530,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "manager_scheduler_daemon_state",
-                        "start_month": "2016-07",
+                        "start_month": "2017-01",
                         "end_month": "2016-07",
                         "current_month": "2016-07",
                     }
@@ -5522,7 +5541,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             write_task_progress_node(
                 progress_root=runtime / "task_progress",
                 worker_id="model_worker_1",
-                task_uid="2016-01..2016-06:model_02_target_state.data_acquisition",
+                task_uid="2016-01..2017-06:model_02_target_state.data_acquisition",
                 stage_id="model_02_target_state.data_acquisition",
                 unit_label="rows",
                 processed_count=40,
@@ -5542,14 +5561,36 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
-        fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-fold1"]
+        fold_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2017-06"]
         model_tasks = [task for task in fold_tasks if task["stage_type"] == "model_task"]
         lifecycle_tasks = [task for task in fold_tasks if str(task["task_id"]).startswith("model_group.")]
         self.assertEqual([task["stage_type"] for task in model_tasks], ["model_task", "model_task", "model_task"])
         self.assertEqual([task["task_number"] for task in model_tasks], [1, 2, 3])
         self.assertEqual([task["sequence"] for task in model_tasks], [1, 2, 3])
-        self.assertEqual(model_tasks[0]["task_uid"], "2016-01..2016-06:model_01_market_context")
-        self.assertEqual(model_tasks[0]["detail"]["child_partitions"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
+        self.assertEqual(model_tasks[0]["task_uid"], "2016-01..2017-06:model_01_market_context")
+        self.assertEqual(
+            model_tasks[0]["detail"]["child_partitions"],
+            [
+                "2016-01",
+                "2016-02",
+                "2016-03",
+                "2016-04",
+                "2016-05",
+                "2016-06",
+                "2016-07",
+                "2016-08",
+                "2016-09",
+                "2016-10",
+                "2016-11",
+                "2016-12",
+                "2017-01",
+                "2017-02",
+                "2017-03",
+                "2017-04",
+                "2017-05",
+                "2017-06",
+            ],
+        )
         self.assertEqual(model_tasks[0]["task_label"], "M01 Market Regime Model")
         self.assertEqual(model_tasks[1]["task_label"], "M01 Sector Context Model")
         self.assertEqual(model_tasks[2]["task_label"], "M02 Target State Vector Model")
@@ -5571,9 +5612,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             for task in payload["chart_payload"]["task_timeline"]
             if task["task_id"] == "model_02_target_state"
         ]
-        self.assertEqual([task["month"] for task in fold_prep_tasks], ["2016-fold1"])
+        self.assertEqual([task["month"] for task in fold_prep_tasks], ["2016-01..2017-06"])
         timeline_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
-        self.assertIn("2016-fold1", timeline_months)
+        self.assertIn("2016-01..2017-06", timeline_months)
         self.assertEqual(fold_prep_tasks[0]["worker_label"], "Model Worker 1")
         self.assertEqual(fold_prep_tasks[0]["dataset_unit_months"], None)
         self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["ready_count"], 0)
@@ -5593,12 +5634,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             self._write_target_queue(runtime, ["AAPL"])
-            (runtime / "model_training_fold_state_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2018-06",
                         "target_symbol": "AAPL",
                         "stages": [
                             {
@@ -5615,12 +5656,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.feature_generation",
@@ -5631,8 +5672,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "last_reason": "stage completed by manager stage executor",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                 },
                             }
                         ],
@@ -5643,7 +5684,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             state_path = tmp / "runtime" / "historical_scheduler_state.json"
             state_path.parent.mkdir(parents=True, exist_ok=True)
-            state_path.write_text(json.dumps({"current_month": "2016-07", "start_month": "2016-07"}) + "\n", encoding="utf-8")
+            state_path.write_text(json.dumps({"current_month": "2016-07", "start_month": "2017-01"}) + "\n", encoding="utf-8")
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
                 state_path=state_path,
@@ -5659,7 +5700,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if task["month"] == "2016-fold1" and task["task_id"] == "model_02_target_state"
+            if task["month"] == "2016-01..2017-06" and task["task_id"] == "model_02_target_state"
         )
         self.assertEqual(task["status"], "succeeded")
         self.assertEqual(task["target_symbol"], "AAPL")
@@ -5691,7 +5732,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     + "\n",
                     encoding="utf-8",
                 )
-            for start, end in (("2016-01", "2016-06"), ("2016-07", "2016-12")):
+            for start, end in (("2016-01", "2017-06"), ("2017-01", "2018-06")):
                 (runtime / f"model_training_fold_state_{start}_{end}.json").write_text(
                     json.dumps(
                         {
@@ -5739,15 +5780,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         ordered_months = [task["month"] for task in payload["chart_payload"]["task_timeline"]]
-        self.assertIn("2016-fold1", ordered_months)
-        self.assertIn("2016-fold2", ordered_months)
+        self.assertIn("2016-01..2017-06", ordered_months)
+        self.assertIn("2017-01..2018-06", ordered_months)
         fold2_blocked = [
             task
             for task in payload["chart_payload"]["task_timeline"]
-            if task["month"] == "2016-fold2" and task["task_state"] == "blocked"
+            if task["month"] == "2017-01..2018-06" and task["task_state"] == "blocked"
         ]
         self.assertTrue(fold2_blocked)
-        self.assertIn("previous_fold_complete:2016-fold1", fold2_blocked[0]["detail"]["blockers"])
+        self.assertIn("previous_fold_complete:2016-01..2017-06", fold2_blocked[0]["detail"]["blockers"])
 
     def test_current_incomplete_fold_is_not_exposed_as_ready_task(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -5993,7 +6034,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-12T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertEqual([task["month"] for task in current_tasks], ["2017-fold1"])
+        self.assertEqual([task["month"] for task in current_tasks], ["2017-01..2018-06"])
         self.assertEqual([task["worker_id"] for task in current_tasks], ["model_worker_1"])
         self.assertTrue(all(task["task_id"] == "model_01_sector_context" for task in current_tasks))
 
@@ -6078,7 +6119,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-14T12:00:00Z")
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
-        self.assertEqual([(task["month"], task["task_id"]) for task in current_tasks], [("2020-fold2", "model_02_target_state")])
+        self.assertEqual([(task["month"], task["task_id"]) for task in current_tasks], [("2020-01..2021-06", "model_02_target_state")])
 
     def test_task_timeline_blocks_later_fold_until_earliest_open_fold_closes(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -6086,12 +6127,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_2016-07_2016-12.json").write_text(
+            (runtime / "model_training_fold_state_2017-01_2018-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
-                        "start_month": "2016-07",
-                        "end_month": "2016-12",
+                        "start_month": "2017-01",
+                        "end_month": "2018-06",
                         "target_symbol": "AAOI",
                         "stages": [
                             {
@@ -6108,12 +6149,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (runtime / "model_training_fold_state_2017-01_2017-06.json").write_text(
+            (runtime / "model_training_fold_state_2017-01_2018-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2017-01",
-                        "end_month": "2017-06",
+                        "end_month": "2018-06",
                         "stages": [
                             {
                                 "stage_id": "model_01_market_context.model_generation",
@@ -6141,15 +6182,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             payload = build_historical_task_progress_summary(status, generated_at_utc="2026-05-18T12:00:00Z")
 
         timeline = payload["chart_payload"]["task_timeline"]
-        self.assertIn("2016-fold2", {task["month"] for task in timeline})
-        self.assertIn("2017-fold1", {task["month"] for task in timeline})
+        self.assertIn("2017-01..2018-06", {task["month"] for task in timeline})
+        self.assertIn("2017-01..2018-06", {task["month"] for task in timeline})
         fold_2017_blocked = [
             task
             for task in timeline
-            if task["month"] == "2017-fold1" and task["task_state"] == "blocked"
+            if task["month"] == "2017-01..2018-06" and task["task_state"] == "blocked"
         ]
         self.assertTrue(fold_2017_blocked)
-        self.assertIn("previous_fold_complete:2016-fold2", fold_2017_blocked[0]["detail"]["blockers"])
+        self.assertIn("fold_models_01_05_model_generation_complete", fold_2017_blocked[0]["detail"]["blockers"])
 
     def test_task_timeline_exposes_missing_start_month_gap_before_later_work(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -6224,12 +6265,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
             self._write_target_queue(runtime, ["AAPL"])
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_01_market_context.model_evaluation",
@@ -6239,8 +6280,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                 },
                             }
                         ],
@@ -6249,12 +6290,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (runtime / "model_training_fold_state_aaoi_2016-07_2016-12.json").write_text(
+            (runtime / "model_training_fold_state_aaoi_2017-01_2018-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
-                        "start_month": "2016-07",
-                        "end_month": "2016-12",
+                        "start_month": "2017-01",
+                        "end_month": "2018-06",
                         "target_symbol": "AAPL",
                         "stages": [
                             {
@@ -6265,8 +6306,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAOI",
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                 },
                             }
                         ],
@@ -6275,12 +6316,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (runtime / "model_training_fold_state_aapl_2016-07_2016-12.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2017-01_2018-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
-                        "start_month": "2016-07",
-                        "end_month": "2016-12",
+                        "start_month": "2017-01",
+                        "end_month": "2018-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.data_acquisition",
@@ -6290,8 +6331,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                 },
                             },
                             {
@@ -6302,8 +6343,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                 },
                             },
                         ],
@@ -6322,8 +6363,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "selected_work": "model_02_target_state.data_acquisition",
                         "execution_summary": {
                             "workflow_plan": {
-                                "start_month": "2016-07",
-                                "end_month": "2016-12",
+                                "start_month": "2017-01",
+                                "end_month": "2018-06",
                                 "selected_target_symbol": "AAPL",
                             },
                             "stage_execution": {
@@ -6351,11 +6392,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertIn(
-            ("2016-fold2", "model_02_target_state", "AAPL", "Model Worker 1"),
+            ("2017-01..2018-06", "model_02_target_state", "AAPL", "Model Worker 1"),
             [(task["month"], task["task_id"], task["target_symbol"], task["worker_label"]) for task in current_tasks],
         )
         self.assertNotIn(
-            ("2016-fold1", "model_01_market_context.model_evaluation"),
+            ("2016-01..2017-06", "model_01_market_context.model_evaluation"),
             [(task["month"], task["task_id"]) for task in current_tasks],
         )
 
@@ -6369,12 +6410,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runtime = tmp / "storage" / "02_control_plane" / "runtime"
             runtime.mkdir(parents=True, exist_ok=True)
-            (runtime / "model_training_fold_state_aapl_2016-01_2016-06.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.feature_generation",
@@ -6384,8 +6425,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                 },
                             }
                         ],
@@ -6394,12 +6435,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            (runtime / "model_training_fold_state_aapl_2016-07_2016-12.json").write_text(
+            (runtime / "model_training_fold_state_aapl_2017-01_2018-06.json").write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
-                        "start_month": "2016-07",
-                        "end_month": "2016-12",
+                        "start_month": "2017-01",
+                        "end_month": "2018-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.model_generation",
@@ -6410,8 +6451,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "last_reason": "stage command is currently running outside checkpoint state",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_twelve_month",
-                                    "unit_months": 6,
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
                                 },
                             }
                         ],
@@ -6430,8 +6471,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "selected_work": "model_02_target_state.feature_generation",
                         "execution_summary": {
                             "workflow_plan": {
-                                "start_month": "2016-07",
-                                "end_month": "2016-12",
+                                "start_month": "2017-01",
+                                "end_month": "2018-06",
                                 "selected_target_symbol": "AAPL",
                             },
                             "stage_execution": {
@@ -6459,7 +6500,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         current_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["task_state"] == "current"]
         self.assertNotIn(
-            ("2016-fold1", "model_02_target_state.feature_generation"),
+            ("2016-01..2017-06", "model_02_target_state.feature_generation"),
             [(task["month"], task["task_id"]) for task in current_tasks],
         )
 

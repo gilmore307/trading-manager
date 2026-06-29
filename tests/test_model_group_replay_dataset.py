@@ -290,7 +290,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
             dataset_root.mkdir(parents=True, exist_ok=True)
             (dataset_root / "base_context.json").write_text(
-                json.dumps({"candidate_fold_id": "fold_2016-01_2016-12", "pre_replay_target_refs": ["AAPL"]}) + "\n",
+                json.dumps({"candidate_fold_id": "fold_2016-01_2017-06", "pre_replay_target_refs": ["AAPL"]}) + "\n",
                 encoding="utf-8",
             )
             (dataset_root / "dataset_manifest.json").write_text(
@@ -299,7 +299,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                         "contract_type": "replay_dataset_preparation_manifest",
                         "contract_id": "promotion_replay_candidate_policy",
                         "freeze_status": "frozen",
-                        "candidate_fold_id": "fold_2016-01_2016-12",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "missing_feed_acquisition_count": 0,
                         "pre_replay_target_refs": ["AAPL"],
                     }
@@ -327,8 +327,8 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             self.assertIsNone(decision)
             manifest = json.loads((dataset_root / "dataset_manifest.json").read_text(encoding="utf-8"))
             base_context = json.loads((dataset_root / "base_context.json").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["candidate_fold_id"], "fold_2016-01_2016-12")
-            self.assertEqual(base_context["candidate_fold_id"], "fold_2016-01_2016-12")
+            self.assertEqual(manifest["candidate_fold_id"], "fold_2016-01_2017-06")
+            self.assertEqual(base_context["candidate_fold_id"], "fold_2016-01_2017-06")
 
     def test_missing_coverage_requires_provider_acquisition_gate(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -367,7 +367,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
             dataset_root.mkdir(parents=True, exist_ok=True)
             (dataset_root / "base_context.json").write_text(
-                json.dumps({"candidate_fold_id": "fold_2016-01_2016-06", "pre_replay_target_refs": ["AAPL"]}) + "\n",
+                json.dumps({"candidate_fold_id": "fold_2016-01_2017-06", "pre_replay_target_refs": ["AAPL"]}) + "\n",
                 encoding="utf-8",
             )
             (dataset_root / "dataset_manifest.json").write_text(
@@ -376,7 +376,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                         "contract_type": "replay_dataset_preparation_manifest",
                         "contract_id": "promotion_replay_candidate_policy",
                         "freeze_status": "frozen",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "missing_feed_acquisition_count": 0,
                         "pre_replay_target_refs": ["AAPL"],
                     }
@@ -428,7 +428,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
             dataset_root.mkdir(parents=True, exist_ok=True)
             (dataset_root / "base_context.json").write_text(
-                json.dumps({"candidate_fold_id": "fold_2016-01_2016-06", "pre_replay_target_refs": ["AAPL"]}) + "\n",
+                json.dumps({"candidate_fold_id": "fold_2016-01_2017-06", "pre_replay_target_refs": ["AAPL"]}) + "\n",
                 encoding="utf-8",
             )
             (dataset_root / "dataset_manifest.json").write_text(
@@ -437,7 +437,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                         "contract_type": "replay_dataset_preparation_manifest",
                         "contract_id": "promotion_replay_candidate_policy",
                         "freeze_status": "frozen",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "missing_feed_acquisition_count": 0,
                         "pre_replay_target_refs": ["AAPL"],
                     }

@@ -76,7 +76,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
         )
 
     def _write_completed_fold(self, storage_root: Path) -> None:
-        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
         stages = []
         for layer in range(1, 7):

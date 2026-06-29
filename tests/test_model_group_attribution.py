@@ -293,8 +293,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             receipt.update(
                 {
-                    "candidate_fold_id": "fold_2016-01_2016-06",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_fold_id": "fold_2016-01_2017-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                     "candidate_training_target": "AAPL",
                     "replay_execution_run_id": "model_group_replay_fixture",
                     "replay_completion_scope": "full_candidate_universe",
@@ -325,7 +325,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
             state_path.parent.mkdir(parents=True, exist_ok=True)
             state_path.write_text(
                 json.dumps(
@@ -358,8 +358,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(rejection["contract_type"], "promotion_eligibility_decision")
             self.assertEqual(rejection["decision_status"], "rejected")
             self.assertEqual(rejection["decision_reason_code"], "no_replay_decisions")
-            self.assertEqual(rejection["fold_id"], "fold_2016-01_2016-06")
-            self.assertEqual(rejection["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2016-06")
+            self.assertEqual(rejection["fold_id"], "fold_2016-01_2017-06")
+            self.assertEqual(rejection["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2017-06")
             self.assertEqual(rejection["source_fold_state_path"], str(state_path))
             self.assertEqual(
                 list((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json")),

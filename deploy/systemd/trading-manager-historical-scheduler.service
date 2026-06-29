@@ -9,7 +9,7 @@ Type=simple
 WorkingDirectory=/root/projects/trading-manager
 Environment=PYTHONPATH=/root/projects/trading-manager/src:/root/projects/trading-data/src:/root/projects/trading-storage/src:/root/projects/trading-model/src
 Environment=TRADING_MANAGER_HISTORICAL_START_MONTH=2016-01
-Environment=TRADING_MANAGER_HISTORICAL_END_MONTH=2016-12
+Environment=TRADING_MANAGER_HISTORICAL_END_MONTH=2017-06
 Environment=TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=5
 Environment=TRADING_MANAGER_PROVIDER_STAGE_NEXT_LIMIT=80
 Environment=TRADING_MANAGER_PROVIDER_STAGE_MAX_WORKERS=4

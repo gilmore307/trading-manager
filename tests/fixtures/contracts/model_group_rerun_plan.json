@@ -11,9 +11,9 @@
     "description": "Option-expression output schema and scoring contract changed."
   },
   "affected_scope": {
-    "fold_id": "2016-fold1",
+    "fold_id": "2016-01..2017-06",
     "start_month": "2016-01",
-    "end_month": "2016-06",
+    "end_month": "2017-06",
     "target_symbols": [
       "AAPL"
     ]
@@ -26,7 +26,7 @@
   "delete_set": [
     {
       "artifact_class": "model_output",
-      "ref": "postgres://trading_model.model_05_option_expression_model_generation?target=AAPL&start=2016-01&end=2016-06",
+      "ref": "postgres://trading_model.model_05_option_expression_model_generation?target=AAPL&start=2016-01&end=2017-06",
       "delete_reason": "Earliest affected model_generation stage changed.",
       "requires_storage_lifecycle_review": false
     },
@@ -76,7 +76,7 @@
     "requested_action": "classify_rerun_invalidated_artifacts",
     "reason": "M05 option-expression model_generation contract changed; downstream model group outputs must be rebuilt.",
     "candidate_refs": [
-      "postgres://trading_model.model_05_option_expression_model_generation?target=AAPL&start=2016-01&end=2016-06",
+      "postgres://trading_model.model_05_option_expression_model_generation?target=AAPL&start=2016-01&end=2017-06",
       "storage://02_control_plane/runtime/model_training_workflow_state_2016-01.json#model_04_plus"
     ],
     "protected_refs": [

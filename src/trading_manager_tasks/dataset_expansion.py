@@ -360,7 +360,7 @@ def build_dataset_expansion_plan(
             wrote_plan=True,
             plan_path=str(output_path),
             note=(
-                "M02+ expansion is blocked until the task names the selected target symbol for the twelve-month unit."
+                "M02+ expansion is blocked until the task names the selected target symbol for the 12+3+3 walk-forward unit."
                 if target_missing
                 else "Expansion request selected by manager; component-specific implementation is queued through the workflow state."
                 if not decision.provider_calls_allowed
@@ -407,7 +407,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model-schema", default="trading_model")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_DATASET_EXPANSION_PATH)
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ twelve-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ 12+3+3 walk-forward dataset units.")
     parser.add_argument("--write", action="store_true", help="Prepare the selected safe expansion artifact/payloads without provider calls.")
     args = parser.parse_args(argv)
 

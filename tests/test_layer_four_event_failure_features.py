@@ -17,7 +17,7 @@ class LayerFourEventFailureFeatureTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             receipt = materialize_layer_four_event_failure_features(
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2017-06",
                 input_root=tmp / "missing",
                 output_root=tmp / "output",
                 write=True,
@@ -32,7 +32,7 @@ class LayerFourEventFailureFeatureTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             input_root = tmp / "input"
             input_root.mkdir()
-            (input_root / "2016-01_2016-06.json").write_text(
+            (input_root / "2016-01_2017-06.json").write_text(
                 json.dumps(
                     {
                         "reviewed_event_interpretations": [
@@ -58,7 +58,7 @@ class LayerFourEventFailureFeatureTests(unittest.TestCase):
 
             receipt = materialize_layer_four_event_failure_features(
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2017-06",
                 input_root=input_root,
                 output_root=tmp / "output",
                 write=True,
@@ -83,7 +83,7 @@ class LayerFourEventFailureFeatureTests(unittest.TestCase):
                     "--start-month",
                     "2016-01",
                     "--end-month",
-                    "2016-06",
+                    "2017-06",
                     "--input-root",
                     str(tmp / "missing"),
                     "--output-root",

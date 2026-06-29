@@ -24,7 +24,7 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
                 "next_internal_stage": "autonomous_target_local_provider_acquisition",
                 "worker_id": "model_worker_1",
                 "selected_target_symbol": "btc",
-                "fold_id": "fold_2016-01_2016-06",
+                "fold_id": "fold_2016-01_2017-06",
                 "execution_summary": {
                     "workflow_plan": {"start_month": "2016-01", "end_month": "2016-06"},
                 },
@@ -39,7 +39,7 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
         self.assertEqual(transition["target_symbol"], "BTC")
         self.assertEqual(transition["start_month"], "2016-01")
         self.assertEqual(transition["end_month"], "2016-06")
-        self.assertEqual(transition["fold_id"], "fold_2016-01_2016-06")
+        self.assertEqual(transition["fold_id"], "fold_2016-01_2017-06")
         self.assertEqual(transition["task_id"], "model_02_target_state")
         self.assertEqual(transition["created_at"], "2026-06-29T01:00:00+00:00")
         self.assertEqual(transition["started_at"], "2026-06-29T01:00:00+00:00")

@@ -26,6 +26,8 @@ from .storage_paths import projects_root
 from .model_training_workflow import (
     MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
     PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT,
+    ROLLING_FOLD_SIZE_MONTHS,
+    ROLLING_FOLD_STEP_MONTHS,
     ROLLING_FOLD_TRAIN_MONTHS,
     base_stack_model_generation_splits_complete,
 )
@@ -1022,8 +1024,8 @@ def _previous_after_cost_alpha_model_path(*, storage_root: Path, training_fold: 
         return None
     if start_month == "2016-01":
         return None
-    previous_start_month = _add_months(start_month, -6)
-    previous_end_month = _add_months(start_month, -1)
+    previous_start_month = _add_months(start_month, -ROLLING_FOLD_STEP_MONTHS)
+    previous_end_month = _add_months(previous_start_month, ROLLING_FOLD_SIZE_MONTHS - 1)
     filename = f"after_cost_alpha_model_{previous_start_month}_{previous_end_month}.json"
     return storage_root.parent / "03_model_artifacts" / "runtime" / "model_05_alpha_confidence" / filename
 

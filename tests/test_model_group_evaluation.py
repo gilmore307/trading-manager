@@ -47,7 +47,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         }
 
     def _write_completed_fold(self, storage_root: Path) -> None:
-        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
         state_path.parent.mkdir(parents=True)
         stages = []
         for layer in range(1, 7):
@@ -61,7 +61,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
-                            "split_policy": "chronological_rolling_fold_8_2_2",
+                            "split_policy": "chronological_cumulative_walk_forward_12_3_3",
                         },
                     }
                 )
@@ -70,7 +70,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 {
                     "contract_type": "manager_model_training_workflow_state",
                     "start_month": "2016-01",
-                    "end_month": "2016-06",
+                    "end_month": "2017-06",
                     "stages": stages,
                 }
             )
@@ -79,7 +79,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         )
 
     def _write_completed_fold_two(self, storage_root: Path) -> None:
-        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-07_2016-12.json"
+        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2017-01_2018-06.json"
         state_path.parent.mkdir(parents=True)
         stages = []
         for layer in range(1, 7):
@@ -93,7 +93,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
-                            "split_policy": "chronological_rolling_fold_8_2_2",
+                            "split_policy": "chronological_cumulative_walk_forward_12_3_3",
                         },
                     }
                 )
@@ -101,8 +101,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             json.dumps(
                 {
                     "contract_type": "manager_model_training_workflow_state",
-                    "start_month": "2016-07",
-                    "end_month": "2016-12",
+                    "start_month": "2017-01",
+                    "end_month": "2018-06",
                     "stages": stages,
                 }
             )
@@ -111,7 +111,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         )
 
     def _write_pre_replay_complete_fold_with_pending_m06_generation(self, storage_root: Path) -> None:
-        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+        state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
         state_path.parent.mkdir(parents=True)
         stages = []
         for layer in range(1, 6):
@@ -125,7 +125,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
-                            "split_policy": "chronological_rolling_fold_8_2_2",
+                            "split_policy": "chronological_cumulative_walk_forward_12_3_3",
                         },
                     }
                 )
@@ -139,7 +139,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "status": status,
                     "dataset_split": {
                         "split_name": split_name,
-                        "split_policy": "chronological_rolling_fold_8_2_2",
+                        "split_policy": "chronological_cumulative_walk_forward_12_3_3",
                     },
                 }
             )
@@ -148,7 +148,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 {
                     "contract_type": "manager_model_training_workflow_state",
                     "start_month": "2016-01",
-                    "end_month": "2016-06",
+                    "end_month": "2017-06",
                     "stages": stages,
                 }
             )
@@ -251,7 +251,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             / "03_model_artifacts"
             / "runtime"
             / "model_05_alpha_confidence"
-            / "after_cost_alpha_model_2016-01_2016-06.json"
+            / "after_cost_alpha_model_2016-01_2017-06.json"
         )
         alpha_artifact_path.parent.mkdir(parents=True, exist_ok=True)
         alpha_artifact_path.write_text(
@@ -275,8 +275,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "contract_type": "evaluation_replay_execution_run",
                     "created_at_utc": "2026-05-28T00:00:00+00:00",
                     "replay_execution_run_id": "model_group_replay_fixture",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                    "candidate_fold_id": "fold_2016-01_2017-06",
                     "candidate_training_target": "AAPL",
                     "target_symbol": "AAPL",
                     "pre_replay_target_refs": ["AAPL"],
@@ -338,8 +338,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "event_observation_count": 1,
                     "event_candidate_count": 1,
                     "replay_execution_run_id": "model_group_replay_fixture",
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                    "candidate_fold_id": "fold_2016-01_2017-06",
                     "candidate_training_target": "AAPL",
                     "target_symbol": "AAPL",
                     "replay_review_scope_status": "passed",
@@ -420,7 +420,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["ready_check_count"], 5)
-            self.assertEqual(receipt["candidate_fold_id"], "fold_2016-01_2016-06")
+            self.assertEqual(receipt["candidate_fold_id"], "fold_2016-01_2017-06")
             self.assertEqual(receipt["candidate_training_target"], "AAPL")
             self.assertEqual(receipt["replay_execution_run_id"], "model_group_replay_fixture")
             self.assertIn("residual_event_governance_event_focus_proposal", receipt["ready_checks"])
@@ -432,11 +432,11 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             metrics = settlement["metrics"]
             self.assertEqual(eligibility["contract_type"], "promotion_eligibility_decision")
             self.assertEqual(settlement["target_symbol"], "AAPL")
-            self.assertEqual(settlement["candidate_fold_id"], "fold_2016-01_2016-06")
+            self.assertEqual(settlement["candidate_fold_id"], "fold_2016-01_2017-06")
             self.assertEqual(settlement["candidate_training_target"], "AAPL")
             self.assertEqual(settlement["replay_execution_run_id"], "model_group_replay_fixture")
             self.assertEqual(eligibility["target_symbol"], "AAPL")
-            self.assertEqual(settlement["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2016-06")
+            self.assertEqual(settlement["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2017-06")
             self.assertEqual(eligibility["decision_status"], "deferred")
             self.assertEqual(eligibility["agent_review_recommendation"], "deferred")
             self.assertEqual(metrics["feature_column_count"], 3)
@@ -532,8 +532,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "event_observation_count": 1,
                         "event_candidate_count": 2,
                         "replay_execution_run_id": "model_group_replay_fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "candidate_training_target": "AAPL",
                         "target_symbol": "AAPL",
                         "replay_review_scope_status": "passed",
@@ -559,7 +559,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             latest_receipt = json.loads(latest_receipt_path.read_text(encoding="utf-8"))
             self.assertEqual(latest_receipt["residual_event_governance_receipt_ref"], str(refreshed_attribution_receipt))
 
-            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
             newer_mtime = max(path.stat().st_mtime for path in (dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json")) + 1
             os.utime(state_path, (newer_mtime, newer_mtime))
 

@@ -23,6 +23,7 @@ from .model_training_workflow import (
     LAYER_METADATA,
     MONTHLY_SUBSTRATE_LAYERS,
     ROLLING_FOLD_SIZE_MONTHS,
+    ROLLING_FOLD_STEP_MONTHS,
     ROLLING_FOLD_SPLIT_MONTHS,
     base_stack_model_generation_splits_complete,
     build_model_training_workflow_plan,
@@ -66,7 +67,8 @@ FOLD_MODEL_STAGE_TYPES = {
     "promotion_review",
     "maintenance",
 }
-MONTHS_PER_MODEL_FOLD = 6
+MONTHS_PER_MODEL_FOLD = ROLLING_FOLD_SIZE_MONTHS
+MONTHS_PER_MODEL_FOLD_STEP = ROLLING_FOLD_STEP_MONTHS
 CURRENT_MODEL_GROUP_TRAINING_FOLD_MONTHS = ROLLING_FOLD_SIZE_MONTHS
 MODEL_GENERATION_SPLIT_MONTH_COUNT = sum(months for _name, months in ROLLING_FOLD_SPLIT_MONTHS)
 MODEL_GROUP_EVALUATION_TESTS = (
@@ -2204,7 +2206,7 @@ def _fold_stage_coverage_progress(
         "accepted_failed_count": accepted_failed,
         "can_unlock_downstream": complete,
         "progress_source": "fold_stage_coverage",
-        "progress_basis": "download/source partitions required by the twelve-month fold",
+        "progress_basis": "download/source partitions required by the 12+3+3 walk-forward fold",
         "covered_partition_count": len(rows),
         "expected_partition_count": len(months),
     }
@@ -3008,7 +3010,7 @@ def _fold_start_month(period: str | None) -> str | None:
     if fold_label:
         year = int(fold_label.group(1))
         fold_number = int(fold_label.group(2))
-        month_number = (fold_number - 1) * MONTHS_PER_MODEL_FOLD + 1
+        month_number = (fold_number - 1) * MONTHS_PER_MODEL_FOLD_STEP + 1
         if month_number <= 12:
             return f"{year:04d}-{month_number:02d}"
         return None
@@ -3071,7 +3073,7 @@ def _fold_label_for_month(month: str | None) -> str | None:
     if not _is_month_key(month):
         return None
     assert month is not None
-    fold_start_offset = (_month_offset(month) or 0) % MONTHS_PER_MODEL_FOLD
+    fold_start_offset = (_month_offset(month) or 0) % MONTHS_PER_MODEL_FOLD_STEP
     fold_start = _add_months(month, -fold_start_offset)
     if fold_start is None:
         return None
@@ -4321,7 +4323,7 @@ def _model_group_training_fold_window(
     if completed_fold is not None:
         start_month, end_month, _target_symbol = completed_fold
         return start_month, end_month, _month_span_count(start_month, end_month)
-    return ("2016-01", "2016-12", CURRENT_MODEL_GROUP_TRAINING_FOLD_MONTHS)
+    return ("2016-01", "2017-06", CURRENT_MODEL_GROUP_TRAINING_FOLD_MONTHS)
 
 
 def _completed_model_group_training_fold(

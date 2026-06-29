@@ -280,7 +280,7 @@ class SchedulerTests(unittest.TestCase):
         ), patch("trading_manager_tasks.scheduler.next_ready_or_blocked_stage", return_value=ready_stage), patch(
             "trading_manager_tasks.scheduler.first_blocked_stage", return_value=None
         ), patch("trading_manager_tasks.scheduler._execute_autonomous_provider_stage", return_value=fake_summary) as execute_provider_stage:
-            state_path = Path("/tmp/model_training_fold_state_aapl_2016-01_2016-06.json")
+            state_path = Path("/tmp/model_training_fold_state_aapl_2016-01_2017-06.json")
             decision = run_scheduler_once(
                 now_utc=datetime(2026, 5, 10, 14, 0, tzinfo=UTC),
                 resource_snapshot=self._healthy_resource_snapshot(),
@@ -297,7 +297,7 @@ class SchedulerTests(unittest.TestCase):
 
     def test_scheduler_cli_passes_fold_state_path_and_post_foundation_scope(self):
         fake_decision = SimpleNamespace(summary_row=lambda: {"decision_status": "ready"})
-        state_path = Path("/tmp/model_training_fold_state_aapl_2016-01_2016-06.json")
+        state_path = Path("/tmp/model_training_fold_state_aapl_2016-01_2017-06.json")
 
         with patch.object(scheduler, "run_scheduler_once", return_value=fake_decision) as run_mock, patch.object(
             scheduler, "write_scheduler_decision"
@@ -363,7 +363,7 @@ class SchedulerTests(unittest.TestCase):
             "trading_manager_tasks.scheduler.reconcile_provider_stage",
             return_value=reconcile_summary,
         ) as reconcile_mock:
-            target_state_path = Path(raw_tmp) / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            target_state_path = Path(raw_tmp) / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
             _execute_autonomous_provider_stage(
                 stage_id="model_05_option_expression.option_chain_data_acquisition",
                 start_month="2016-01",

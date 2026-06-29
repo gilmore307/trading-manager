@@ -48,7 +48,7 @@ class ModelGroupReplayTests(unittest.TestCase):
         storage_root: Path,
         *,
         start_month: str = "2016-01",
-        end_month: str = "2016-06",
+        end_month: str = "2017-06",
         parent_start_month: str | None = None,
         parent_end_month: str | None = None,
     ) -> None:
@@ -109,7 +109,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             / "runtime"
             / "model_02_target_state"
             / "input_materialization"
-            / "2016_01_2016_06"
+            / "2016_01_2017_06"
             / "target_candidates.jsonl"
         )
         target_candidates_path.parent.mkdir(parents=True, exist_ok=True)
@@ -141,7 +141,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
-                            "split_policy": "chronological_rolling_fold_8_2_2",
+                            "split_policy": "chronological_cumulative_walk_forward_12_3_3",
                         },
                     }
                 )
@@ -262,7 +262,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": run_id,
                     "candidate_model_ref": candidate_model_ref,
-                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_fold_id": "fold_2016-01_2017-06",
                     "decision_rows_ref": str(decision_rows_ref),
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
@@ -313,8 +313,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "replay_execution_run_id": run_id,
                     "replay_month": month,
                     "decision_rows_ref": str(decision_rows_path),
-                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                    "candidate_fold_id": "fold_2016-01_2017-06",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
@@ -355,7 +355,7 @@ class ModelGroupReplayTests(unittest.TestCase):
         *,
         run_id: str = "continuous_run",
         start_month: str = "2016-01",
-        end_month: str = "2016-06",
+        end_month: str = "2017-06",
     ) -> None:
         receipt_root = dataset_root / "replay_execution_runs" / run_id
         receipt_root.mkdir(parents=True, exist_ok=True)
@@ -467,11 +467,11 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.provider_calls, 0)
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
-            self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2016-06", decision.command)
+            self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2017-06", decision.command)
             self.assertNotIn("--replay-month", decision.command)
             self.assertIn("--after-cost-alpha-model-json", decision.command)
             alpha_ref = decision.command[decision.command.index("--after-cost-alpha-model-json") + 1]
-            self.assertTrue(alpha_ref.endswith("after_cost_alpha_model_2016-01_2016-06.json"))
+            self.assertTrue(alpha_ref.endswith("after_cost_alpha_model_2016-01_2017-06.json"))
             self.assertIn("--initial-capital-usd", decision.command)
             self.assertEqual(decision.command[decision.command.index("--initial-capital-usd") + 1], "25000.0")
             self.assertNotIn("--option-feature-database-url", decision.command)
@@ -508,8 +508,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "previous_run",
                         "decision_rows_ref": str(decision_rows_path),
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
@@ -573,10 +573,10 @@ class ModelGroupReplayTests(unittest.TestCase):
             self._write_completed_fold(storage_root)
             self._write_completed_fold(
                 storage_root,
-                start_month="2016-07",
-                end_month="2016-12",
+                start_month="2017-01",
+                end_month="2018-06",
                 parent_start_month="2016-01",
-                parent_end_month="2016-06",
+                parent_end_month="2017-06",
             )
 
             decision = run_model_group_replay_if_ready(
@@ -594,7 +594,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_ready")
             self.assertEqual(
                 decision.execution_summary["training_fold"]["candidate_model_ref"],
-                "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                "storage://trading-manager/model_group/aapl/2016-01_2017-06",
             )
 
     def test_replay_selects_next_fold_after_previous_fold_has_valid_replay(self):
@@ -606,10 +606,10 @@ class ModelGroupReplayTests(unittest.TestCase):
             self._write_completed_fold(storage_root)
             self._write_completed_fold(
                 storage_root,
-                start_month="2016-07",
-                end_month="2016-12",
+                start_month="2017-01",
+                end_month="2018-06",
                 parent_start_month="2016-01",
-                parent_end_month="2016-06",
+                parent_end_month="2017-06",
             )
             self._write_completed_continuous_replay(dataset_root, run_id="fold1_run")
 
@@ -628,7 +628,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_ready")
             self.assertEqual(
                 decision.execution_summary["training_fold"]["candidate_model_ref"],
-                "storage://trading-manager/model_group/aapl/2016-07_2016-12",
+                "storage://trading-manager/model_group/aapl/2017-01_2018-06",
             )
 
     def test_replay_resume_checkpoint_is_fold_scoped(self):
@@ -640,16 +640,16 @@ class ModelGroupReplayTests(unittest.TestCase):
             self._write_completed_fold(storage_root)
             self._write_completed_fold(
                 storage_root,
-                start_month="2016-07",
-                end_month="2016-12",
+                start_month="2017-01",
+                end_month="2018-06",
                 parent_start_month="2016-01",
-                parent_end_month="2016-06",
+                parent_end_month="2017-06",
             )
             self._write_completed_continuous_replay(
                 dataset_root,
                 run_id="fold2_run",
-                start_month="2016-07",
-                end_month="2016-12",
+                start_month="2017-01",
+                end_month="2018-06",
             )
             checkpoint_path = dataset_root / "replay_execution_runs" / "fold2_run" / "replay_resume_checkpoint.json"
             checkpoint_path.write_text(
@@ -681,7 +681,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(
                 decision.execution_summary["training_fold"]["candidate_model_ref"],
-                "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                "storage://trading-manager/model_group/aapl/2016-01_2017-06",
             )
             self.assertNotIn("--resume-checkpoint-path", decision.command)
 
@@ -771,8 +771,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": run_id,
                         "replay_month": "2021-02",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
@@ -904,7 +904,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 / "03_model_artifacts"
                 / "runtime"
                 / "model_05_alpha_confidence"
-                / "after_cost_alpha_model_2016-01_2016-06.json"
+                / "after_cost_alpha_model_2016-01_2017-06.json"
             )
             alpha_model_path.unlink()
 
@@ -937,10 +937,10 @@ class ModelGroupReplayTests(unittest.TestCase):
             self._write_dataset(storage_root)
             self._write_completed_fold(
                 storage_root,
-                start_month="2016-07",
-                end_month="2016-12",
+                start_month="2017-01",
+                end_month="2018-06",
                 parent_start_month="2016-01",
-                parent_end_month="2016-06",
+                parent_end_month="2017-06",
             )
 
             decision = run_model_group_replay_if_ready(
@@ -957,7 +957,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_parent_checkpoint_missing")
-            self.assertTrue(decision.execution_summary["parent_checkpoint_ref"].endswith("after_cost_alpha_model_2016-01_2016-06.json"))
+            self.assertTrue(decision.execution_summary["parent_checkpoint_ref"].endswith("after_cost_alpha_model_2016-01_2017-06.json"))
 
     def test_cumulative_fold_blocks_when_artifact_lacks_parent_lineage(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -966,7 +966,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             storage_root.mkdir(parents=True)
             dataset_root = self._write_dataset(storage_root)
             self._write_completed_fold(storage_root)
-            self._write_completed_fold(storage_root, start_month="2016-07", end_month="2016-12")
+            self._write_completed_fold(storage_root, start_month="2017-01", end_month="2018-06")
             self._write_completed_continuous_replay(dataset_root, run_id="fold1_run")
 
             decision = run_model_group_replay_if_ready(
@@ -1000,7 +1000,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 / "03_model_artifacts"
                 / "runtime"
                 / "model_05_alpha_confidence"
-                / "after_cost_alpha_model_2016-01_2016-06.json"
+                / "after_cost_alpha_model_2016-01_2017-06.json"
             )
             alpha_model_path.write_text(
                 json.dumps(
@@ -1057,7 +1057,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 / "03_model_artifacts"
                 / "runtime"
                 / "model_05_alpha_confidence"
-                / "after_cost_alpha_model_2016-01_2016-06.json"
+                / "after_cost_alpha_model_2016-01_2017-06.json"
             )
             alpha_model_path.write_text(
                 json.dumps(
@@ -1115,7 +1115,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 / "03_model_artifacts"
                 / "runtime"
                 / "model_05_alpha_confidence"
-                / "after_cost_alpha_model_2016-01_2016-06.json"
+                / "after_cost_alpha_model_2016-01_2017-06.json"
             )
             alpha_model_path.write_text(
                 json.dumps(
@@ -1167,7 +1167,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 / "runtime"
                 / "model_02_target_state"
                 / "input_materialization"
-                / "2016_01_2016_06"
+                / "2016_01_2017_06"
                 / "target_candidates.jsonl"
             )
 
@@ -1225,8 +1225,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": run_id,
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
@@ -1403,20 +1403,20 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_receipt_scope_mismatch")
             self.assertIn("deterministic crypto placeholder", decision.reason)
 
-    def test_legacy_unsplit_model_generation_fold_does_not_unlock_replay(self):
+    def test_unsplit_model_generation_fold_does_not_unlock_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             self._write_dataset(storage_root)
-            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-06.json"
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
             state_path.parent.mkdir(parents=True)
             state_path.write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2016-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": f"model_{layer:02d}_fixture.model_generation",
@@ -1479,7 +1479,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             dataset_root = self._write_dataset(storage_root)
             manifest_path = dataset_root / "dataset_manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["candidate_fold_id"] = "fold_2016-07_2016-12"
+            manifest["candidate_fold_id"] = "fold_2017-01_2018-06"
             manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
             self._write_completed_fold(storage_root)
 
@@ -1498,7 +1498,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "model_group_replay_executed")
             self.assertEqual(
                 decision.execution_summary["training_fold"]["candidate_model_ref"],
-                "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                "storage://trading-manager/model_group/aapl/2016-01_2017-06",
             )
 
     def test_runner_failure_returns_backoff_decision(self):
@@ -1597,7 +1597,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     {
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "legacy_run",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "pre_replay_target_refs": ["XLK"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -1649,7 +1649,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": "diagnostic_run",
                         "decision_rows_ref": str(decision_rows_path),
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "pre_replay_target_refs": ["XLK"],
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
@@ -1740,8 +1740,8 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "replay_execution_run_id": run_id,
                         "decision_rows_ref": str(decision_rows_path),
                         "progress_ref": str(progress_path),
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_2016-01_2017-06",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",

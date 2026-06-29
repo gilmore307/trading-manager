@@ -14,7 +14,7 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             runtime = tmp / "runtime"
             runtime.mkdir()
-            state_path = runtime / "model_training_fold_state_2016-01_2016-06.json"
+            state_path = runtime / "model_training_fold_state_2016-01_2017-06.json"
             state_path.write_text(
                 json.dumps(
                     {
@@ -48,7 +48,7 @@ class ModelTrainingInvalidationTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             runtime = tmp / "runtime"
             runtime.mkdir()
-            state_path = runtime / "model_training_fold_state_2016-01_2016-06.json"
+            state_path = runtime / "model_training_fold_state_2016-01_2017-06.json"
             original = {"stages": [{"stage_id": "model_06_residual_event_governance.data_acquisition", "layer": 6, "status": "succeeded", "artifact_refs": []}]}
             state_path.write_text(json.dumps(original), encoding="utf-8")
 
