@@ -78,6 +78,31 @@ class TaskProgressTests(unittest.TestCase):
         self.assertEqual(progress["current_activity"], "Fetching M02 target-state feature rows")
         self.assertEqual(progress["nodes"][0]["node_id"], "fetch_database_input_rows")
 
+    def test_processed_only_node_reports_activity_without_fake_total(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            progress_root = Path(raw_tmp) / "progress"
+            write_task_progress_node(
+                progress_root=progress_root,
+                worker_id="model_worker_1",
+                task_uid="2016-01..2017-06:model_02_target_state.model_generation.train",
+                stage_id="model_02_target_state.model_generation.train",
+                status="running",
+                unit_label="rows",
+                processed_count=53000,
+                node_id="model_rows_written",
+                node_label="Model rows written",
+                current_activity="Wrote 53000 M02 target-state rows",
+            )
+
+            payloads = load_active_task_progress(progress_root)
+
+        progress = payloads["2016-01..2017-06:model_02_target_state.model_generation.train"]
+        self.assertNotIn("expected_count", progress)
+        self.assertNotIn("ready_count", progress)
+        self.assertNotIn("pending_count", progress)
+        self.assertEqual(progress["current_activity"], "Wrote 53000 M02 target-state rows")
+        self.assertEqual(progress["nodes"][0]["processed_count"], 53000)
+
     def test_write_task_progress_from_env_uses_stage_progress_contract(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             progress_root = Path(raw_tmp) / "progress"

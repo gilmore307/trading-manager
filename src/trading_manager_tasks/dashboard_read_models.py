@@ -2371,22 +2371,6 @@ def _worker_facing_progress(progress: Mapping[str, Any] | None) -> Mapping[str, 
     return updated
 
 
-def _worker_completed_progress_label(progress: Mapping[str, Any] | None) -> str | None:
-    if not isinstance(progress, Mapping):
-        return None
-    if not _active_progress_has_counter(progress):
-        return None
-    try:
-        expected = max(0, int(progress.get("expected_count") or 0))
-        processed = max(0, int(progress.get("processed_count") or progress.get("ready_count") or 0))
-    except (TypeError, ValueError):
-        return None
-    unit_label = str(_worker_facing_progress(progress).get("unit_label") or "units") if isinstance(_worker_facing_progress(progress), Mapping) else "units"
-    if expected <= 0:
-        return f"{processed} {unit_label}"
-    return f"{processed}/{expected} {unit_label}"
-
-
 def _active_progress_node(progress: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
     if not isinstance(progress, Mapping):
         return None
@@ -2402,7 +2386,7 @@ def _active_progress_node(progress: Mapping[str, Any] | None) -> Mapping[str, An
 def _active_progress_has_counter(progress: Mapping[str, Any] | None) -> bool:
     if not isinstance(progress, Mapping):
         return False
-    return progress.get("expected_count") is not None or progress.get("processed_count") is not None or progress.get("ready_count") is not None
+    return progress.get("expected_count") is not None
 
 
 def _merge_task_progress_with_active_worker(
@@ -2460,12 +2444,9 @@ def _task_runtime_activity_from_worker(
     if row_count_label and row_count_label not in node_label:
         node_label = f"{node_label} · {row_count_label}"
     progress_label = _progress_display_label(task_progress)
-    worker_progress_label = _worker_completed_progress_label(active_progress)
     explicit_details = active_progress.get("activity_details")
     explicit_details = [str(line) for line in explicit_details] if isinstance(explicit_details, list) else []
     activity_details = [
-        f"Task progress {progress_label}" if progress_label else None,
-        f"Worker completed {worker_progress_label}" if worker_progress_label else None,
         f"Window {window_label}" if window_label else None,
         row_count_label,
         _worker_candidate_label(extra),
@@ -3379,9 +3360,7 @@ def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status
         None,
     )
     active_count = ready_count
-    if active_stage is not None and str(status or "") in {"running", "ready", "pending"}:
-        active_count = min(expected_count, ready_count + stage_weight(active_stage))
-    pending_count = max(expected_count - max(ready_count, active_count) - failed_count, 0)
+    pending_count = max(expected_count - ready_count - failed_count, 0)
     if expected_count and ready_count == expected_count and failed_count == 0:
         progress_status = "complete"
     elif failed_count:

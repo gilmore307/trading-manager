@@ -3479,8 +3479,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["unit_label"], "task units")
         self.assertEqual(progress["expected_count"], 20)
         self.assertEqual(progress["ready_count"], 14)
-        self.assertEqual(progress["active_count"], 17)
-        self.assertEqual(progress["pending_count"], 3)
+        self.assertEqual(progress["active_count"], 14)
+        self.assertEqual(progress["pending_count"], 6)
         self.assertIn("all layer-internal", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
 

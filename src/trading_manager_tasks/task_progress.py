@@ -314,8 +314,7 @@ def _progress_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
         measurable_nodes = [
             node
             for node in node_rows
-            if node.get("processed_count") is not None
-            or node.get("expected_count") is not None
+            if node.get("expected_count") is not None
             or node.get("elapsed_seconds") is not None
             or node.get("expected_seconds") is not None
             or str(node.get("status") or "").lower() in {"succeeded", "success", "completed", "complete", "ready", "failed", "error"}
