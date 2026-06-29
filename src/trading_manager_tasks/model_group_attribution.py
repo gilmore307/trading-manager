@@ -58,7 +58,11 @@ def run_model_group_replay_review_if_ready(
     expected_months = _expected_replay_months(dataset_root)
     replay_run_id = str(replay_receipt.get("replay_execution_run_id") or "")
     ready_months = _ready_replay_months(dataset_root, replay_run_id=replay_run_id)
+    completed_month_count = _int_value(replay_receipt.get("completed_replay_month_count"))
+    receipt_declares_full_completion = expected_months > 0 and completed_month_count >= expected_months
     replay_complete = expected_months <= 0 or len(ready_months) >= expected_months
+    if receipt_declares_full_completion and _replay_receipt_full_completion_scope(replay_receipt):
+        replay_complete = True
     if not replay_complete and not allow_partial_replay:
         return None
     if not replay_complete:
@@ -69,7 +73,7 @@ def run_model_group_replay_review_if_ready(
             return None
         if not force:
             return None
-    if expected_months > 0 and len(ready_months) < expected_months and not allow_partial_replay:
+    if expected_months > 0 and len(ready_months) < expected_months and not receipt_declares_full_completion and not allow_partial_replay:
         return None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
@@ -1738,6 +1742,13 @@ def _expected_replay_months(dataset_root: Path) -> int:
     except (TypeError, ValueError):
         return 60
     return max(1, (end.year - start.year) * 12 + end.month - start.month)
+
+
+def _int_value(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _ready_replay_months(dataset_root: Path, *, replay_run_id: str) -> set[str]:

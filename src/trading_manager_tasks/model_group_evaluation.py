@@ -70,6 +70,8 @@ def run_model_group_evaluation_if_ready(
     execute: bool = True,
     python_executable: str = sys.executable,
     selected_target_symbol: str | None = None,
+    selected_start_month: str | None = None,
+    selected_end_month: str | None = None,
     now_utc: datetime | None = None,
     force: bool = False,
     call_agent_review: bool = True,
@@ -81,7 +83,12 @@ def run_model_group_evaluation_if_ready(
     """Run one model-group evaluation build when M06 evidence is complete."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
-    training_fold = _completed_training_fold(storage_root=storage_root, selected_target_symbol=selected_target_symbol)
+    training_fold = _completed_training_fold(
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+        selected_start_month=selected_start_month,
+        selected_end_month=selected_end_month,
+    )
     if training_fold is None:
         return None
     replay_receipt_path, replay_receipt = _latest_replay_execution_receipt(
@@ -2309,11 +2316,19 @@ def _evaluation_check_summary(
     return {"ready_checks": ready_checks, "checks": checks}
 
 
-def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str | None) -> dict[str, Any] | None:
+def _completed_training_fold(
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+    selected_start_month: str | None = None,
+    selected_end_month: str | None = None,
+) -> dict[str, Any] | None:
     runtime_root = storage_root / "runtime"
     if not runtime_root.exists():
         return None
     selected = str(selected_target_symbol or "").strip().lower()
+    selected_start = str(selected_start_month or "").strip()
+    selected_end = str(selected_end_month or "").strip()
     candidates: list[tuple[str, dict[str, Any]]] = []
     for path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
         try:
@@ -2328,6 +2343,10 @@ def _completed_training_fold(*, storage_root: Path, selected_target_symbol: str 
         start_month = str(payload.get("start_month") or "")
         end_month = str(payload.get("end_month") or "")
         if not start_month or not end_month:
+            continue
+        if selected_start and start_month != selected_start:
+            continue
+        if selected_end and end_month != selected_end:
             continue
         target_symbol = _fold_state_target_symbol(path, payload)
         target_ref_part = _candidate_model_ref_target_part(target_symbol)

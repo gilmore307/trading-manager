@@ -15,6 +15,8 @@ def main() -> int:
     parser.add_argument("--storage-root", type=Path, default=Path("/root/projects/trading-storage/storage/02_control_plane"))
     parser.add_argument("--contract-id", default="promotion_replay_candidate_policy")
     parser.add_argument("--target-symbol")
+    parser.add_argument("--start-month", help="Select a specific completed training fold start month")
+    parser.add_argument("--end-month", help="Select a specific completed training fold end month")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true", help="write a fresh evaluation run even when one already exists for this replay")
     parser.add_argument("--local-fallback-review", action="store_true", help="write deterministic insufficient-evidence review without invoking Codex")
@@ -30,6 +32,8 @@ def main() -> int:
         execute=not args.dry_run,
         force=args.force,
         call_agent_review=not args.local_fallback_review,
+        selected_start_month=args.start_month,
+        selected_end_month=args.end_month,
         codex_bin=args.codex_bin,
         codex_model=args.codex_model,
         codex_timeout_seconds=args.codex_timeout_seconds,
