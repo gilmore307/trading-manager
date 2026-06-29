@@ -28,16 +28,17 @@ PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT = 5
 BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 5)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 12
-DATASET_UNIT_MONTHS = 6
+DATASET_UNIT_MONTHS = 12
 FOUNDATION_CATCH_UP_LAYERS = (1, 3)
 MONTHLY_SUBSTRATE_LAYERS = (1, 3)
 FOUNDATION_CATCH_UP_STAGE_TYPES = ("data_acquisition", "feature_generation")
 FOUNDATION_CATCH_UP_BLOCKER = "model_01_03_historical_catch_up_to_current_required"
 POST_MODEL_GENERATION_REBUILD_BLOCKER = "post_model_generation_rebuild_required_after_model_01_03_catch_up"
-ROLLING_FOLD_TRAIN_MONTHS = 4
-ROLLING_FOLD_VALIDATION_MONTHS = 1
-ROLLING_FOLD_TEST_MONTHS = 1
+ROLLING_FOLD_TRAIN_MONTHS = 8
+ROLLING_FOLD_VALIDATION_MONTHS = 2
+ROLLING_FOLD_TEST_MONTHS = 2
 ROLLING_FOLD_SIZE_MONTHS = ROLLING_FOLD_TRAIN_MONTHS + ROLLING_FOLD_VALIDATION_MONTHS + ROLLING_FOLD_TEST_MONTHS
+ROLLING_FOLD_SPLIT_POLICY = "chronological_rolling_fold_8_2_2"
 ROLLING_FOLD_SPLIT_MONTHS = (
     ("train", ROLLING_FOLD_TRAIN_MONTHS),
     ("validation", ROLLING_FOLD_VALIDATION_MONTHS),
@@ -231,8 +232,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "BackgroundContextModel",
         "depends_on_layers": (),
         "progression_mode": "background_panel_continuous",
-        "candidate_axis": "six_month_window",
-        "candidate_progression_policy": "complete fixed M01 market and sector background substrate for each six-month chronological unit; promotion waits for M01-M05 model generation, model-group replay, and residual-event attribution",
+        "candidate_axis": "twelve_month_window",
+        "candidate_progression_policy": "complete fixed M01 market and sector background substrate for each twelve-month chronological unit; promotion waits for M01-M05 model generation, model-group replay, and residual-event attribution",
         "data_surface": "autonomous Alpaca market/background ETF bars acquisition plus migration-source m01/m02 context features",
         "feature_cli": "trading-data-m01-market-regime-feature-generation",
     },
@@ -242,7 +243,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "TargetStateModel",
         "depends_on_layers": (1,),
         "progression_mode": "target_state_full_minute_coverage",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id",
+        "candidate_axis": "target_symbol;twelve_month_window;target_candidate_id",
         "candidate_progression_policy": "materialize anonymous target-state samples for every eligible minute; evaluation and promotion must aggregate by fold and candidate-universe policy batch",
         "data_surface": "target-local source artifacts, accepted target-context mappings, model_03_target_state_vector_data_acquisition, and model_03_target_state_vector_feature_generation as migration-source input",
         "feature_cli": "trading-data-m03-target-state-vector-feature-generation",
@@ -253,7 +254,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "EventStateModel",
         "depends_on_layers": (1, 2),
         "progression_mode": "event_state_full_minute_coverage",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;event_state_context_id",
+        "candidate_axis": "target_symbol;twelve_month_window;target_candidate_id;event_state_context_id",
         "candidate_progression_policy": "apply M06-governed event-family attributes point-in-time, including no-event minutes and option-vs-underlying impact channels",
         "data_surface": "fold-scoped event observation inputs and reviewed event_interpretation normalization; no raw event alpha requirement",
         "input_stage": True,
@@ -265,7 +266,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "UnifiedDecisionModel",
         "depends_on_layers": (1, 2, 3),
         "progression_mode": "target_major_serial_chain",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;decision_context_id",
+        "candidate_axis": "target_symbol;twelve_month_window;target_candidate_id;decision_context_id",
         "candidate_progression_policy": "train the full-minute direct-underlying utility decision, including no-trade and maintain outcomes as first-class rows",
         "data_surface": "M01 background, M02 target state, M03 event state, costs, account capacity, risk budget, current/pending position, and labels",
         "feature_cli": None,
@@ -276,7 +277,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "OptionExpressionModel",
         "depends_on_layers": (4,),
         "progression_mode": "conditional_option_expression_after_underlying_intent",
-        "candidate_axis": "target_symbol;six_month_window;minute_timestamp;option_contract_bucket",
+        "candidate_axis": "target_symbol;twelve_month_window;minute_timestamp;option_contract_bucket",
         "candidate_progression_policy": "train option-expression and explicit no-option/not-applicable states after M04 direct-underlying intent exists; live/replay invocation remains conditional",
         "data_surface": "model_05_option_expression_feature_generation migration-source rows derived from shared option_chain_state_source after M04 intent",
         "feature_cli": "trading-data-m05-option-expression-feature-generation",
@@ -287,7 +288,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "model_name": "ResidualEventGovernanceModel",
         "depends_on_layers": (1, 3, 4, 5),
         "progression_mode": "residual_event_governance_after_thesis",
-        "candidate_axis": "target_symbol;six_month_window;target_candidate_id;residual_event_context_id",
+        "candidate_axis": "target_symbol;twelve_month_window;target_candidate_id;residual_event_context_id",
         "candidate_progression_policy": "train residual event intervention, overblock/underblock, missed-event, and underlying-vs-option failure attribution after M04/M05 thesis formation",
         "data_surface": "M01 background, M03 event state, M04 decision, optional M05 expression, event observations, and settled replay/failure evidence",
         "feature_cli": None,
@@ -465,24 +466,24 @@ def _dataset_unit_for_layer(
 ) -> DatasetUnit:
     if layer == 1:
         return DatasetUnit(
-            unit_kind="six_month_panel",
+            unit_kind="twelve_month_panel",
             unit_months=DATASET_UNIT_MONTHS,
             start_month=start_month,
             end_month=end_month,
             target_symbol=None,
             target_required=False,
-            description="M01 dataset unit: fixed background panel over one six-month window; no single target symbol applies.",
+            description="M01 dataset unit: fixed background panel over one twelve-month window; no single target symbol applies.",
         )
     target = _normalize_selected_target_symbol(selected_target_symbol)
     target_text = target if target else "UNSELECTED_TARGET"
     return DatasetUnit(
-        unit_kind="target_symbol_six_month",
+        unit_kind="target_symbol_twelve_month",
         unit_months=DATASET_UNIT_MONTHS,
         start_month=start_month,
         end_month=end_month,
         target_symbol=target,
         target_required=True,
-        description=f"M{layer:02d} dataset unit: target {target_text} over one six-month window.",
+        description=f"M{layer:02d} dataset unit: target {target_text} over one twelve-month window.",
     )
 
 
@@ -658,7 +659,7 @@ def _after_cost_alpha_checkpoint_path(*, storage_root: Path, start_month: str, e
 def _previous_after_cost_alpha_checkpoint_path(*, storage_root: Path, start_month: str) -> Path | None:
     if start_month == "2016-01":
         return None
-    previous_start_month = _add_months(start_month, -6)
+    previous_start_month = _add_months(start_month, -ROLLING_FOLD_SIZE_MONTHS)
     previous_end_month = _add_months(start_month, -1)
     return _after_cost_alpha_checkpoint_path(
         storage_root=storage_root,
@@ -705,7 +706,7 @@ def _after_cost_alpha_checkpoint_command(
 
 
 def _rolling_fold_dataset_splits(start_month: str, end_month: str) -> tuple[dict[str, Any], ...]:
-    """Return the accepted chronological 4/1/1 split contract for a six-month fold."""
+    """Return the accepted chronological 8/2/2 split contract for a twelve-month fold."""
 
     if _month_span_count(start_month, end_month) != ROLLING_FOLD_SIZE_MONTHS:
         return ()
@@ -723,7 +724,7 @@ def _rolling_fold_dataset_splits(start_month: str, end_month: str) -> tuple[dict
                 "split_months": month_count,
                 "split_start_time": _month_start_et(split_start),
                 "split_end_time": _exclusive_month_start_et(split_end),
-                "split_policy": "chronological_rolling_fold_4_1_1",
+                "split_policy": ROLLING_FOLD_SPLIT_POLICY,
             }
         )
         offset += month_count
@@ -1090,7 +1091,7 @@ def _build_layer_workflow(
                 status="blocked",
                 command=generate,
                 dataset_unit=dataset_unit,
-                blockers=("rolling_fold_4_1_1_split_required",),
+                blockers=("rolling_fold_8_2_2_split_required",),
             )
         )
     return LayerWorkflow(
@@ -1189,7 +1190,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--trading-storage-root", type=Path)
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ twelve-month dataset units.")
     parser.add_argument(
         "--allow-post-foundation-model-stages",
         action="store_true",

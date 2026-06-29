@@ -293,17 +293,17 @@ def _decision_for_role(
     if layer_evidence.layer == 1:
         action = "prepare_layer_one_historical_training_batch"
     elif target_missing:
-        action = "select_target_symbol_for_six_month_unit"
+        action = "select_target_symbol_for_twelve_month_unit"
     elif layer_evidence.layer == 7:
         action = "prepare_trading_guidance_option_expression_gate"
     else:
         action = "queue_offline_dataset_materialization"
-    dataset_unit_kind = "six_month_panel" if layer_evidence.layer in {1, 2} else "target_symbol_six_month"
+    dataset_unit_kind = "twelve_month_panel" if layer_evidence.layer in {1, 2} else "target_symbol_twelve_month"
     target_text = normalized_target if normalized_target else ("UNSELECTED_TARGET" if target_required else "not_applicable")
     task_scope_description = (
-        f"{layer_evidence.layer_key}: {role} dataset unit is the fixed M{layer_evidence.layer:02d} panel over 6 months."
+        f"{layer_evidence.layer_key}: {role} dataset unit is the fixed M{layer_evidence.layer:02d} panel over 12 months."
         if layer_evidence.layer in {1, 2}
-        else f"{layer_evidence.layer_key}: {role} dataset unit is target {target_text} over 6 months."
+        else f"{layer_evidence.layer_key}: {role} dataset unit is target {target_text} over 12 months."
     )
     return DatasetExpansionDecision(
         layer=layer_evidence.layer,
@@ -360,7 +360,7 @@ def build_dataset_expansion_plan(
             wrote_plan=True,
             plan_path=str(output_path),
             note=(
-                "M02+ expansion is blocked until the task names the selected target symbol for the six-month unit."
+                "M02+ expansion is blocked until the task names the selected target symbol for the twelve-month unit."
                 if target_missing
                 else "Expansion request selected by manager; component-specific implementation is queued through the workflow state."
                 if not decision.provider_calls_allowed
@@ -407,7 +407,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model-schema", default="trading_model")
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_DATASET_EXPANSION_PATH)
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ twelve-month dataset units.")
     parser.add_argument("--write", action="store_true", help="Prepare the selected safe expansion artifact/payloads without provider calls.")
     args = parser.parse_args(argv)
 

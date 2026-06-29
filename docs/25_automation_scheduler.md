@@ -54,7 +54,7 @@ scaffold. Month checkpoints, fold states, and downstream blocked stages remain
 internal scheduler evidence. The dashboard may show completed history and the
 single current fold- or month-scoped task, with child partitions inside detail,
 but it must not project later M03-M06 dependencies as independent Future
-Tasks rows. A six-month fold opens only after its final calendar month has
+Tasks rows. A twelve-month fold opens only after its final calendar month has
 completed in `America/New_York`, so `2026-fold1` is not eligible before
 2026-07-01 even if some January-June child months already have source data.
 Runtime execution advances one canonical month at a time. Historical scheduler

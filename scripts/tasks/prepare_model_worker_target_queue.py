@@ -47,7 +47,7 @@ def _mapping_targets(mapping_csv: Path) -> list[dict[str, object]]:
                     {
                         "symbol": symbol,
                         "enabled": True,
-                        "target_asset_class": asset_class or None,
+                        TARGET_ASSET_CLASS: asset_class or None,
                         "option_capability": _option_capability(asset_class),
                     }
                 )

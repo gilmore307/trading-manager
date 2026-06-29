@@ -80,6 +80,7 @@ DEFAULT_MONTH_INGEST_WORKERS = 1
 DEFAULT_TARGET_QUEUE_PATH = DEFAULT_RUNTIME_DIR / "model_training_target_queue.json"
 DEFAULT_DECISION_LOG_MAX_BYTES = 8 * 1024 * 1024
 COMPLETED_MONTH_CUTOFF_TZ = "America/New_York"
+ROLLING_FOLD_MONTH_COUNT = 12
 MODEL_WORKER_STAGE_TYPES = {"model_generation", "model_evaluation", "promotion_review", "maintenance"}
 MODEL_WORKER_PREP_STAGE_TYPES = {"data_acquisition", "feature_generation"}
 REPLAY_OPTION_FEATURE_FAILURE_AGENT_REASONS = {
@@ -131,24 +132,22 @@ def completed_historical_month_cutoff(now: datetime | None = None) -> str:
 
 
 def completed_historical_fold_cutoff_month(max_completed_month: str) -> str:
-    """Return latest completed month whose six-month training fold is complete."""
+    """Return latest completed month whose twelve-month training fold is complete."""
 
     year_text, month_text = max_completed_month.split("-", 1)
     year = int(year_text)
     month_number = int(month_text)
     if month_number < 1 or month_number > 12:
         raise ValueError(f"invalid month: {max_completed_month}")
-    if month_number < 6:
+    if month_number < ROLLING_FOLD_MONTH_COUNT:
         return f"{year - 1:04d}-12"
-    if month_number < 12:
-        return f"{year:04d}-06"
     return f"{year:04d}-12"
 
 
 def completed_historical_fold_cutoff(now: datetime | None = None) -> str:
     """Return latest month allowed for fold-scoped historical training.
 
-    Historical training is scheduled by complete six-month folds. A new fold
+    Historical training is scheduled by complete twelve-month folds. A new fold
     does not open until its final calendar month is complete in the project
     timezone, so 2026-fold1 remains closed until July 2026 opens.
     """
@@ -285,7 +284,7 @@ def select_next_historical_work(
     configured default bootstrap month.
     """
 
-    max_month = _eligible_historical_fold_cutoff(max_month)
+    max_month = max_month or completed_historical_month_cutoff()
     runtime_root = storage_root / "runtime"
     completed: list[str] = []
     open_months: list[str] = []
@@ -468,7 +467,7 @@ def select_month_ingest_worker_months(
     the historical scheduler now advances one canonical month at a time.
     """
 
-    max_month = _eligible_historical_fold_cutoff(max_month)
+    max_month = max_month or completed_historical_month_cutoff()
     active_target_symbol = active_model_worker_target_symbol(
         requested_target_symbol=selected_target_symbol,
         target_queue_path=storage_root / "runtime" / "model_training_target_queue.json",
@@ -544,12 +543,12 @@ def select_month_ingest_worker_months(
 
 @dataclass(frozen=True)
 class ModelWorkerFoldSelection:
-    """Model-worker selection for the next complete non-overlapping six-month fold."""
+    """Model-worker selection for the next complete non-overlapping twelve-month fold."""
 
     contract_type: str = "manager_model_worker_fold_selection"
-    fold_id: str = "fold_2016-01_2016-06"
+    fold_id: str = "fold_2016-01_2016-12"
     start_month: str = "2016-01"
-    end_month: str = "2016-06"
+    end_month: str = "2016-12"
     fold_months: tuple[str, ...] = ()
     reason_code: str = "no_complete_fold_available"
     state_path: str | None = None
@@ -560,8 +559,8 @@ class ModelWorkerFoldSelection:
         return row
 
 
-def rolling_fold_months(start_month: str, *, month_count: int = 6) -> tuple[str, ...]:
-    """Return the inclusive month sequence for one frozen six-month fold."""
+def rolling_fold_months(start_month: str, *, month_count: int = ROLLING_FOLD_MONTH_COUNT) -> tuple[str, ...]:
+    """Return the inclusive month sequence for one frozen twelve-month fold."""
 
     months = [start_month]
     while len(months) < month_count:
@@ -569,7 +568,15 @@ def rolling_fold_months(start_month: str, *, month_count: int = 6) -> tuple[str,
     return tuple(months)
 
 
-def _advance_fold_start_month(start_month: str, *, month_count: int = 6) -> str:
+def _is_current_rolling_fold_span(start_month: str, end_month: str) -> bool:
+    """Return whether a persisted fold state matches the current annual fold contract."""
+
+    if not start_month or not end_month:
+        return False
+    return rolling_fold_months(start_month)[-1] == end_month
+
+
+def _advance_fold_start_month(start_month: str, *, month_count: int = ROLLING_FOLD_MONTH_COUNT) -> str:
     """Return the next non-overlapping fold start month."""
 
     month = start_month
@@ -836,6 +843,8 @@ def _completed_pre_replay_fold_states(
         end_month = str(payload.get("end_month") or "")
         if not start_month or not end_month:
             continue
+        if not _is_current_rolling_fold_span(start_month, end_month):
+            continue
         if selected_target_symbol:
             expected_path = model_worker_fold_state_path(
                 start_month,
@@ -975,6 +984,8 @@ def _open_model_worker_fold_for_target(
         end_month = str(payload.get("end_month") or "")
         if not start_month or not end_month:
             continue
+        if not _is_current_rolling_fold_span(start_month, end_month):
+            continue
         expected_path = model_worker_fold_state_path(
             start_month,
             end_month,
@@ -1024,6 +1035,8 @@ def _open_any_model_worker_fold(
         start_month = str(payload.get("start_month") or "")
         end_month = str(payload.get("end_month") or "")
         if not start_month or not end_month or end_month > max_month:
+            continue
+        if not _is_current_rolling_fold_span(start_month, end_month):
             continue
         if _workflow_payload_all_stages_complete(payload):
             continue
@@ -1125,7 +1138,7 @@ def select_model_worker_fold(
     max_month: str | None = None,
     selected_target_symbol: str | None = None,
 ) -> ModelWorkerFoldSelection | None:
-    """Select the earliest complete non-overlapping six-month fold with open Model Worker work."""
+    """Select the earliest complete non-overlapping twelve-month fold with open Model Worker work."""
 
     if not selected_target_symbol:
         return None
@@ -1157,11 +1170,8 @@ def select_model_worker_fold(
         known_months.add(default_start_month)
 
     start = min(known_months | {default_start_month})
-    last_start = previous_month(previous_month(previous_month(previous_month(previous_month(max_month)))))
-    if start > last_start:
-        return None
     candidate = start
-    while candidate <= last_start:
+    while True:
         if _first_missing_workflow_month(
             storage_root=storage_root,
             default_start_month=default_start_month,
@@ -1170,6 +1180,8 @@ def select_model_worker_fold(
             return None
         ready, months = _model_worker_fold_is_ready(storage_root, candidate)
         end_month = months[-1]
+        if end_month > max_month:
+            return None
         state_path = model_worker_fold_state_path(
             candidate,
             end_month,
@@ -3606,7 +3618,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Maximum local replay option-feature requirements to repair per drain batch. Provider calls still use --provider-stage-next-limit.",
     )
     parser.add_argument("--month-ingest-workers", type=int, default=DEFAULT_MONTH_INGEST_WORKERS, help="Compatibility option retained for older service env files; historical runtime advances one month at a time.")
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M03+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M03+ twelve-month dataset units.")
     parser.add_argument("--target-queue-path", type=Path, default=DEFAULT_TARGET_QUEUE_PATH, help="Ordered JSON target queue used when --target-symbol is omitted.")
     parser.add_argument("--auto-select-next-work", action="store_true", help="Inspect month-scoped workflow states and choose the next open or planned chronological month automatically.")
     parser.add_argument("--advance-month-on-complete", action="store_true", help="Advance the daemon month cursor automatically after a month workflow reaches terminal completion.")

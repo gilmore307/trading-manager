@@ -90,7 +90,7 @@ class ModelGroupReplayOptionFeaturesTests(unittest.TestCase):
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
-                            "split_policy": "chronological_rolling_fold_4_1_1",
+                            "split_policy": "chronological_rolling_fold_8_2_2",
                         },
                     }
                 )

@@ -17,7 +17,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
         storage_root: Path,
         *,
         start_month: str = "2016-01",
-        end_month: str = "2016-06",
+        end_month: str = "2016-12",
     ) -> None:
         state_path = storage_root / "runtime" / f"model_training_fold_state_aapl_{start_month}_{end_month}.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -33,10 +33,19 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
-                            "split_policy": "chronological_rolling_fold_4_1_1",
+                            "split_policy": "chronological_rolling_fold_8_2_2",
                         },
                     }
                 )
+        stages.append(
+            {
+                "stage_id": "model_05_alpha_confidence.model_generation.checkpoint",
+                "stage_type": "model_generation",
+                "layer": 5,
+                "layer_key": "model_05_alpha_confidence",
+                "status": "succeeded",
+            }
+        )
         state_path.write_text(
             json.dumps(
                 {
@@ -60,7 +69,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
         artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
 
-    def _mark_m06_incomplete(self, storage_root: Path, *, start_month: str = "2016-01", end_month: str = "2016-06") -> None:
+    def _mark_m06_incomplete(self, storage_root: Path, *, start_month: str = "2016-01", end_month: str = "2016-12") -> None:
         state_path = storage_root / "runtime" / f"model_training_fold_state_aapl_{start_month}_{end_month}.json"
         payload = json.loads(state_path.read_text(encoding="utf-8"))
         for stage in payload["stages"]:
@@ -271,17 +280,17 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
         self.assertEqual(decision.decision_status, "ready")
         self.assertEqual(decision.reason_code, "model_group_replay_dataset_base_context_ready")
 
-    def test_stale_frozen_manifest_is_reprepared_for_latest_completed_fold(self):
+    def test_frozen_manifest_is_fold_agnostic_after_latest_completed_fold_changes(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
-            self._write_completed_fold(storage_root, start_month="2016-01", end_month="2016-06")
-            self._write_completed_fold(storage_root, start_month="2016-07", end_month="2016-12")
+            self._write_completed_fold(storage_root, start_month="2016-01", end_month="2016-12")
+            self._write_completed_fold(storage_root, start_month="2017-01", end_month="2017-12")
             dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
             dataset_root.mkdir(parents=True, exist_ok=True)
             (dataset_root / "base_context.json").write_text(
-                json.dumps({"candidate_fold_id": "fold_2016-01_2016-06", "pre_replay_target_refs": ["AAPL"]}) + "\n",
+                json.dumps({"candidate_fold_id": "fold_2016-01_2016-12", "pre_replay_target_refs": ["AAPL"]}) + "\n",
                 encoding="utf-8",
             )
             (dataset_root / "dataset_manifest.json").write_text(
@@ -290,7 +299,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                         "contract_type": "replay_dataset_preparation_manifest",
                         "contract_id": "promotion_replay_candidate_policy",
                         "freeze_status": "frozen",
-                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-12",
                         "missing_feed_acquisition_count": 0,
                         "pre_replay_target_refs": ["AAPL"],
                     }
@@ -315,14 +324,11 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                 selected_target_symbol="AAPL",
             )
 
-            self.assertIsNotNone(decision)
-            assert decision is not None
-            self.assertEqual(decision.reason_code, "model_group_replay_dataset_frozen")
-            self.assertTrue(decision.execution_summary["stale_dataset_scope"])
+            self.assertIsNone(decision)
             manifest = json.loads((dataset_root / "dataset_manifest.json").read_text(encoding="utf-8"))
             base_context = json.loads((dataset_root / "base_context.json").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["candidate_fold_id"], "fold_2016-07_2016-12")
-            self.assertEqual(base_context["candidate_fold_id"], "fold_2016-07_2016-12")
+            self.assertEqual(manifest["candidate_fold_id"], "fold_2016-01_2016-12")
+            self.assertEqual(base_context["candidate_fold_id"], "fold_2016-01_2016-12")
 
     def test_missing_coverage_requires_provider_acquisition_gate(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

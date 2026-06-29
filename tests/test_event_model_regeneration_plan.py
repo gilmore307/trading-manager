@@ -10,11 +10,27 @@ from trading_manager_tasks.event_model_regeneration_plan import build_event_mode
 
 class EventModelRegenerationPlanTests(unittest.TestCase):
     def test_plan_preserves_foundation_and_blocks_storage_cleanup_until_review(self) -> None:
-        plan = build_event_model_regeneration_plan(start_month="2016-01", end_month="2016-06", target_symbol="aapl")
+        plan = build_event_model_regeneration_plan(start_month="2016-01", end_month="2016-12", target_symbol="aapl")
         row = plan.summary_row()
 
         self.assertEqual(row["contract_type"], "manager_event_model_regeneration_plan")
-        self.assertEqual(row["fold_months"], ["2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"])
+        self.assertEqual(
+            row["fold_months"],
+            [
+                "2016-01",
+                "2016-02",
+                "2016-03",
+                "2016-04",
+                "2016-05",
+                "2016-06",
+                "2016-07",
+                "2016-08",
+                "2016-09",
+                "2016-10",
+                "2016-11",
+                "2016-12",
+            ],
+        )
         self.assertIn("model_01_market_context_and_model_01_sector_context_persistent_foundation_data", row["preserved_surfaces"])
         self.assertIn("pre_replay_residual_event_governance_data_or_feature_outputs", row["superseded_surfaces"])
         self.assertIn("base-stack and replay outputs remain reusable", row["invalidation_scope"])

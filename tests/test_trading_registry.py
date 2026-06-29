@@ -2081,8 +2081,8 @@ class RegistryHelperTests(unittest.TestCase):
             "promotion_waits_for_model_group_evaluation_complete",
             rows["MONTHLY_SUBSTRATE_FOLD_MODEL_STAGE_BOUNDARY"]["payload"],
         )
-        self.assertEqual(rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["kind"], "config")
-        self.assertIn("train_months=4", rows["ROLLING_FOLD_FOUR_ONE_ONE_SPLIT"]["payload"])
+        self.assertEqual(rows["ROLLING_FOLD_EIGHT_TWO_TWO_SPLIT"]["kind"], "config")
+        self.assertIn("train_months=8", rows["ROLLING_FOLD_EIGHT_TWO_TWO_SPLIT"]["payload"])
         self.assertEqual(
             rows["MONTH_SCOPED_INGEST_ONLY_DURING_FOUNDATION_CATCH_UP"]["payload"],
             "month_scoped_model_01_03_workflow_exposes_data_acquisition_and_feature_generation_only",

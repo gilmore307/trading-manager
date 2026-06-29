@@ -22,6 +22,7 @@ from .model_training_workflow import (
     FOUNDATION_CATCH_UP_STAGE_TYPES,
     LAYER_METADATA,
     MONTHLY_SUBSTRATE_LAYERS,
+    ROLLING_FOLD_SIZE_MONTHS,
     ROLLING_FOLD_SPLIT_MONTHS,
     base_stack_model_generation_splits_complete,
     build_model_training_workflow_plan,
@@ -66,6 +67,7 @@ FOLD_MODEL_STAGE_TYPES = {
     "maintenance",
 }
 MONTHS_PER_MODEL_FOLD = 6
+CURRENT_MODEL_GROUP_TRAINING_FOLD_MONTHS = ROLLING_FOLD_SIZE_MONTHS
 MODEL_GENERATION_SPLIT_MONTH_COUNT = sum(months for _name, months in ROLLING_FOLD_SPLIT_MONTHS)
 MODEL_GROUP_EVALUATION_TESTS = (
     "replay_metrics",
@@ -2202,7 +2204,7 @@ def _fold_stage_coverage_progress(
         "accepted_failed_count": accepted_failed,
         "can_unlock_downstream": complete,
         "progress_source": "fold_stage_coverage",
-        "progress_basis": "download/source partitions required by the six-month fold",
+        "progress_basis": "download/source partitions required by the twelve-month fold",
         "covered_partition_count": len(rows),
         "expected_partition_count": len(months),
     }
@@ -4319,7 +4321,7 @@ def _model_group_training_fold_window(
     if completed_fold is not None:
         start_month, end_month, _target_symbol = completed_fold
         return start_month, end_month, _month_span_count(start_month, end_month)
-    return ("2016-01", "2016-06", MONTHS_PER_MODEL_FOLD)
+    return ("2016-01", "2016-12", CURRENT_MODEL_GROUP_TRAINING_FOLD_MONTHS)
 
 
 def _completed_model_group_training_fold(

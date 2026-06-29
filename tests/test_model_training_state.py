@@ -191,7 +191,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             completed.append("model_05_option_expression.option_chain_data_acquisition")
             state = advance_workflow_state(
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 storage_root=tmp,
                 state_path=state_path,
                 completed_stage_ids=completed,
@@ -218,7 +218,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             )
             state = advance_workflow_state(
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 storage_root=tmp,
                 state_path=state_path,
                 stage_coverage_reports=[coverage],
@@ -414,7 +414,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             ]
             state = advance_workflow_state(
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 storage_root=tmp,
                 state_path=state_path,
                 completed_stage_ids=completions + ["model_05_option_expression.option_chain_data_acquisition"],
@@ -433,7 +433,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             state_path = tmp / "workflow_state.json"
             state = advance_workflow_state(
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 storage_root=tmp,
                 state_path=state_path,
                 selected_target_symbol="AAPL",
@@ -457,7 +457,7 @@ class ModelTrainingWorkflowStateTests(unittest.TestCase):
             ]
             state = advance_workflow_state(
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 storage_root=tmp,
                 state_path=state_path,
                 completed_stage_ids=completions,

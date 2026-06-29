@@ -56,7 +56,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=Path(raw_tmp),
                 trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
@@ -167,7 +167,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertNotIn("model_02_target_state.feature_generation", {stage.stage_id for stage in stages})
         self.assertNotIn("model_05_option_expression.feature_generation", {stage.stage_id for stage in stages})
         self.assertFalse(any(stage.stage_type == "model_generation" for stage in stages))
-        self.assertFalse(any("rolling_fold_4_1_1_split_required" in stage.blockers for stage in stages))
+        self.assertFalse(any("rolling_fold_8_2_2_split_required" in stage.blockers for stage in stages))
 
     def test_m02_target_state_blocks_without_target_local_feed_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -205,7 +205,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=Path(raw_tmp),
                 trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
@@ -232,7 +232,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=tmp,
                 trading_storage_root=tmp,
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 selected_target_symbol="XYZ",
                 foundation_catch_up_only=False,
             )
@@ -260,7 +260,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=tmp,
                 trading_storage_root=tmp,
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 selected_target_symbol="BTC",
                 foundation_catch_up_only=False,
             )
@@ -283,7 +283,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=Path(raw_tmp),
                 trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
@@ -295,7 +295,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             "model_04_unified_decision.model_generation.test",
         ])
         self.assertEqual([stage.dataset_split["split_name"] for stage in split_stages], ["train", "validation", "test"])
-        self.assertEqual([stage.dataset_split["split_months"] for stage in split_stages], [4, 1, 1])
+        self.assertEqual([stage.dataset_split["split_months"] for stage in split_stages], [8, 2, 2])
         self.assertEqual(split_stages[1].blockers, ("model_04_unified_decision.model_generation.train_complete",))
         self.assertEqual(split_stages[2].blockers, ("model_04_unified_decision.model_generation.validation_complete",))
 
@@ -305,8 +305,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             plan = build_model_training_workflow_plan(
                 storage_root=root,
                 trading_storage_root=Path(raw_tmp),
-                start_month="2016-07",
-                end_month="2016-12",
+                start_month="2017-01",
+                end_month="2017-12",
                 selected_target_symbol="AAPL",
                 foundation_catch_up_only=False,
             )
@@ -317,10 +317,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(stage.blockers, ("model_05_option_expression.model_generation.test_complete",))
         self.assertTrue(any(token.endswith("train_model_05_alpha_confidence.py") for token in stage.command))
         self.assertIn("--parent-checkpoint-ref", stage.command)
-        self.assertTrue(any(token.endswith("after_cost_alpha_model_2016-01_2016-06.json") for token in stage.command))
-        self.assertTrue(any(token.endswith("after_cost_alpha_model_2016-07_2016-12.json") for token in stage.command))
+        self.assertTrue(any(token.endswith("after_cost_alpha_model_2016-01_2016-12.json") for token in stage.command))
+        self.assertTrue(any(token.endswith("after_cost_alpha_model_2017-01_2017-12.json") for token in stage.command))
         self.assertIn("--source-end", stage.command)
-        self.assertIn("2016-11-01T00:00:00-05:00", stage.command)
+        self.assertIn("2017-09-01T00:00:00-05:00", stage.command)
 
     def test_dataset_units_are_model_aware_and_target_visible(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -328,17 +328,17 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=Path(raw_tmp),
                 trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 selected_target_symbol="aapl",
                 foundation_catch_up_only=False,
             )
 
         self.assertEqual(plan.selected_target_symbol, "AAPL")
-        self.assertEqual(plan.layers[0].dataset_unit.unit_kind, "six_month_panel")
+        self.assertEqual(plan.layers[0].dataset_unit.unit_kind, "twelve_month_panel")
         self.assertFalse(plan.layers[0].dataset_unit.target_required)
         self.assertEqual(plan.layers[2].stages[0].dataset_unit.unit_kind, "event_observation_fold_panel")
         for layer in (plan.layers[1], plan.layers[3], plan.layers[4], plan.layers[5]):
-            self.assertEqual(layer.dataset_unit.unit_kind, "target_symbol_six_month")
+            self.assertEqual(layer.dataset_unit.unit_kind, "target_symbol_twelve_month")
             self.assertEqual(layer.dataset_unit.target_symbol, "AAPL")
             self.assertTrue(layer.dataset_unit.target_required)
 
@@ -349,7 +349,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                     storage_root=Path(raw_tmp),
                     trading_storage_root=Path(raw_tmp),
                     start_month="2016-01",
-                    end_month="2016-06",
+                    end_month="2016-12",
                     selected_target_symbol="AAPL,MSFT",
                     foundation_catch_up_only=False,
                 )
@@ -360,7 +360,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 storage_root=Path(raw_tmp),
                 trading_storage_root=Path(raw_tmp),
                 start_month="2016-01",
-                end_month="2016-06",
+                end_month="2016-12",
                 foundation_catch_up_only=False,
             )
 

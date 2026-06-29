@@ -665,10 +665,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "status": "succeeded",
                         "dataset_split": {
                             "split_name": split_name,
-                            "split_policy": "chronological_rolling_fold_4_1_1",
+                            "split_policy": "chronological_rolling_fold_8_2_2",
                         },
                         "dataset_unit": {
-                            "unit_kind": "six_month_target_fold",
+                            "unit_kind": "twelve_month_target_fold",
                             "unit_months": 6,
                             "start_month": "2016-01",
                             "end_month": "2016-06",
@@ -1085,13 +1085,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["unit_label"], "task units")
         self.assertEqual(progress["ready_count"], 1)
         self.assertEqual(progress["active_count"], 2)
-        self.assertEqual(progress["expected_count"], 8)
+        self.assertEqual(progress["expected_count"], 14)
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(
             live_activity["activity_summary"],
             "Generating feature window 9 of 26 · 2016-02-25 to 2016-03-03 · examples AAPL, BTC, MSFT, NVDA",
         )
-        self.assertEqual(live_activity["progress_label"], "1/8 task units")
+        self.assertEqual(live_activity["progress_label"], "1/14 task units")
         self.assertEqual(live_activity["sample_targets"], ["AAPL", "BTC", "MSFT", "NVDA"])
         self.assertIn("Candidate symbols 50", live_activity["activity_details"])
 
@@ -1267,7 +1267,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                 },
                             }
@@ -2309,7 +2309,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded" if layer <= 2 else "blocked",
                                 "last_reason": "waiting for pre-replay input" if layer > 2 else "stage complete",
                                 "dataset_unit": {
-                                    "unit_kind": "six_month_target_fold",
+                                    "unit_kind": "twelve_month_target_fold",
                                     "unit_months": 6,
                                     "start_month": "2016-07",
                                     "end_month": "2016-12",
@@ -2385,7 +2385,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": split_name},
                                 "dataset_unit": {
-                                    "unit_kind": "six_month_target_fold",
+                                    "unit_kind": "twelve_month_target_fold",
                                     "unit_months": 6,
                                     "start_month": start,
                                     "end_month": end,
@@ -2881,7 +2881,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": f"model_{layer:02d}_fixture",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "six_month_target_fold",
+                                    "unit_kind": "twelve_month_target_fold",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -2953,7 +2953,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_01_market_context",
                                 "status": "ready",
                                 "dataset_unit": {
-                                    "unit_kind": "six_month_panel",
+                                    "unit_kind": "twelve_month_panel",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3042,7 +3042,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3080,7 +3080,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["expected_count"], 6)
         self.assertEqual(progress["ready_count"], 0)
         self.assertEqual(progress["pending_count"], 6)
-        self.assertIn("six-month fold", progress["progress_basis"])
+        self.assertIn("twelve-month fold", progress["progress_basis"])
 
     def test_reset_fold_waits_for_monthly_foundation_instead_of_showing_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3110,7 +3110,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                     "contract changed; reset AAPL fold M02 and downstream generated workflow state."
                                 ),
                                 "dataset_unit": {
-                                    "unit_kind": "six_month_panel",
+                                    "unit_kind": "twelve_month_panel",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3183,7 +3183,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_01_market_context",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "six_month_panel",
+                                    "unit_kind": "twelve_month_panel",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3198,7 +3198,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_06_residual_event_governance",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3213,7 +3213,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_05_option_expression",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3269,7 +3269,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3329,10 +3329,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
         self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["expected_count"], 8)
-        self.assertEqual(progress["ready_count"], 6)
-        self.assertEqual(progress["active_count"], 7)
-        self.assertEqual(progress["pending_count"], 1)
+        self.assertEqual(progress["expected_count"], 14)
+        self.assertEqual(progress["ready_count"], 10)
+        self.assertEqual(progress["active_count"], 12)
+        self.assertEqual(progress["pending_count"], 2)
         self.assertIn("all layer-internal", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
 
@@ -3357,7 +3357,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "train"},
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3413,15 +3413,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["status"], "running")
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
         self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["expected_count"], 6)
-        self.assertEqual(progress["ready_count"], 4)
-        self.assertEqual(progress["active_count"], 5)
-        self.assertEqual(progress["pending_count"], 1)
+        self.assertEqual(progress["expected_count"], 12)
+        self.assertEqual(progress["ready_count"], 8)
+        self.assertEqual(progress["active_count"], 10)
+        self.assertEqual(progress["pending_count"], 2)
         self.assertEqual(progress["stage_id"], "model_02_target_state.model_generation.validation")
         self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(live_activity["activity_summary"], "Stage process started")
-        self.assertEqual(live_activity["progress_label"], "4/6 task units")
+        self.assertEqual(live_activity["progress_label"], "8/12 task units")
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3444,7 +3444,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "train"},
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3468,7 +3468,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_split": {"split_name": "test"},
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -3497,8 +3497,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
         self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["expected_count"], 6)
-        self.assertEqual(progress["ready_count"], 6)
+        self.assertEqual(progress["expected_count"], 12)
+        self.assertEqual(progress["ready_count"], 12)
         self.assertEqual(progress["pending_count"], 0)
         self.assertNotIn("artifact_count", progress)
 
@@ -4023,7 +4023,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
-                                    "unit_kind": "six_month_target_fold",
+                                    "unit_kind": "twelve_month_target_fold",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -4172,7 +4172,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
-                                    "unit_kind": "six_month_target_fold",
+                                    "unit_kind": "twelve_month_target_fold",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -4324,7 +4324,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_05_option_expression",
                                 "status": "succeeded",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -4339,7 +4339,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "layer_key": "model_02_target_state",
                                 "status": "ready",
                                 "dataset_unit": {
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                     "start_month": "2016-01",
                                     "end_month": "2016-06",
@@ -5631,7 +5631,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "last_reason": "stage completed by manager stage executor",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                 },
                             }
@@ -6239,7 +6239,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                 },
                             }
@@ -6265,7 +6265,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAOI",
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                 },
                             }
@@ -6290,7 +6290,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                 },
                             },
@@ -6302,7 +6302,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                 },
                             },
@@ -6384,7 +6384,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "status": "ready",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                 },
                             }
@@ -6410,7 +6410,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 "last_reason": "stage command is currently running outside checkpoint state",
                                 "dataset_unit": {
                                     "target_symbol": "AAPL",
-                                    "unit_kind": "target_symbol_six_month",
+                                    "unit_kind": "target_symbol_twelve_month",
                                     "unit_months": 6,
                                 },
                             }

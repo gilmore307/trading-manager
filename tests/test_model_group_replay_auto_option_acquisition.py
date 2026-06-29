@@ -23,7 +23,10 @@ def _write_supervised_alpha_model(path: Path) -> None:
         json.dumps(
             {
                 "contract_type": "after_cost_alpha_model",
+                "checkpoint_ref": str(path),
+                "learning_contract": "replayable_cumulative_fold_checkpoint",
                 "training_summary": {
+                    "cumulative_learning_mode": "cumulative_checkpoint",
                     "training_mode": "supervised_fit",
                     "sample_count": 128,
                 },

@@ -47,6 +47,7 @@ docs/25_automation_scheduler.md          Scheduler policy.
 docs/26_historical_scheduler_runtime.md  Resident service runtime.
 docs/27_control_plane_acceptance.md      Accepted control-plane scope.
 docs/28_numbering_physical_contract.md   Current numbering and physical-name contract.
+docs/29_train_replay_realtime_input_parity.md  Train/replay/realtime input parity contract.
 docs/30_helpers.md                       Shared helper package policy.
 ```
 

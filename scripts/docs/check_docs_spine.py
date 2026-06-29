@@ -30,6 +30,7 @@ EXPECTED_DOCS = (
     "docs/26_historical_scheduler_runtime.md",
     "docs/27_control_plane_acceptance.md",
     "docs/28_numbering_physical_contract.md",
+    "docs/29_train_replay_realtime_input_parity.md",
     "docs/30_helpers.md",
 )
 

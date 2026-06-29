@@ -16,19 +16,19 @@ DEFAULT_TASK_PROGRESS_ROOT = DEFAULT_STORAGE_ROOT / "runtime" / "task_progress"
 STAGE_PROGRESS_CONTRACTS: dict[str, dict[str, str]] = {
     "data_acquisition": {
         "unit_label": "source-month requests",
-        "progress_basis": "download/source partitions required by the six-month fold",
+        "progress_basis": "download/source partitions required by the twelve-month fold",
     },
     "feature_generation": {
         "unit_label": "feature months",
-        "progress_basis": "feature partitions required by the six-month fold",
+        "progress_basis": "feature partitions required by the twelve-month fold",
     },
     "model_generation": {
         "unit_label": "dataset months",
-        "progress_basis": "chronological train/validation/test month coverage required by the six-month fold",
+        "progress_basis": "chronological train/validation/test month coverage required by the twelve-month fold",
     },
     "model_training": {
         "unit_label": "training months",
-        "progress_basis": "chronological training months used to fit a frozen model artifact for the six-month fold",
+        "progress_basis": "chronological training months used to fit a frozen model artifact for the twelve-month fold",
     },
     "replay": {
         "unit_label": "replay months",

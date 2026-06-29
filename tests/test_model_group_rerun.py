@@ -16,9 +16,9 @@ class ModelGroupRerunTests(unittest.TestCase):
     def test_dry_run_builds_schema_valid_plan_without_mutating_state(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
-            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-07_2016-12.json"
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-12.json"
             plan = build_model_training_workflow_plan(
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 storage_root=storage_root,
                 selected_target_symbol="AAPL",
@@ -31,7 +31,7 @@ class ModelGroupRerunTests(unittest.TestCase):
                 if stage.layer <= 4
             ]
             advance_workflow_state(
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 storage_root=storage_root,
                 state_path=state_path,
@@ -44,7 +44,7 @@ class ModelGroupRerunTests(unittest.TestCase):
 
             result = execute_model_group_rerun_reset(
                 storage_root=storage_root,
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 target_symbol="AAPL",
                 layer_id=2,
@@ -92,9 +92,9 @@ class ModelGroupRerunTests(unittest.TestCase):
     def test_execute_resets_cutpoint_and_downstream_state_for_scheduler_reentry(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
-            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-07_2016-12.json"
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-12.json"
             plan = build_model_training_workflow_plan(
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 storage_root=storage_root,
                 selected_target_symbol="AAPL",
@@ -107,7 +107,7 @@ class ModelGroupRerunTests(unittest.TestCase):
                 if stage.layer <= 4
             ]
             advance_workflow_state(
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 storage_root=storage_root,
                 state_path=state_path,
@@ -119,7 +119,7 @@ class ModelGroupRerunTests(unittest.TestCase):
 
             result = execute_model_group_rerun_reset(
                 storage_root=storage_root,
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 target_symbol="AAPL",
                 layer_id=2,
@@ -157,9 +157,9 @@ class ModelGroupRerunTests(unittest.TestCase):
     def test_execute_resets_model_training_cutpoint(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
-            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-07_2016-12.json"
+            state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2016-12.json"
             plan = build_model_training_workflow_plan(
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 storage_root=storage_root,
                 selected_target_symbol="AAPL",
@@ -172,7 +172,7 @@ class ModelGroupRerunTests(unittest.TestCase):
                 if stage.layer <= 5
             ]
             advance_workflow_state(
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 storage_root=storage_root,
                 state_path=state_path,
@@ -184,7 +184,7 @@ class ModelGroupRerunTests(unittest.TestCase):
 
             result = execute_model_group_rerun_reset(
                 storage_root=storage_root,
-                start_month="2016-07",
+                start_month="2016-01",
                 end_month="2016-12",
                 target_symbol="AAPL",
                 layer_id=5,

@@ -26,6 +26,7 @@ from .storage_paths import projects_root
 from .model_training_workflow import (
     MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
     PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT,
+    ROLLING_FOLD_TRAIN_MONTHS,
     base_stack_model_generation_splits_complete,
 )
 
@@ -1114,7 +1115,7 @@ def _after_cost_alpha_training_bounds(training_fold: Mapping[str, Any]) -> tuple
     start_month = str(training_fold.get("start_month") or "").strip()
     if not re.fullmatch(r"\d{4}-\d{2}", start_month):
         raise ValueError("training fold start_month must be YYYY-MM")
-    source_end_month = _add_months(start_month, 4)
+    source_end_month = _add_months(start_month, ROLLING_FOLD_TRAIN_MONTHS)
     return f"{start_month}-01T00:00:00-05:00", f"{source_end_month}-01T00:00:00-05:00"
 
 

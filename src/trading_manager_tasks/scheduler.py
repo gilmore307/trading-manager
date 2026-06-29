@@ -1004,7 +1004,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--execute-autonomous-provider-stages", action="store_true", help="Execute one bounded autonomous provider-dispatch/reconcile slice when a provider acquisition stage is ready.")
     parser.add_argument("--provider-stage-next-limit", type=int, default=5, help="Maximum provider requests to dispatch in one scheduler tick.")
     parser.add_argument("--provider-stage-max-workers", type=int, default=4, help="Maximum dynamic provider worker threads in one scheduler tick.")
-    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ six-month dataset units.")
+    parser.add_argument("--target-symbol", help="Required task-scope target symbol for M02+ twelve-month dataset units.")
     parser.add_argument("--state-path", type=Path, default=None, help="Workflow checkpoint path; defaults to the month-scoped manager runtime checkpoint.")
     parser.add_argument(
         "--allow-post-foundation-model-stages",
