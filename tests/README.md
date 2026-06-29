@@ -78,3 +78,4 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_trading_bigquery.py`
 - `test_trading_economics_calendar.py`
 - `test_trading_registry.py`
+- `test_workflow_transition_ledger.py`

@@ -30,6 +30,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler_daemon import (
     DEFAULT_MONTH_INGEST_WORKERS,
     DEFAULT_TARGET_QUEUE_PATH,
+    active_model_worker_target_symbol,
     completed_historical_month_cutoff,
     select_model_worker_fold,
     select_month_ingest_worker_months,
@@ -1405,7 +1406,7 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
             status.blocked_reason,
         )
     )
-    resolved_storage_root = storage_root or _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    resolved_storage_root = storage_root or _storage_root_from_status(status)
     runtime_activity = None
     decision_activity = _scheduler_decision_runtime_activity(latest_decision)
     is_replay_work = (
@@ -2431,6 +2432,13 @@ def _storage_root_from_checkpoint_path(path: object) -> Path:
     return DEFAULT_STORAGE_ROOT
 
 
+def _storage_root_from_status(status: HistoricalSchedulerStatus) -> Path:
+    raw_storage_root = str(getattr(status, "storage_root", "") or "").strip()
+    if raw_storage_root:
+        return Path(raw_storage_root)
+    return _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+
+
 def _selected_target_symbol_from_service_env(status: HistoricalSchedulerStatus) -> str | None:
     env_path = _resolve_local_path(status.service_env.path)
     if env_path is None or not env_path.exists():
@@ -2452,6 +2460,11 @@ def _selected_target_symbol_from_service_env(status: HistoricalSchedulerStatus) 
 
 
 def _selected_target_symbol_from_latest_decision(status: HistoricalSchedulerStatus) -> str | None:
+    latest_transition = getattr(status, "latest_workflow_transition", None) or {}
+    if isinstance(latest_transition, Mapping):
+        symbol = str(latest_transition.get("target_symbol") or latest_transition.get("selected_target_symbol") or "").strip().upper()
+        if symbol:
+            return symbol
     latest_decision = status.latest_decision or {}
     if not isinstance(latest_decision, Mapping):
         return None
@@ -2466,7 +2479,12 @@ def _selected_target_symbol_from_latest_decision(status: HistoricalSchedulerStat
 
 
 def _selected_target_symbol(status: HistoricalSchedulerStatus) -> str | None:
-    return _selected_target_symbol_from_latest_decision(status) or _selected_target_symbol_from_service_env(status)
+    requested = _selected_target_symbol_from_latest_decision(status) or _selected_target_symbol_from_service_env(status)
+    storage_root = _storage_root_from_status(status)
+    return active_model_worker_target_symbol(
+        requested_target_symbol=requested,
+        target_queue_path=storage_root / "runtime" / "model_training_target_queue.json",
+    )
 
 
 def _planned_stage_rows(status: HistoricalSchedulerStatus, *, month: str | None = None) -> list[dict[str, Any]]:
@@ -2477,7 +2495,7 @@ def _planned_stage_rows(status: HistoricalSchedulerStatus, *, month: str | None 
         plan = build_model_training_workflow_plan(
             start_month=selected_month,
             end_month=selected_month,
-            storage_root=_storage_root_from_checkpoint_path(status.workflow_checkpoint.path),
+            storage_root=_storage_root_from_status(status),
             selected_target_symbol=_selected_target_symbol(status),
         )
     except Exception:
@@ -3364,8 +3382,6 @@ def _instrument_scope_for_task(layer: object) -> str:
 
 def _target_queue_summary(storage_root: Path) -> dict[str, Any] | None:
     queue_path = storage_root / "runtime" / DEFAULT_TARGET_QUEUE_PATH.name
-    if not queue_path.exists() and DEFAULT_TARGET_QUEUE_PATH.exists():
-        queue_path = DEFAULT_TARGET_QUEUE_PATH
     if not queue_path.exists():
         return None
     try:
@@ -3497,7 +3513,7 @@ def _task_timeline(
     only month allowed to expose a `current` row.
     """
 
-    storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    storage_root = _storage_root_from_status(status)
     active_task_progress = load_active_task_progress(storage_root / "runtime" / "task_progress")
     month_ingest_worker_count = DEFAULT_MONTH_INGEST_WORKERS
     max_dashboard_month = completed_historical_month_cutoff()
@@ -5685,7 +5701,7 @@ def build_historical_task_progress_summary(
     generated_at_utc = generated_at_utc or now_utc()
     stage_counts = _stage_counts(status)
     task_timeline = _task_timeline(status, stage_coverage=stage_coverage)
-    storage_root = _storage_root_from_checkpoint_path(status.workflow_checkpoint.path)
+    storage_root = _storage_root_from_status(status)
     selected_target_symbol = _selected_target_symbol(status)
     task_timeline.extend(
         _model_group_lifecycle_tasks_for_visible_folds(

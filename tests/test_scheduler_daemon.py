@@ -19,6 +19,7 @@ from trading_manager_tasks.scheduler_daemon import (
     ModelWorkerFoldSelection,
     SchedulerDaemonState,
     acquire_daemon_lock,
+    active_model_worker_target_symbol,
     append_decision_log,
     apply_auto_work_selection,
     apply_model_worker_selection_to_state,
@@ -102,11 +103,11 @@ class SchedulerDaemonTests(unittest.TestCase):
                 start_month="2016-01",
                 end_month="2016-06",
                 fold_months=("2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06"),
-                reason_code="resume_existing_open_model_worker_fold_outside_target_queue",
+                reason_code="selected_target_has_open_model_worker_fold",
                 state_path="/tmp/model_training_fold_state_btc_2016-01_2016-06.json",
             ),
             selected_target_symbol="BTC",
-            selection_reason_code="resume_existing_open_model_worker_fold_outside_target_queue",
+            selection_reason_code="selected_target_has_open_model_worker_fold",
             updated_utc="2026-06-29T01:12:00+00:00",
         )
 
@@ -1231,6 +1232,30 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(target_selection.fold_selection.start_month, "2016-01")
         self.assertEqual(Path(target_selection.fold_selection.state_path or "").name, "model_training_fold_state_msft_2016-01_2016-06.json")
 
+    def test_target_queue_loader_excludes_non_optionable_model_worker_targets(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            queue_path = Path(raw_tmp) / "model_training_target_queue.json"
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_target_queue",
+                        "targets": [
+                            {"symbol": "BTC", "target_asset_class": "crypto_spot", "option_capability": "structurally_no_listed_options"},
+                            {"symbol": "AAPL", "target_asset_class": "equity_common"},
+                            {"symbol": "SPOTX", "option_capability": "non_optionable_underlying"},
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            loaded_queue = load_model_worker_target_queue(queue_path)
+            active_target = active_model_worker_target_symbol(requested_target_symbol="BTC", target_queue_path=queue_path)
+
+        self.assertEqual(loaded_queue, ("AAPL",))
+        self.assertEqual(active_target, "AAPL")
+
     def test_model_worker_selects_foundation_fold_without_target_queue(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
@@ -1253,7 +1278,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         assert target_selection.fold_selection is not None
         self.assertEqual(target_selection.fold_selection.fold_id, "fold_2016-01_2016-06")
 
-    def test_model_worker_resumes_open_fold_outside_target_queue(self):
+    def test_model_worker_ignores_open_fold_outside_target_queue(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
             queue_path = storage_root / "runtime" / "model_training_target_queue.json"
@@ -1267,7 +1292,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             )
             self.assertIsNotNone(selection)
             assert selection is not None
-            state_path = seed_model_worker_fold_state(
+            seed_model_worker_fold_state(
                 storage_root=storage_root,
                 selection=selection,
                 selected_target_symbol="BTC",
@@ -1292,11 +1317,170 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNotNone(target_selection)
         assert target_selection is not None
-        self.assertEqual(target_selection.selected_target_symbol, "BTC")
-        self.assertEqual(target_selection.reason_code, "resume_existing_open_model_worker_fold_outside_target_queue")
+        self.assertEqual(target_selection.selected_target_symbol, "AAPL")
+        self.assertEqual(target_selection.reason_code, "selected_target_has_open_model_worker_fold")
         self.assertIsNotNone(target_selection.fold_selection)
         assert target_selection.fold_selection is not None
-        self.assertEqual(Path(target_selection.fold_selection.state_path or ""), state_path)
+        self.assertEqual(Path(target_selection.fold_selection.state_path or "").name, "model_training_fold_state_aapl_2016-01_2016-06.json")
+
+    def test_next_historical_work_uses_first_queue_target_lifecycle_not_global_target_hold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            queue_path = storage_root / "runtime" / "model_training_target_queue.json"
+            queue_path.parent.mkdir(parents=True, exist_ok=True)
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_target_queue",
+                        "targets": [{"symbol": "AAPL"}, {"symbol": "AAOI"}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            aapl_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            self.assertIsNotNone(aapl_selection)
+            assert aapl_selection is not None
+            aapl_state_path = seed_model_worker_fold_state(
+                storage_root=storage_root,
+                selection=aapl_selection,
+                selected_target_symbol="AAPL",
+            )
+            aapl_plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                state_path=aapl_state_path,
+                completed_stage_ids=[stage.stage_id for layer in aapl_plan.layers for stage in layer.stages],
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+            self._write_terminal_promotion_decision_after(storage_root=storage_root, state_path=aapl_state_path, status="rejected")
+            aaoi_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAOI",
+            )
+            self.assertIsNotNone(aaoi_selection)
+            assert aaoi_selection is not None
+            seed_model_worker_fold_state(
+                storage_root=storage_root,
+                selection=aaoi_selection,
+                selected_target_symbol="AAOI",
+            )
+
+            next_work = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                default_end_month="2016-01",
+                max_month="2017-06",
+                target_queue_path=queue_path,
+            )
+
+        self.assertEqual(next_work.reason_code, "advance_after_latest_completed_workflow_state")
+        self.assertEqual(next_work.start_month, "2017-01")
+
+    def test_next_historical_work_holds_open_target_fold_before_later_month(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            queue_path = storage_root / "runtime" / "model_training_target_queue.json"
+            queue_path.parent.mkdir(parents=True, exist_ok=True)
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_target_queue",
+                        "targets": [{"symbol": "AAPL"}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            for month in rolling_fold_months("2016-01") + rolling_fold_months("2016-07"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            first_fold_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            self.assertIsNotNone(first_fold_selection)
+            assert first_fold_selection is not None
+            first_fold_state_path = seed_model_worker_fold_state(
+                storage_root=storage_root,
+                selection=first_fold_selection,
+                selected_target_symbol="AAPL",
+            )
+            first_fold_plan = build_model_training_workflow_plan(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+            advance_workflow_state(
+                start_month="2016-01",
+                end_month="2016-06",
+                storage_root=storage_root,
+                state_path=first_fold_state_path,
+                completed_stage_ids=[stage.stage_id for layer in first_fold_plan.layers for stage in layer.stages],
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+                write=True,
+            )
+            self._write_terminal_promotion_decision_after(storage_root=storage_root, state_path=first_fold_state_path, status="rejected")
+            second_fold_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+            self.assertIsNotNone(second_fold_selection)
+            assert second_fold_selection is not None
+            seed_model_worker_fold_state(
+                storage_root=storage_root,
+                selection=second_fold_selection,
+                selected_target_symbol="AAPL",
+            )
+            later_plan = build_model_training_workflow_plan(
+                start_month="2017-01",
+                end_month="2017-01",
+                storage_root=storage_root,
+            )
+            advance_workflow_state(
+                start_month="2017-01",
+                end_month="2017-01",
+                storage_root=storage_root,
+                state_path=workflow_state_path_for_month("2017-01", root=storage_root / "runtime"),
+                completed_stage_ids=[later_plan.layers[0].stages[0].stage_id],
+                write=True,
+            )
+
+            next_work = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                default_end_month="2016-01",
+                max_month="2017-06",
+                target_queue_path=queue_path,
+            )
+
+        self.assertEqual(next_work.reason_code, "resume_open_model_worker_fold")
+        self.assertEqual((next_work.start_month, next_work.end_month), ("2016-07", "2016-12"))
 
     def test_model_worker_executes_foundation_fold_without_selected_target(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

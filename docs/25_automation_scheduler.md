@@ -84,12 +84,11 @@ normal safe offline M02 materialization stage continues.
 
 M05 option-expression owns option-chain source acquisition. The shared
 `trading_data.option_chain_state_source` table owns contract-level ThetaData
-option-chain rows. Scheduler adds
-`model_05_option_expression.option_chain_data_acquisition` only when the
-selected target's metadata leaves listed options applicable. Targets marked as
-`crypto_spot` or confirmed no-listed-options skip the option source/feature
-stages, but M05 model generation still runs so no-option/not-applicable states
-are represented in training.
+option-chain rows. Model-worker training targets must come from the reviewed
+optionable equity queue. Crypto spot rows such as BTC may remain in replay
+candidate universes or market-context inputs, but they are not legal
+model-worker training targets because they cannot exercise the option-expression
+surface.
 
 Replay-selected listed option contracts require a second source boundary after
 M05 has chosen a concrete contract. `model_group.replay_contract_paths` reads
@@ -137,12 +136,10 @@ Accepted queue shape:
 If the first target has completed all eligible substrate windows through the completed-fold cutoff and its current fold lifecycle has completed maintenance/readiness handoff, the scheduler skips it and starts the next queued target from the earliest ready window, usually `2016-01`. The queue controls data-preparation routing only; it does not become fixed-target promotion evidence and does not replace component-led candidate selection replay.
 
 The runtime queue can be prepared from reviewed target context mappings. The
-default prepared queue defers crypto spot targets until the crypto target-local
-feed route is explicitly verified, while confirmed no-listed-options targets
-remain eligible. Eligible no-option targets skip M05 option-chain acquisition
-while still running the direct-underlying target and decision chain with
-explicit no-option/not-applicable states. Use `--include-crypto-spot` only after
-the crypto historical feed route is ready for autonomous scheduler use.
+prepared queue excludes crypto spot and other structurally non-optionable
+targets. Those symbols may be used by replay/context paths, but the autonomous
+model-worker lane only trains targets that can support the option-expression
+surface.
 
 ```bash
 PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --write

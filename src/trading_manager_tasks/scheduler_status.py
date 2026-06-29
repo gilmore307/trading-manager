@@ -91,6 +91,7 @@ class HistoricalSchedulerStatus:
 
     contract_type: str
     generated_utc: str
+    storage_root: str | None
     service_runtime_ready: bool
     recommended_next_action: str
     current_month: str | None
@@ -388,12 +389,18 @@ def collect_historical_scheduler_status(
 ) -> HistoricalSchedulerStatus:
     """Collect a read-only status snapshot for service operation review."""
 
+    if latest_transition_path == DEFAULT_LATEST_TRANSITION_PATH and storage_root != DEFAULT_STORAGE_ROOT:
+        latest_transition_path = storage_root / "runtime" / DEFAULT_LATEST_TRANSITION_PATH.name
+    target_queue_path = storage_root / "runtime" / "model_training_target_queue.json"
     state_file = _file_status(state_path)
     decision_log_file = _file_status(decision_log_path)
     daemon_state = _read_json_object(state_path)
     latest_decision, decision_log_rows = _latest_jsonl_object(decision_log_path)
     latest_transition = read_latest_transition(latest_transition_path)
-    auto_work_selection = select_next_historical_work(storage_root=storage_root).summary_row()
+    auto_work_selection = select_next_historical_work(
+        storage_root=storage_root,
+        target_queue_path=target_queue_path,
+    ).summary_row()
     lifecycle_holds_fold_lane = auto_work_selection.get("reason_code") == "model_group_lifecycle_holds_fold_lane"
     stale_completed_decision = _is_stale_completed_decision(latest_decision, auto_work_selection)
     current_decision = None if stale_completed_decision or lifecycle_holds_fold_lane else latest_decision
@@ -495,6 +502,7 @@ def collect_historical_scheduler_status(
     return HistoricalSchedulerStatus(
         contract_type="manager_historical_scheduler_status",
         generated_utc=_now_utc(),
+        storage_root=str(storage_root),
         service_runtime_ready=service_runtime_ready,
         recommended_next_action=recommended_next_action,
         current_month=current_month,
