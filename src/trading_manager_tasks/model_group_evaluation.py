@@ -15,7 +15,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
@@ -44,6 +44,11 @@ DEFAULT_PROMOTION_REVIEW_CODEX_MODEL = "gpt-5.5"
 DEFAULT_PROMOTION_REVIEW_CODEX_TIMEOUT_SECONDS = 900
 DEFAULT_PROMOTION_REVIEW_CODEX_WORKDIR = Path("/root/.openclaw/workspace")
 DEFAULT_PROMOTION_REVIEW_CODEX_ADD_DIR = Path("/root/projects")
+DEFAULT_DB_URL_FILE = Path("/root/secrets/trading_storage_postgres.json")
+FALLBACK_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
+BENCHMARK_SYMBOL = "SPY"
+BENCHMARK_BAR_TIMEFRAME = "1Min"
+BAR_SOURCE_TABLE = "trading_data.model_01_market_regime_data_acquisition"
 FEATURE_DIAGNOSTIC_SAMPLE_LIMIT = 160
 FEATURE_DIAGNOSTIC_POINT_LIMIT = 80
 DECISION_VARIABLE_SAMPLE_LIMIT = 12
@@ -438,7 +443,15 @@ def _build_settlement_run(
     calibration_diagnostics = _calibration_diagnostics(scored_rows)
     economic_diagnostics = _economic_diagnostics(net_returns=net_returns, realized_returns=realized_returns, costs=costs)
     data_integrity_diagnostics = _data_integrity_diagnostics(raw_decision_rows=raw_decision_rows, decision_rows=decision_rows)
-    temporal_stability_diagnostics = _temporal_stability_diagnostics(scored_rows)
+    benchmark_returns_by_month, benchmark_diagnostics = _benchmark_returns_by_month(
+        scored_rows,
+        benchmark_symbol=BENCHMARK_SYMBOL,
+    )
+    temporal_stability_diagnostics = _temporal_stability_diagnostics(
+        scored_rows,
+        benchmark_returns_by_month=benchmark_returns_by_month,
+        benchmark_symbol=BENCHMARK_SYMBOL,
+    )
     scorecards = _model_group_scorecards(
         decision_rows=decision_rows,
         scored_rows=scored_rows,
@@ -513,6 +526,12 @@ def _build_settlement_run(
         "cost_sensitivity_2x": economic_diagnostics.get("cost_sensitivity", {}).get("2.0x"),
         "worst_month_return": temporal_stability_diagnostics.get("worst_month_return"),
         "month_slice_count": temporal_stability_diagnostics.get("month_slice_count"),
+        "benchmark_symbol": temporal_stability_diagnostics.get("benchmark_symbol"),
+        "benchmark_return_total": temporal_stability_diagnostics.get("benchmark_return_total"),
+        "benchmark_month_count": temporal_stability_diagnostics.get("benchmark_month_count"),
+        "benchmark_beta": temporal_stability_diagnostics.get("benchmark_beta"),
+        "market_beta": temporal_stability_diagnostics.get("market_beta"),
+        "beta": temporal_stability_diagnostics.get("beta"),
         "data_integrity_status": data_integrity_diagnostics.get("status"),
         "leakage_check_status": data_integrity_diagnostics.get("leakage_check_status"),
         "feature_column_count": feature_diagnostics["feature_column_count"],
@@ -539,6 +558,7 @@ def _build_settlement_run(
         "scorecards": scorecards,
         "evaluation_disagreement_report": disagreement_report,
         "temporal_stability_diagnostics": temporal_stability_diagnostics,
+        "benchmark_diagnostics": benchmark_diagnostics,
         "baseline_comparison_diagnostics": baseline_comparison_diagnostics,
         "high_score_tail_risk_diagnostics": high_score_tail_risk_diagnostics,
         "uncertainty_diagnostics": {
@@ -1514,7 +1534,13 @@ def _data_integrity_diagnostics(
     }
 
 
-def _temporal_stability_diagnostics(scored_rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _temporal_stability_diagnostics(
+    scored_rows: Sequence[Mapping[str, Any]],
+    *,
+    benchmark_returns_by_month: Mapping[str, float] | None = None,
+    benchmark_symbol: str = BENCHMARK_SYMBOL,
+) -> dict[str, Any]:
+    benchmark_returns = dict(benchmark_returns_by_month or {})
     by_month: dict[str, list[Mapping[str, Any]]] = {}
     for row in scored_rows:
         month = _month_key(row.get("timestamp"))
@@ -1526,26 +1552,243 @@ def _temporal_stability_diagnostics(scored_rows: Sequence[Mapping[str, Any]]) ->
         labels = [int(row["label"]) for row in rows]
         scores = [float(row["score"]) for row in rows]
         returns = [float(row["net_return"]) for _index, row in ordered_rows]
-        slices.append(
-            {
-                "month": month,
-                "row_count": len(rows),
-                "base_rate": _round_metric(sum(labels) / len(labels)) if labels else None,
-                "auroc": _auroc(labels, scores),
-                "brier_score": _brier_score(labels, scores),
-                "net_return_total": _round_metric(sum(returns)),
-                "max_drawdown": _round_metric(_max_drawdown(returns)),
-                "net_return_path_ohlc": _return_path_ohlc(returns),
-            }
-        )
+        slice_row = {
+            "month": month,
+            "row_count": len(rows),
+            "base_rate": _round_metric(sum(labels) / len(labels)) if labels else None,
+            "auroc": _auroc(labels, scores),
+            "brier_score": _brier_score(labels, scores),
+            "net_return_total": _round_metric(sum(returns)),
+            "max_drawdown": _round_metric(_max_drawdown(returns)),
+            "net_return_path_ohlc": _return_path_ohlc(returns),
+        }
+        benchmark_return = benchmark_returns.get(month)
+        if benchmark_return is not None:
+            rounded_benchmark = _round_metric(benchmark_return)
+            slice_row["benchmark_symbol"] = benchmark_symbol
+            slice_row["benchmark_return_total"] = rounded_benchmark
+            slice_row["market_return_total"] = rounded_benchmark
+            if benchmark_symbol.strip().upper() == "SPY":
+                slice_row["spy_return_total"] = rounded_benchmark
+            net_return_total = slice_row.get("net_return_total")
+            if net_return_total is not None:
+                slice_row["excess_vs_benchmark_return_total"] = _round_metric(float(net_return_total) - benchmark_return)
+        slices.append(slice_row)
     returns_by_month = [float(item["net_return_total"]) for item in slices if item.get("net_return_total") is not None]
+    paired_strategy_returns: list[float] = []
+    paired_benchmark_returns: list[float] = []
+    missing_benchmark_months: list[str] = []
+    for item in slices:
+        month = str(item.get("month") or "")
+        strategy_return = _finite_float(item.get("net_return_total"))
+        benchmark_return = benchmark_returns.get(month)
+        if benchmark_return is None:
+            missing_benchmark_months.append(month)
+            continue
+        if strategy_return is None:
+            continue
+        paired_strategy_returns.append(strategy_return)
+        paired_benchmark_returns.append(float(benchmark_return))
+    beta = _beta_against_benchmark(paired_strategy_returns, paired_benchmark_returns)
+    benchmark_total = sum(paired_benchmark_returns) if paired_benchmark_returns else None
     return {
         "contract_type": "temporal_stability_diagnostic",
         "month_slice_count": len(slices),
         "slices": slices,
         "worst_month_return": min(returns_by_month) if returns_by_month else None,
         "best_month_return": max(returns_by_month) if returns_by_month else None,
+        "benchmark_symbol": benchmark_symbol,
+        "benchmark_month_count": len(paired_benchmark_returns),
+        "benchmark_missing_months": missing_benchmark_months,
+        "benchmark_return_total": _round_metric(benchmark_total) if benchmark_total is not None else None,
+        "benchmark_beta": beta,
+        "market_beta": beta,
+        "beta": beta,
     }
+
+
+def _benchmark_returns_by_month(
+    scored_rows: Sequence[Mapping[str, Any]],
+    *,
+    benchmark_symbol: str = BENCHMARK_SYMBOL,
+    database_url: str | None = None,
+    bar_rows: Sequence[Mapping[str, Any]] | None = None,
+) -> tuple[dict[str, float], dict[str, Any]]:
+    months = tuple(sorted({month for row in scored_rows if (month := _month_key(row.get("timestamp")))}))
+    symbol = benchmark_symbol.strip().upper()
+    base_diagnostics: dict[str, Any] = {
+        "contract_type": "benchmark_return_diagnostic",
+        "benchmark_symbol": symbol,
+        "bar_timeframe": BENCHMARK_BAR_TIMEFRAME,
+        "bar_source_ref": BAR_SOURCE_TABLE,
+        "required_months": list(months),
+        "provider_call_performed": False,
+        "sql_mutation_performed": False,
+        "storage_source_mutation_performed": False,
+    }
+    if not months:
+        return {}, {
+            **base_diagnostics,
+            "status": "unavailable",
+            "reason_code": "no_timestamped_scored_rows",
+            "benchmark_month_count": 0,
+            "missing_months": [],
+        }
+    if bar_rows is None:
+        url = _database_url(database_url)
+        if not url:
+            return {}, {
+                **base_diagnostics,
+                "status": "unavailable",
+                "reason_code": "database_url_unavailable",
+                "benchmark_month_count": 0,
+                "missing_months": list(months),
+            }
+        try:
+            import psycopg  # type: ignore
+            from psycopg.rows import dict_row  # type: ignore
+        except ImportError:
+            return {}, {
+                **base_diagnostics,
+                "status": "unavailable",
+                "reason_code": "psycopg_unavailable",
+                "benchmark_month_count": 0,
+                "missing_months": list(months),
+            }
+        first_month_start, _ = _month_date_bounds(months[0])
+        _, last_month_end = _month_date_bounds(months[-1])
+        try:
+            with psycopg.connect(url, row_factory=dict_row) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT symbol, timestamp, bar_close
+                        FROM trading_data.model_01_market_regime_data_acquisition
+                        WHERE timeframe = %s
+                          AND symbol = %s
+                          AND timestamp::date >= %s
+                          AND timestamp::date < %s
+                        ORDER BY timestamp
+                        """,
+                        (BENCHMARK_BAR_TIMEFRAME, symbol, first_month_start, last_month_end),
+                    )
+                    rows = [dict(row) for row in cursor.fetchall()]
+        except Exception as exc:  # pragma: no cover - environmental DB failures are reported in diagnostics.
+            return {}, {
+                **base_diagnostics,
+                "status": "unavailable",
+                "reason_code": "sql_read_failed",
+                "error": str(exc),
+                "benchmark_month_count": 0,
+                "missing_months": list(months),
+            }
+    else:
+        rows = [dict(row) for row in bar_rows]
+    returns = _benchmark_monthly_returns_from_bar_rows(rows, months=months, benchmark_symbol=symbol)
+    missing_months = [month for month in months if month not in returns]
+    if not returns:
+        status = "unavailable"
+        reason_code = "benchmark_bars_missing"
+    elif missing_months:
+        status = "partial"
+        reason_code = "benchmark_bars_partial"
+    else:
+        status = "available"
+        reason_code = "benchmark_bars_available"
+    return returns, {
+        **base_diagnostics,
+        "status": status,
+        "reason_code": reason_code,
+        "benchmark_month_count": len(returns),
+        "missing_months": missing_months,
+    }
+
+
+def _benchmark_monthly_returns_from_bar_rows(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    months: Sequence[str],
+    benchmark_symbol: str,
+) -> dict[str, float]:
+    required_months = set(months)
+    bars_by_month: dict[str, list[tuple[str, float]]] = {}
+    symbol = benchmark_symbol.strip().upper()
+    for row in rows:
+        if str(row.get("symbol") or "").strip().upper() != symbol:
+            continue
+        timestamp = row.get("timestamp")
+        month = _month_key(timestamp)
+        if month not in required_months:
+            continue
+        close = _finite_float(row.get("bar_close"))
+        if close is None or close <= 0:
+            continue
+        bars_by_month.setdefault(month, []).append((str(timestamp), close))
+    returns: dict[str, float] = {}
+    for month, bars in bars_by_month.items():
+        ordered = sorted(bars, key=lambda item: item[0])
+        if len(ordered) < 2:
+            continue
+        first_close = ordered[0][1]
+        last_close = ordered[-1][1]
+        if first_close <= 0:
+            continue
+        returns[month] = _round_metric((last_close / first_close) - 1.0)
+    return returns
+
+
+def _beta_against_benchmark(strategy_returns: Sequence[float], benchmark_returns: Sequence[float]) -> float | None:
+    pairs = [
+        (strategy_return, benchmark_return)
+        for strategy_return, benchmark_return in zip(strategy_returns, benchmark_returns, strict=True)
+        if math.isfinite(strategy_return) and math.isfinite(benchmark_return)
+    ]
+    if len(pairs) < 2:
+        return None
+    strategy_mean = sum(strategy_return for strategy_return, _benchmark_return in pairs) / len(pairs)
+    benchmark_mean = sum(benchmark_return for _strategy_return, benchmark_return in pairs) / len(pairs)
+    variance = sum((benchmark_return - benchmark_mean) ** 2 for _strategy_return, benchmark_return in pairs)
+    if variance == 0:
+        return None
+    covariance = sum((strategy_return - strategy_mean) * (benchmark_return - benchmark_mean) for strategy_return, benchmark_return in pairs)
+    return _round_metric(covariance / variance)
+
+
+def _month_date_bounds(month: str) -> tuple[date, date]:
+    year_text, month_text = month.split("-", 1)
+    year = int(year_text)
+    month_number = int(month_text)
+    start = date(year, month_number, 1)
+    if month_number == 12:
+        return start, date(year + 1, 1, 1)
+    return start, date(year, month_number + 1, 1)
+
+
+def _database_url(value: str | None) -> str | None:
+    if value:
+        return value
+    env_value = os.environ.get("OPENCLAW_DATABASE_URL", "").strip() or os.environ.get("DATABASE_URL", "").strip()
+    if env_value:
+        return env_value
+    for path in (DEFAULT_DB_URL_FILE, FALLBACK_DB_URL_FILE):
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if not text:
+            continue
+        if text.startswith("{"):
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            for key in ("dsn", "database_url", "url"):
+                dsn = str(payload.get(key) or "").strip()
+                if dsn:
+                    return dsn
+        else:
+            return text
+    return None
 
 
 def _baseline_comparison_diagnostics(

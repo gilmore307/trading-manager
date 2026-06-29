@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from trading_manager_tasks.model_group_evaluation import (
+    _benchmark_returns_by_month,
+    _beta_against_benchmark,
     _build_promotion_eligibility_decision,
     _build_promotion_review_packet,
     _build_settlement_run,
@@ -167,6 +169,49 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             diagnostics["slices"][0]["net_return_path_ohlc"],
             {"open": 1.0, "high": 1.1, "low": 0.8, "close": 0.85},
         )
+
+    def test_temporal_stability_publishes_benchmark_beta(self):
+        diagnostics = _temporal_stability_diagnostics(
+            [
+                {"timestamp": "2021-01-02T00:00:00Z", "label": 1, "score": 0.8, "net_return": 0.08},
+                {"timestamp": "2021-01-03T00:00:00Z", "label": 0, "score": 0.2, "net_return": 0.04},
+                {"timestamp": "2021-02-02T00:00:00Z", "label": 1, "score": 0.7, "net_return": -0.03},
+                {"timestamp": "2021-02-03T00:00:00Z", "label": 0, "score": 0.3, "net_return": -0.01},
+            ],
+            benchmark_returns_by_month={"2021-01": 0.03, "2021-02": -0.01},
+            benchmark_symbol="SPY",
+        )
+
+        self.assertEqual(diagnostics["benchmark_symbol"], "SPY")
+        self.assertEqual(diagnostics["benchmark_month_count"], 2)
+        self.assertEqual(diagnostics["benchmark_return_total"], 0.02)
+        self.assertEqual(diagnostics["slices"][0]["benchmark_return_total"], 0.03)
+        self.assertEqual(diagnostics["slices"][0]["spy_return_total"], 0.03)
+        self.assertEqual(diagnostics["beta"], 4.0)
+        self.assertEqual(diagnostics["market_beta"], 4.0)
+        self.assertEqual(diagnostics["benchmark_beta"], 4.0)
+
+    def test_benchmark_returns_by_month_uses_bar_rows_without_provider_call(self):
+        scored_rows = [
+            {"timestamp": "2021-01-15T00:00:00Z", "label": 1, "score": 0.8, "net_return": 0.08},
+            {"timestamp": "2021-02-15T00:00:00Z", "label": 0, "score": 0.2, "net_return": -0.01},
+        ]
+        returns, diagnostics = _benchmark_returns_by_month(
+            scored_rows,
+            bar_rows=[
+                {"symbol": "SPY", "timestamp": "2021-01-04T00:00:00Z", "bar_close": 100},
+                {"symbol": "SPY", "timestamp": "2021-01-29T00:00:00Z", "bar_close": 110},
+                {"symbol": "SPY", "timestamp": "2021-02-01T00:00:00Z", "bar_close": 110},
+                {"symbol": "SPY", "timestamp": "2021-02-26T00:00:00Z", "bar_close": 99},
+            ],
+        )
+
+        self.assertEqual(returns, {"2021-01": 0.1, "2021-02": -0.1})
+        self.assertEqual(diagnostics["status"], "available")
+        self.assertFalse(diagnostics["provider_call_performed"])
+
+    def test_beta_against_benchmark_requires_benchmark_variance(self):
+        self.assertIsNone(_beta_against_benchmark([0.1, 0.2], [0.01, 0.01]))
 
     def _write_ready_replay_and_attribution(self, storage_root: Path) -> Path:
         dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
