@@ -245,6 +245,7 @@ class HistoricalWorkSelection:
     blocked_fold_start_month: str | None = None
     blocked_fold_end_month: str | None = None
     blocked_fold_state_path: str | None = None
+    blocked_target_symbol: str | None = None
 
     def summary_row(self) -> dict[str, Any]:
         row = asdict(self)
@@ -319,6 +320,7 @@ def select_next_historical_work(
             blocked_fold_start_month=lifecycle_block["start_month"],
             blocked_fold_end_month=lifecycle_block["end_month"],
             blocked_fold_state_path=lifecycle_block["state_path"],
+            blocked_target_symbol=lifecycle_block.get("target_symbol"),
         )
 
     eligible_open_tuple = tuple(month for month in open_tuple if month <= max_month)
@@ -734,6 +736,7 @@ def _first_incomplete_model_group_lifecycle_fold(
             "start_month": start_month,
             "end_month": end_month,
             "state_path": str(state_path),
+            "target_symbol": _fold_scope_from_state_path(state_path).get("target_symbol", ""),
         }
     return None
 
@@ -861,6 +864,63 @@ def _open_model_worker_fold_for_target(
             )
         )
     return sorted(candidates, key=lambda selection: (selection.start_month, selection.end_month, selection.state_path or ""))[0] if candidates else None
+
+
+def _open_any_model_worker_fold(
+    *,
+    storage_root: Path,
+    max_month: str | None,
+) -> tuple[str | None, ModelWorkerFoldSelection] | None:
+    """Return the earliest existing non-terminal fold, even if it is outside the target queue."""
+
+    max_month = _eligible_historical_fold_cutoff(max_month)
+    runtime_root = storage_root / "runtime"
+    if not runtime_root.exists():
+        return None
+    candidates: list[tuple[str, str, str | None, ModelWorkerFoldSelection]] = []
+    for path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        start_month = str(payload.get("start_month") or "")
+        end_month = str(payload.get("end_month") or "")
+        if not start_month or not end_month or end_month > max_month:
+            continue
+        if _workflow_payload_all_stages_complete(payload):
+            continue
+        if not _fold_payload_has_open_model_worker_stage(payload):
+            continue
+        if _first_missing_workflow_month(
+            storage_root=storage_root,
+            default_start_month="2016-01",
+            limit_month=previous_month(start_month),
+        ):
+            continue
+        ready, _ = _model_worker_fold_is_ready(storage_root, start_month)
+        if not ready:
+            continue
+        target_symbol = _fold_scope_from_state_path(path).get("target_symbol") or None
+        selection = ModelWorkerFoldSelection(
+            fold_id=_model_worker_fold_id(start_month, end_month),
+            start_month=start_month,
+            end_month=end_month,
+            fold_months=rolling_fold_months(start_month),
+            reason_code=(
+                "resume_open_model_worker_fold"
+                if _fold_payload_has_ready_model_worker_stage(payload)
+                else "blocked_model_worker_fold_holds_target_lane"
+            ),
+            state_path=str(path),
+        )
+        candidates.append((start_month, end_month, target_symbol, selection))
+    if not candidates:
+        return None
+    _start_month, _end_month, target_symbol, selection = sorted(
+        candidates,
+        key=lambda item: (item[0], item[1], item[2] or "", item[3].state_path or ""),
+    )[0]
+    return target_symbol, selection
 
 
 def target_has_open_model_worker_fold(
@@ -1126,6 +1186,25 @@ def select_model_worker_target(
                 reason_code="model_group_lifecycle_holds_target_lane",
                 fold_selection=None,
             )
+        open_selection = _open_model_worker_fold_for_target(storage_root=storage_root, selected_target_symbol=symbol)
+        if open_selection is not None and open_selection.end_month <= _eligible_historical_fold_cutoff(max_month):
+            return ModelWorkerTargetSelection(
+                selected_target_symbol=symbol,
+                target_queue=target_queue,
+                reason_code="selected_target_has_open_model_worker_fold",
+                fold_selection=open_selection,
+            )
+    orphan_selection = _open_any_model_worker_fold(storage_root=storage_root, max_month=max_month)
+    if orphan_selection is not None:
+        orphan_target, orphan_fold = orphan_selection
+        if orphan_target not in set(target_queue):
+            return ModelWorkerTargetSelection(
+                selected_target_symbol=orphan_target,
+                target_queue=target_queue,
+                reason_code="resume_existing_open_model_worker_fold_outside_target_queue",
+                fold_selection=orphan_fold,
+            )
+    for symbol in target_queue:
         fold_selection = select_model_worker_fold(
             storage_root=storage_root,
             default_start_month=default_start_month,
@@ -1214,6 +1293,7 @@ class SchedulerDaemonState:
     last_work_selection_reason: str | None = None
     last_completed_months: tuple[str, ...] = ()
     last_open_months: tuple[str, ...] = ()
+    selected_target_symbol: str | None = None
     last_progress_utc: str | None = None
     last_stall_agent_call_utc: str | None = None
     last_stall_agent_error_ref: str | None = None
@@ -1345,14 +1425,18 @@ def apply_auto_work_selection(
         last_work_selection_reason=selection.reason_code,
         last_completed_months=selection.completed_months,
         last_open_months=selection.open_months,
+        selected_target_symbol=selection.blocked_target_symbol,
         updated_utc=utc_now_iso(),
     )
 
 
-def append_decision_log(path: Path, decision: SchedulerDecision) -> None:
+def append_decision_log(path: Path, decision: SchedulerDecision, extra_row: dict[str, Any] | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    row = decision.summary_row()
+    if extra_row:
+        row.update(extra_row)
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(decision.summary_row(), sort_keys=True) + "\n")
+        handle.write(json.dumps(row, sort_keys=True) + "\n")
     compact_decision_log_tail(path)
 
 
@@ -1454,7 +1538,6 @@ def _scheduler_waiting_for_future_fold(state: SchedulerDaemonState) -> bool:
 def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonState) -> bool:
     known_nonprogress_reasons = {
         "waiting_for_next_training_fold_to_complete",
-        "model_group_lifecycle_holds_fold_lane",
         "model_group_replay_dataset_acquisition_required",
         "model_group_evaluation_complete",
         "model_group_evaluation_executed",
@@ -2342,18 +2425,24 @@ def run_daemon_loop(
                 try:
                     use_single_month_work_loop = auto_select_next_work
                     if use_single_month_work_loop:
+                        loop_selected_target_symbol = selected_target_symbol or state.selected_target_symbol
                         lifecycle_block = _first_incomplete_model_group_lifecycle_fold(
                             storage_root=storage_root,
-                            selected_target_symbol=selected_target_symbol,
+                            selected_target_symbol=loop_selected_target_symbol,
+                        )
+                        lifecycle_target_symbol = (
+                            loop_selected_target_symbol
+                            or (str(lifecycle_block.get("target_symbol") or "").strip().upper() if lifecycle_block else None)
+                            or None
                         )
                         replay_dataset_probe = run_model_group_replay_dataset_if_ready(
                             storage_root=storage_root,
-                            selected_target_symbol=selected_target_symbol,
+                            selected_target_symbol=lifecycle_target_symbol,
                             execute=False,
                         )
                         replay_probe = run_model_group_replay_if_ready(
                             storage_root=storage_root,
-                            selected_target_symbol=selected_target_symbol,
+                            selected_target_symbol=lifecycle_target_symbol,
                             execute=False,
                         )
                         replay_review_probe = run_model_group_replay_review_if_ready(
@@ -2366,7 +2455,7 @@ def run_daemon_loop(
                         )
                         evaluation_probe = run_model_group_evaluation_if_ready(
                             storage_root=storage_root,
-                            selected_target_symbol=selected_target_symbol,
+                            selected_target_symbol=lifecycle_target_symbol,
                             execute=False,
                         )
                         lifecycle_holds_target_lane = (
@@ -2385,7 +2474,7 @@ def run_daemon_loop(
                                 storage_root=storage_root,
                                 default_start_month=active_start_month,
                                 worker_count=lane_limit,
-                                selected_target_symbol=selected_target_symbol,
+                                selected_target_symbol=loop_selected_target_symbol,
                             )
                         decisions = _run_month_ingest_worker_decisions(
                             months=months,
@@ -2397,7 +2486,7 @@ def run_daemon_loop(
                             execute_autonomous_provider_stages=execute_autonomous_provider_stages,
                             provider_stage_next_limit=provider_stage_next_limit,
                             provider_stage_max_workers=provider_stage_max_workers,
-                            selected_target_symbol=selected_target_symbol,
+                            selected_target_symbol=loop_selected_target_symbol,
                         )
                         completed = utc_now_iso()
                         if months:
@@ -2441,14 +2530,23 @@ def run_daemon_loop(
                                 execute_autonomous_provider_stages=execute_autonomous_provider_stages,
                                 provider_stage_next_limit=provider_stage_next_limit,
                                 provider_stage_max_workers=provider_stage_max_workers,
-                                selected_target_symbol=selected_target_symbol,
+                                selected_target_symbol=loop_selected_target_symbol,
                                 target_queue_path=target_queue_path,
                             )
                         if model_worker_result is not None:
                             target_selection, model_decision = model_worker_result
                             model_selection = target_selection.fold_selection
                             assert model_selection is not None
-                            append_decision_log(decision_log_path, model_decision)
+                            append_decision_log(
+                                decision_log_path,
+                                model_decision,
+                                extra_row={
+                                    "worker_id": "model_worker_1",
+                                    "selected_target_symbol": target_selection.selected_target_symbol,
+                                    "fold_id": model_selection.fold_id,
+                                    "fold_months": list(model_selection.fold_months),
+                                },
+                            )
                             completed = utc_now_iso()
                             state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=model_decision)
                             state = replace(
@@ -2457,6 +2555,7 @@ def run_daemon_loop(
                                 end_month=active_end_month,
                                 last_next_internal_stage="model_worker_1",
                                 last_work_selection_reason=target_selection.reason_code,
+                                selected_target_symbol=target_selection.selected_target_symbol,
                                 updated_utc=completed,
                             )
                             refresh_needed = refresh_needed or model_decision.decision_status == "executed"
@@ -2472,7 +2571,7 @@ def run_daemon_loop(
                                 output.flush()
                         replay_dataset_decision = run_model_group_replay_dataset_if_ready(
                             storage_root=storage_root,
-                            selected_target_symbol=selected_target_symbol,
+                            selected_target_symbol=lifecycle_target_symbol,
                             execute=execute_model_group_replay_dataset,
                             execute_provider_acquisition=execute_autonomous_provider_stages,
                             provider_acquisition_limit=provider_stage_next_limit,
@@ -2504,7 +2603,7 @@ def run_daemon_loop(
                             replay_option_feature_decisions = _drain_replay_option_feature_backoff(
                                 pending_replay_option_backoff,
                                 storage_root=storage_root,
-                                selected_target_symbol=selected_target_symbol,
+                                selected_target_symbol=lifecycle_target_symbol,
                                 execute=execute_model_group_replay,
                                 execute_provider_acquisition=execute_autonomous_provider_stages,
                                 provider_acquisition_limit=provider_stage_next_limit,
@@ -2547,7 +2646,7 @@ def run_daemon_loop(
                         replay_decision = (
                             run_model_group_replay_if_ready(
                                 storage_root=storage_root,
-                                selected_target_symbol=selected_target_symbol,
+                                selected_target_symbol=lifecycle_target_symbol,
                                 execute=execute_model_group_replay,
                             )
                             if retry_replay_after_pending_option_drain and not replay_blocked_by_dataset_decision
@@ -2577,7 +2676,7 @@ def run_daemon_loop(
                                 _drain_replay_option_feature_backoff(
                                     replay_decision,
                                     storage_root=storage_root,
-                                    selected_target_symbol=selected_target_symbol,
+                                    selected_target_symbol=lifecycle_target_symbol,
                                     execute=execute_model_group_replay,
                                     execute_provider_acquisition=execute_autonomous_provider_stages,
                                     provider_acquisition_limit=provider_stage_next_limit,
@@ -2701,7 +2800,7 @@ def run_daemon_loop(
                         if residual_event_governance_decision is not None:
                             m06_event_input_start_decision = _m06_event_input_start_decision(
                                 residual_event_governance_decision,
-                                selected_target_symbol=selected_target_symbol,
+                                selected_target_symbol=lifecycle_target_symbol,
                             )
                             if m06_event_input_start_decision is not None:
                                 append_decision_log(decision_log_path, m06_event_input_start_decision)
@@ -2729,7 +2828,7 @@ def run_daemon_loop(
                                 execute_provider_acquisition=execute_autonomous_provider_stages,
                                 limit=provider_stage_next_limit,
                                 provider_max_workers=provider_stage_max_workers,
-                                selected_target_symbol=selected_target_symbol,
+                                selected_target_symbol=lifecycle_target_symbol,
                             )
                             decision_to_record = m06_event_input_decision or (
                                 residual_event_governance_decision if m06_event_input_start_decision is None else None
@@ -2768,7 +2867,7 @@ def run_daemon_loop(
                                     output.flush()
                         evaluation_decision = run_model_group_evaluation_if_ready(
                             storage_root=storage_root,
-                            selected_target_symbol=selected_target_symbol,
+                            selected_target_symbol=lifecycle_target_symbol,
                             execute=execute_model_group_evaluation,
                         )
                         if evaluation_decision is not None:
@@ -2811,6 +2910,7 @@ def run_daemon_loop(
                                 ),
                                 last_next_internal_stage="model_group_lifecycle",
                                 last_work_selection_reason="model_group_lifecycle_holds_fold_lane",
+                                selected_target_symbol=lifecycle_target_symbol,
                                 updated_utc=completed,
                             )
                         if refresh_needed:

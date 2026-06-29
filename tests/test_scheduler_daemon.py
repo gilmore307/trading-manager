@@ -378,7 +378,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertIsNone(updated.last_stall_agent_error_ref)
         handler.assert_not_called()
 
-    def test_scheduler_progress_stall_ignores_model_group_lifecycle_hold(self):
+    def test_scheduler_progress_stall_reports_model_group_lifecycle_hold(self):
         state = SchedulerDaemonState(
             start_month="2016-01",
             end_month="2016-06",
@@ -387,6 +387,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.scheduler_daemon.handle_server_error") as handler:
             tmp = Path(raw_tmp)
+            handler.return_value = {"error_ref": "ERR-LIFECYCLE-HOLD"}
             updated = handle_scheduler_progress_stall(
                 state,
                 storage_root=tmp / "storage",
@@ -395,8 +396,8 @@ class SchedulerDaemonTests(unittest.TestCase):
                 stall_seconds=600,
             )
 
-        self.assertIsNone(updated.last_stall_agent_error_ref)
-        handler.assert_not_called()
+        self.assertEqual(updated.last_stall_agent_error_ref, "ERR-LIFECYCLE-HOLD")
+        handler.assert_called_once()
 
     def test_scheduler_progress_stall_ignores_event_evidence_waits(self):
         for reason_code in (
@@ -1192,6 +1193,51 @@ class SchedulerDaemonTests(unittest.TestCase):
         assert target_selection.fold_selection is not None
         self.assertEqual(target_selection.fold_selection.fold_id, "fold_2016-01_2016-06")
 
+    def test_model_worker_resumes_open_fold_outside_target_queue(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            queue_path = storage_root / "runtime" / "model_training_target_queue.json"
+            for month in rolling_fold_months("2016-01"):
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-06",
+                selected_target_symbol="BTC",
+            )
+            self.assertIsNotNone(selection)
+            assert selection is not None
+            state_path = seed_model_worker_fold_state(
+                storage_root=storage_root,
+                selection=selection,
+                selected_target_symbol="BTC",
+            )
+            queue_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_target_queue",
+                        "targets": [{"symbol": "AAPL"}, {"symbol": "AAOI"}],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            target_selection = select_model_worker_target(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-06",
+                target_queue_path=queue_path,
+            )
+
+        self.assertIsNotNone(target_selection)
+        assert target_selection is not None
+        self.assertEqual(target_selection.selected_target_symbol, "BTC")
+        self.assertEqual(target_selection.reason_code, "resume_existing_open_model_worker_fold_outside_target_queue")
+        self.assertIsNotNone(target_selection.fold_selection)
+        assert target_selection.fold_selection is not None
+        self.assertEqual(Path(target_selection.fold_selection.state_path or ""), state_path)
+
     def test_model_worker_executes_foundation_fold_without_selected_target(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -1731,6 +1777,12 @@ class SchedulerDaemonTests(unittest.TestCase):
                 max_month="2016-12",
                 selected_target_symbol="AAPL",
             )
+            blocked_historical_work = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                default_end_month="2016-01",
+                max_month="2016-12",
+            )
             self._write_terminal_promotion_decision_after(storage_root=storage_root, state_path=first_state_path)
             unblocked_next_fold = select_model_worker_fold(
                 storage_root=storage_root,
@@ -1740,6 +1792,8 @@ class SchedulerDaemonTests(unittest.TestCase):
             )
 
         self.assertIsNone(blocked_next_fold)
+        self.assertEqual(blocked_historical_work.reason_code, "model_group_lifecycle_holds_fold_lane")
+        self.assertEqual(blocked_historical_work.blocked_target_symbol, "AAPL")
         self.assertIsNotNone(unblocked_next_fold)
         assert unblocked_next_fold is not None
         self.assertEqual(unblocked_next_fold.fold_id, "fold_2016-07_2016-12")

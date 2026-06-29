@@ -392,6 +392,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "asset_class_counts": {"us_equity": 2},
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                    "portfolio_replay_policy": {
+                        "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                        "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                        "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                        "max_positions": 5,
+                        "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                    },
                     "replay_completion_scope": "full_candidate_universe",
                     "max_decision_rows": None,
                     "validation_status": "passed",
@@ -404,6 +411,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": "model_02_target_candidate_handoff",
+                    "portfolio_replay_policy": {
+                        "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                        "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                        "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                        "max_positions": 5,
+                        "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                    },
                     "replay_completion_scope": "full_candidate_universe",
                     "max_decision_rows": None,
                     "validation_status": "passed",
@@ -3316,6 +3330,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
                         "candidate_handoff_source": "model_02_target_candidate_handoff",
+                        "portfolio_replay_policy": {
+                            "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                            "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                            "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                            "max_positions": 5,
+                            "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                        },
                         "replay_completion_scope": "full_candidate_universe",
                         "max_decision_rows": None,
                         "validation_status": "passed",
@@ -3443,6 +3464,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
                         "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "portfolio_replay_policy": {
+                            "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                            "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                            "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                            "max_positions": 5,
+                            "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                        },
                         "replay_completion_scope": "full_candidate_universe",
                         "max_decision_rows": None,
                         "validation_status": "passed",
@@ -3512,12 +3540,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         promotion_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.promotion")
         maintenance_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.maintenance")
         self.assertEqual(promotion_task["status"], "rejected")
-        self.assertEqual(promotion_task["task_state"], "current")
+        self.assertEqual(promotion_task["task_state"], "completed")
+        self.assertEqual(promotion_task["started_at_utc"], "2026-05-22T12:50:00Z")
+        self.assertEqual(promotion_task["ended_at_utc"], "2026-05-22T12:50:00Z")
         self.assertEqual(promotion_task["detail"]["blockers"], ["settlement gate failure: drawdown_too_severe"])
         self.assertEqual(payload["status"], "complete")
-        self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.promotion")
-        self.assertEqual(payload["chart_payload"]["active_task"]["task_label"], "Model Promotion")
-        self.assertEqual(payload["chart_payload"]["active_task"]["status"], "rejected")
+        self.assertIsNone(payload["chart_payload"]["active_stage"])
+        self.assertIsNone(payload["chart_payload"]["active_task"])
         self.assertIn("Model Evaluation completed; Model Promotion is rejected", payload["summary"])
         self.assertNotIn("current public task is Model Replay", payload["summary"])
         self.assertEqual(maintenance_task["status"], "not_applicable")
@@ -3561,6 +3590,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
                         "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
+                        "portfolio_replay_policy": {
+                            "full_budget_replacement_policy": "continue_scanning_after_budget_full",
+                            "residual_cash_replacement_policy": "insufficient_cash_falls_through_to_replacement",
+                            "portfolio_capacity_policy": "default_5_simultaneous_risk_slots_from_20pct_allocation",
+                            "max_positions": 5,
+                            "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
+                        },
                         "replay_completion_scope": "full_candidate_universe",
                         "max_decision_rows": None,
                         "validation_status": "passed",
@@ -5322,9 +5358,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("2016-fold1", timeline_months)
         self.assertEqual(fold_prep_tasks[0]["worker_label"], "Model Worker 1")
         self.assertEqual(fold_prep_tasks[0]["dataset_unit_months"], None)
-        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["ready_count"], 40)
-        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["expected_count"], 100)
-        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["unit_label"], "rows")
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["ready_count"], 0)
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["expected_count"], 1)
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["unit_label"], "task units")
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["nodes"][0]["processed_count"], 40)
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["nodes"][0]["expected_count"], 100)
 
     def test_task_timeline_prefers_selected_target_fold_over_stale_untargeted_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

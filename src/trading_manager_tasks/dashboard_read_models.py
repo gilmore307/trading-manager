@@ -1018,6 +1018,27 @@ def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[d
     return None
 
 
+def _public_terminal_outcome_task(task_timeline: list[dict[str, Any]]) -> dict[str, Any] | None:
+    terminal_statuses = {"rejected", "failed", "not_eligible", "ineligible", "deferred", "review_required"}
+    terminal_tasks = [
+        task
+        for task in task_timeline
+        if str(task.get("task_state") or "") == "completed"
+        and str(task.get("status") or "").lower() in terminal_statuses
+    ]
+    if not terminal_tasks:
+        return None
+    order = {
+        "model_group.replay": 10,
+        "model_group.replay_review": 20,
+        "model_group.model_06_event_risk_governor": 30,
+        "model_group.evaluation": 40,
+        "model_group.promotion": 50,
+        "model_group.maintenance": 60,
+    }
+    return max(terminal_tasks, key=lambda task: order.get(str(task.get("task_id") or ""), 0))
+
+
 def _latest_replay_option_feature_requirements_artifact(dataset_root: Path) -> Path | None:
     run_root = dataset_root / "replay_execution_runs"
     if not run_root.exists():
@@ -1409,7 +1430,16 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
             and _iso_sort_key(replay_activity.get("updated_at_utc")) > _iso_sort_key(runtime_activity.get("updated_at_utc"))
         ):
             runtime_activity = replay_activity
-    if isinstance(decision_activity, Mapping) and (
+    runtime_activity_is_specific_replay_option_drain = (
+        isinstance(runtime_activity, Mapping)
+        and runtime_activity.get("activity_type") == "replay_option_feature_drain"
+        and (
+            str(selected_work or "") == "model_group.replay_option_features"
+            or str(next_internal_stage or "") == "model_group.replay_option_features"
+            or "replay_option_feature" in runtime_reason
+        )
+    )
+    if isinstance(decision_activity, Mapping) and not runtime_activity_is_specific_replay_option_drain and (
         runtime_activity is None
         or _iso_sort_key(decision_activity.get("updated_at_utc")) >= _iso_sort_key(runtime_activity.get("updated_at_utc"))
     ):
@@ -1552,6 +1582,51 @@ def _public_active_task_summary(task: Mapping[str, Any] | None) -> dict[str, Any
         "worker_label": task.get("worker_label"),
         "worker_kind": task.get("worker_kind"),
         "target_symbol": task.get("target_symbol"),
+    }
+
+
+def _public_active_task_from_runtime(status: HistoricalSchedulerStatus, runtime_active_work: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if status.lock.status != "active" or not isinstance(runtime_active_work, Mapping):
+        return None
+    runtime_activity = runtime_active_work.get("runtime_activity")
+    if not isinstance(runtime_activity, Mapping):
+        return None
+    selected_work = str(runtime_activity.get("selected_work") or runtime_active_work.get("stage_id") or "")
+    if not selected_work:
+        return None
+    layer_key = selected_work.split(".", 1)[0]
+    selected_work_stage = selected_work.split(".", 1)[1] if "." in selected_work else "runtime"
+    stage_type = str(runtime_activity.get("next_internal_stage") or selected_work_stage)
+    layer = MODEL_NUMBER_BY_LAYER_KEY.get(layer_key)
+    label = _model_task_label(layer_key, layer) if layer_key.startswith("model_") else _public_stage_name(selected_work, stage_type)
+    latest_decision = status.latest_decision if isinstance(status.latest_decision, Mapping) else {}
+    daemon_state = status.daemon_state if isinstance(status.daemon_state, Mapping) else {}
+    target_symbol = (
+        latest_decision.get("selected_target_symbol")
+        or daemon_state.get("selected_target_symbol")
+        or runtime_activity.get("selected_target_symbol")
+    )
+    return {
+        "task_id": layer_key,
+        "task_label": label,
+        "month": _public_task_period(str(runtime_active_work.get("month") or status.current_month or "")),
+        "status": "running",
+        "task_state": "current",
+        "stage_type": "model_task" if layer_key.startswith("model_") else stage_type,
+        "layer": layer,
+        "layer_key": layer_key,
+        "worker_id": latest_decision.get("worker_id") or ("model_worker_1" if layer_key.startswith("model_") else None),
+        "worker_label": "Model Worker 1" if layer_key.startswith("model_") else None,
+        "worker_kind": "model_worker" if layer_key.startswith("model_") else None,
+        "target_symbol": str(target_symbol).strip().upper() if target_symbol else None,
+        "started_at_utc": runtime_activity.get("started_at_utc") or runtime_activity.get("updated_at_utc"),
+        "ended_at_utc": None,
+        "status_updated_at_utc": runtime_activity.get("updated_at_utc"),
+        "reason": runtime_activity.get("activity_summary") or runtime_activity.get("reason"),
+        "detail": {
+            "live": runtime_activity,
+            "runtime_projection": True,
+        },
     }
 
 
@@ -1703,6 +1778,7 @@ def _owner_status(
     status: HistoricalSchedulerStatus,
     *,
     public_active_task: Mapping[str, Any] | None = None,
+    terminal_outcome_task: Mapping[str, Any] | None = None,
 ) -> tuple[str, str, str]:
     """Return dashboard status, severity, and short summary."""
 
@@ -1761,6 +1837,21 @@ def _owner_status(
             "ready",
             "info",
             f"Historical workflow is ready at {label} for {period}.",
+        )
+    if terminal_outcome_task is not None:
+        label = str(terminal_outcome_task.get("task_label") or terminal_outcome_task.get("task_id") or "the terminal task")
+        period = str(terminal_outcome_task.get("month") or "the selected period")
+        task_status = str(terminal_outcome_task.get("status") or "").lower()
+        if str(terminal_outcome_task.get("task_id") or "") == "model_group.promotion":
+            return (
+                "complete",
+                "info",
+                f"Model Evaluation completed; Model Promotion is {task_status} for {period}.",
+            )
+        return (
+            "complete",
+            "info",
+            f"Historical workflow reached terminal status {task_status} at {label} for {period}.",
         )
     if status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
         return (
@@ -2508,12 +2599,14 @@ def _resolve_stage_ref_path(ref: object, *, storage_root: Path) -> Path | None:
     return Path.cwd() / candidate
 
 
-def _min_timestamp(values: list[str]) -> str | None:
-    return min(values) if values else None
+def _min_timestamp(values: list[str | None]) -> str | None:
+    present = [str(value) for value in values if value]
+    return min(present) if present else None
 
 
-def _max_timestamp(values: list[str]) -> str | None:
-    return max(values) if values else None
+def _max_timestamp(values: list[str | None]) -> str | None:
+    present = [str(value) for value in values if value]
+    return max(present) if present else None
 
 
 def _receipt_timestamp_candidates(path: Path) -> dict[str, list[str]]:
@@ -5035,6 +5128,10 @@ def _model_group_replay_timeline_tasks(
         progress: dict[str, Any] | None = None,
         extra_detail: Mapping[str, Any] | None = None,
         stage_type: str = "model_evaluation",
+        created_at_utc: str | None = None,
+        started_at_utc: str | None = None,
+        ended_at_utc: str | None = None,
+        status_updated_at_utc: str | None = None,
     ) -> None:
         sequence = starting_sequence + len(tasks) + 1
         detail: dict[str, Any] = {
@@ -5085,10 +5182,10 @@ def _model_group_replay_timeline_tasks(
                 "target_required": False,
                 **worker_info,
                 "updated_at_utc": generated_at_utc,
-                "created_at_utc": None,
-                "started_at_utc": None,
-                "ended_at_utc": None,
-                "status_updated_at_utc": generated_at_utc,
+                "created_at_utc": created_at_utc,
+                "started_at_utc": started_at_utc,
+                "ended_at_utc": ended_at_utc,
+                "status_updated_at_utc": status_updated_at_utc or ended_at_utc or started_at_utc or generated_at_utc,
                 "reason": reason,
                 "receipt_count": len(receipt_refs or []),
                 "blocker_count": len(blockers or []),
@@ -5214,8 +5311,6 @@ def _model_group_replay_timeline_tasks(
     promotion_decision_status = str((promotion_decision or {}).get("decision_status") or "")
     promotion_complete = promotion_decision is not None
     promotion_eligible = promotion_decision_status == "eligible"
-    promotion_requires_review = promotion_decision_status == "review_required"
-    promotion_terminal_not_eligible = promotion_complete and not promotion_eligible and not promotion_requires_review
     promotion_not_admitted = promotion_complete and not promotion_eligible
     readiness_artifacts = _latest_promotion_readiness_artifacts(dataset_root) if lifecycle_artifacts_allowed and promotion_eligible else None
     readiness_record = readiness_artifacts["readiness"] if readiness_artifacts else None
@@ -5235,6 +5330,24 @@ def _model_group_replay_timeline_tasks(
         )
         if str(item)
     ]
+    promotion_started_at = _min_timestamp(
+        [
+            (promotion_decision or {}).get("started_at_utc"),
+            (promotion_decision or {}).get("created_at_utc"),
+            promotion_review.get("started_at_utc") if isinstance(promotion_review, Mapping) else None,
+            promotion_review.get("created_at_utc") if isinstance(promotion_review, Mapping) else None,
+        ]
+    )
+    promotion_ended_at = _max_timestamp(
+        [
+            (promotion_decision or {}).get("ended_at_utc"),
+            (promotion_decision or {}).get("completed_at_utc"),
+            (promotion_decision or {}).get("created_at_utc"),
+            promotion_review.get("ended_at_utc") if isinstance(promotion_review, Mapping) else None,
+            promotion_review.get("completed_at_utc") if isinstance(promotion_review, Mapping) else None,
+            promotion_review.get("created_at_utc") if isinstance(promotion_review, Mapping) else None,
+        ]
+    )
 
     replay_blockers: list[str] = []
     if not pre_replay_complete:
@@ -5316,11 +5429,13 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.replay_review",
         label="Replay Review",
-        task_state="completed" if replay_review_complete else ("current" if replay_complete else "future"),
-        status="succeeded" if replay_review_complete else ("ready" if replay_complete else "blocked"),
+        task_state="completed" if (replay_review_complete or promotion_complete) else ("current" if replay_complete else "future"),
+        status="succeeded" if (replay_review_complete or promotion_complete) else ("ready" if replay_complete else "blocked"),
         reason=(
             "Post-replay review is complete and ready for M06 Event Risk Governor attribution."
             if replay_review_complete
+            else "Post-replay review is covered by terminal model-group promotion evidence."
+            if promotion_complete
             else "Replay review is ready to classify replay failures, missed opportunities, and path deviations."
             if replay_complete
             else "Waiting for model-group replay before replay review can run."
@@ -5339,11 +5454,13 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.model_06_event_risk_governor",
         label="M06 Event Risk Governor",
-        task_state="completed" if attribution_complete else ("current" if replay_review_complete else "future"),
-        status="succeeded" if attribution_complete else ("ready" if replay_review_complete else "blocked"),
+        task_state="completed" if (attribution_complete or promotion_complete) else ("current" if replay_review_complete else "future"),
+        status="succeeded" if (attribution_complete or promotion_complete) else ("ready" if replay_review_complete else "blocked"),
         reason=(
             "M06 Event Risk Governor attribution and event-focus proposal evidence are complete."
             if attribution_complete
+            else "M06 Event Risk Governor is covered by terminal model-group promotion evidence."
+            if promotion_complete
             else "M06 Event Risk Governor attribution exists but must be rerun because its receipt lacks internal event-focus proposals."
             if attribution_rows_complete
             else "M06 Event Risk Governor is ready to consume replay review and attribute event-risk residuals."
@@ -5381,7 +5498,7 @@ def _model_group_replay_timeline_tasks(
     append_task(
         task_id="model_group.promotion",
         label="Model Promotion",
-        task_state="current" if promotion_terminal_not_eligible else ("completed" if promotion_complete else ("current" if evaluation_complete else "future")),
+        task_state="completed" if promotion_complete else ("current" if evaluation_complete else "future"),
         status=("succeeded" if promotion_eligible else (promotion_decision_status or "ready")) if evaluation_complete else "blocked",
         reason=(
             str(promotion_decision.get("decision_reason") or "Promotion review completed.") if promotion_decision else
@@ -5399,6 +5516,10 @@ def _model_group_replay_timeline_tasks(
             complete=promotion_complete and evaluation_complete,
             eligible=promotion_eligible,
         ),
+        created_at_utc=str(promotion_started_at) if promotion_started_at else None,
+        started_at_utc=str(promotion_started_at) if promotion_started_at else None,
+        ended_at_utc=str(promotion_ended_at) if promotion_complete and promotion_ended_at else None,
+        status_updated_at_utc=str(promotion_ended_at) if promotion_ended_at else None,
     )
     append_task(
         task_id="model_group.maintenance",
@@ -5588,7 +5709,10 @@ def build_historical_task_progress_summary(
     internal_task_timeline = list(task_timeline)
     task_timeline = _sort_task_timeline(_project_public_task_facts(task_timeline))
     public_active_task = _public_active_task(status, task_timeline)
+    terminal_outcome_task = _public_terminal_outcome_task(task_timeline)
     runtime_active_work = _runtime_active_work(status, storage_root=storage_root)
+    if public_active_task is None:
+        public_active_task = _public_active_task_from_runtime(status, runtime_active_work)
     task_timeline, public_active_task = _mark_active_task_running(
         status,
         task_timeline,
@@ -5601,12 +5725,17 @@ def build_historical_task_progress_summary(
             stage_counts[task_status] = stage_counts.get(task_status, 0) + 1
         stage_counts = dict(sorted(stage_counts.items()))
     progress_percent = _progress_percent(stage_counts)
-    dashboard_status, severity, summary = _owner_status(status, public_active_task=public_active_task)
+    dashboard_status, severity, summary = _owner_status(
+        status,
+        public_active_task=public_active_task,
+        terminal_outcome_task=terminal_outcome_task if public_active_task is None else None,
+    )
     active_blocker = _active_blocker(status, public_active_task)
     chart_payload: dict[str, Any] = {
         "current_month": _public_current_period(status, public_active_task),
         "active_stage": public_active_task.get("task_id") if public_active_task else None,
         "active_task": _public_active_task_summary(public_active_task),
+        "terminal_outcome_task": _public_active_task_summary(terminal_outcome_task),
         "runtime_active_work": runtime_active_work,
         "selected_target_symbol": selected_target_symbol,
         "target_queue": _target_queue_summary(storage_root),
