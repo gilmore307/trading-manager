@@ -1504,12 +1504,14 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
     runtime_status = "ready"
     if not status.service_runtime_ready:
         runtime_status = "blocked"
+    elif isinstance(runtime_activity, Mapping) and _runtime_activity_blocks_public_task(runtime_activity, status):
+        runtime_status = "blocked"
     elif status.lock.status == "active":
         runtime_status = "running"
     elif status.blocked_reason and not _is_transient_active_scheduler_backoff(status):
         runtime_status = "blocked"
     return {
-        "month": latest_decision.get("start_month") or status.current_month,
+        "month": _runtime_work_period(latest_decision, status),
         "stage_id": selected_work,
         "status": runtime_status,
         "decision_status": latest_decision.get("decision_status"),
@@ -1520,6 +1522,21 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
         "runtime_activity": runtime_activity,
         "replay_progress_activity": replay_progress_activity,
     }
+
+
+def _runtime_work_period(latest_decision: Mapping[str, Any], status: HistoricalSchedulerStatus) -> str | None:
+    for decision in (latest_decision, status.latest_decision if isinstance(status.latest_decision, Mapping) else {}):
+        execution_summary = decision.get("execution_summary")
+        if isinstance(execution_summary, Mapping):
+            training_fold = execution_summary.get("training_fold")
+            if isinstance(training_fold, Mapping):
+                fold_label = str(training_fold.get("fold_label") or "").strip()
+                if fold_label:
+                    return fold_label
+                start_month = str(training_fold.get("start_month") or "").strip()
+                if start_month:
+                    return _public_task_period(start_month)
+    return latest_decision.get("start_month") or status.current_month
 
 
 def _runtime_activity_decision(status: HistoricalSchedulerStatus) -> dict[str, Any]:
@@ -1666,11 +1683,12 @@ def _public_active_task_from_runtime(status: HistoricalSchedulerStatus, runtime_
         or daemon_state.get("selected_target_symbol")
         or runtime_activity.get("selected_target_symbol")
     )
+    public_status = "blocked" if _runtime_activity_blocks_public_task(runtime_activity, status) else "running"
     return {
         "task_id": layer_key,
         "task_label": label,
         "month": _public_task_period(str(runtime_active_work.get("month") or status.current_month or "")),
-        "status": "running",
+        "status": public_status,
         "task_state": "current",
         "stage_type": "model_task" if layer_key.startswith("model_") else stage_type,
         "layer": layer,
@@ -1697,6 +1715,22 @@ def _public_task_identity(task: Mapping[str, Any]) -> tuple[str, str, str, str]:
         str(task.get("target_symbol") or ""),
         str(task.get("worker_id") or ""),
     )
+
+
+def _runtime_activity_blocks_public_task(
+    runtime_activity: Mapping[str, Any],
+    status: HistoricalSchedulerStatus,
+) -> bool:
+    if runtime_activity.get("activity_type") != "scheduler_decision":
+        return False
+    if str(runtime_activity.get("decision_status") or "").lower() not in {"backoff", "waiting"}:
+        return False
+    if _is_transient_active_scheduler_backoff(status):
+        return False
+    reason_code = str(runtime_activity.get("reason_code") or "").strip()
+    if reason_code in {"", "waiting_for_model_group_lifecycle_tasks"}:
+        return False
+    return True
 
 
 def _month_key_from_replay_time_pointer(value: object) -> str | None:
@@ -1785,14 +1819,43 @@ def _mark_active_task_running(
     if str(public_active_task.get("task_state") or "") != "current":
         return task_timeline, public_active_task
     public_status = str(public_active_task.get("status") or "")
-    if public_status != "ready" and not (public_status == "blocked" and isinstance(runtime_activity, Mapping)):
-        return task_timeline, public_active_task
+    if isinstance(runtime_activity, Mapping) and _runtime_activity_blocks_public_task(runtime_activity, status):
+        active_key = _public_task_identity(public_active_task)
+
+        def with_blocked_activity(task: dict[str, Any]) -> dict[str, Any]:
+            updated = {**task, "status": "blocked"}
+            reason = runtime_activity.get("reason") or runtime_activity.get("activity_summary")
+            if reason:
+                updated["reason"] = reason
+            detail = dict(updated.get("detail") or {})
+            detail["runtime_activity"] = dict(runtime_activity)
+            progress = detail.get("progress")
+            if isinstance(progress, Mapping):
+                blocked_progress = dict(progress)
+                blocked_progress["status"] = "blocked"
+                detail["progress"] = blocked_progress
+            updated["detail"] = detail
+            if runtime_activity.get("updated_at_utc"):
+                updated["status_updated_at_utc"] = runtime_activity.get("updated_at_utc")
+                updated["updated_at_utc"] = runtime_activity.get("updated_at_utc")
+            return updated
+
+        updated_timeline = [
+            with_blocked_activity(task) if _public_task_identity(task) == active_key else task
+            for task in task_timeline
+        ]
+        blocked_task = next(
+            (task for task in updated_timeline if _public_task_identity(task) == active_key),
+            with_blocked_activity(public_active_task),
+        )
+        return updated_timeline, blocked_task
     if (
         public_status == "blocked"
         and isinstance(runtime_activity, Mapping)
         and runtime_activity.get("activity_type") == "scheduler_decision"
-        and str(runtime_activity.get("decision_status") or "").lower() in {"backoff", "selected", "waiting"}
     ):
+        return task_timeline, public_active_task
+    if public_status != "ready" and not (public_status == "blocked" and isinstance(runtime_activity, Mapping)):
         return task_timeline, public_active_task
     active_key = _public_task_identity(public_active_task)
     def with_running_activity(task: dict[str, Any]) -> dict[str, Any]:

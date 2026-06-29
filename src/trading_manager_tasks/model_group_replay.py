@@ -212,6 +212,24 @@ def run_model_group_replay_if_ready(
                     "required_next_step": required_next_step,
                 },
             )
+    model_artifact_status = _after_cost_alpha_model_status(after_cost_alpha_model_path)
+    if not model_artifact_status["compatible"]:
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_after_cost_alpha_model_not_trained",
+            reason=str(model_artifact_status["reason"]),
+            selected_work="model_group.replay",
+            command=[],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "after_cost_alpha_model_ref": str(after_cost_alpha_model_path),
+                "model_artifact_status": model_artifact_status,
+                "required_next_step": "train a fold-specific supervised after-cost alpha model before model_group replay",
+            },
+        )
     replay_plan_equity_symbols = _replay_dataset_available_equity_symbols_for_replay_plan(dataset_root)
     default_candidate_universe_path = _historical_candidate_universe_path(storage_root)
     resolved_candidate_universe_path = candidate_universe_path or default_candidate_universe_path
@@ -901,6 +919,37 @@ def _after_cost_alpha_training_bounds(training_fold: Mapping[str, Any]) -> tuple
         raise ValueError("training fold start_month must be YYYY-MM")
     source_end_month = _add_months(start_month, 4)
     return f"{start_month}-01T00:00:00-05:00", f"{source_end_month}-01T00:00:00-05:00"
+
+
+def _after_cost_alpha_model_status(path: Path) -> dict[str, Any]:
+    artifact = _load_json_object(path)
+    training_summary = artifact.get("training_summary")
+    if not isinstance(training_summary, Mapping):
+        training_summary = {}
+    training_mode = str(training_summary.get("training_mode") or "").strip()
+    sample_count = _int_value(training_summary.get("sample_count"))
+    if training_mode == "policy_bundle_no_supervised_fit" or sample_count <= 0:
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha artifact is a no-supervised-fit policy bundle, not a trained fold-specific model",
+            "after_cost_alpha_model_ref": str(path),
+            "training_mode": training_mode or None,
+            "sample_count": sample_count,
+        }
+    return {
+        "compatible": True,
+        "reason": "after-cost alpha artifact contains fold-specific supervised training evidence",
+        "after_cost_alpha_model_ref": str(path),
+        "training_mode": training_mode or None,
+        "sample_count": sample_count,
+    }
+
+
+def _int_value(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _add_months(month: str, count: int) -> str:

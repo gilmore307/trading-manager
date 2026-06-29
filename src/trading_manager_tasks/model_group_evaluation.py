@@ -134,6 +134,32 @@ def run_model_group_evaluation_if_ready(
                 "replay_scope_status": replay_scope_status,
             },
         )
+    model_artifact_status = _replay_model_artifact_status(replay_receipt)
+    if not model_artifact_status["compatible"]:
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_evaluation_candidate_model_not_trained",
+            reason=str(model_artifact_status["reason"]),
+            selected_work="model_group.evaluation",
+            command=[
+                python_executable,
+                "scripts/tasks/run_model_group_evaluation.py",
+                "--contract-id",
+                contract_id,
+                "--storage-root",
+                str(storage_root),
+            ],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "replay_execution_receipt_ref": str(replay_receipt_path),
+                "model_artifact_status": model_artifact_status,
+                "required_next_step": "train a fold-specific supervised after-cost alpha model before replay promotion evaluation",
+            },
+        )
     if not force and _latest_promotion_review_artifacts(
         dataset_root,
         replay_result_ref=str(replay_receipt_path),
@@ -2504,6 +2530,51 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         "candidate_model_ref": candidate_model_ref,
         "receipt_target_refs": sorted(target_refs),
     }
+
+
+def _replay_model_artifact_status(replay_receipt: Mapping[str, Any]) -> dict[str, Any]:
+    artifact_ref = str(replay_receipt.get("after_cost_alpha_model_ref") or "").strip()
+    if not artifact_ref:
+        return {
+            "compatible": False,
+            "reason": "replay receipt does not declare after_cost_alpha_model_ref",
+            "after_cost_alpha_model_ref": None,
+        }
+    artifact_path = Path(artifact_ref)
+    if not artifact_path.exists():
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha model artifact is missing",
+            "after_cost_alpha_model_ref": artifact_ref,
+        }
+    artifact = _load_json_object(artifact_path)
+    training_summary = artifact.get("training_summary")
+    if not isinstance(training_summary, Mapping):
+        training_summary = {}
+    training_mode = str(training_summary.get("training_mode") or "").strip()
+    sample_count = _int_value(training_summary.get("sample_count"))
+    if training_mode == "policy_bundle_no_supervised_fit" or sample_count <= 0:
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha artifact is a no-supervised-fit policy bundle, not a trained fold-specific model",
+            "after_cost_alpha_model_ref": artifact_ref,
+            "training_mode": training_mode or None,
+            "sample_count": sample_count,
+        }
+    return {
+        "compatible": True,
+        "reason": "after-cost alpha artifact contains fold-specific supervised training evidence",
+        "after_cost_alpha_model_ref": artifact_ref,
+        "training_mode": training_mode or None,
+        "sample_count": sample_count,
+    }
+
+
+def _int_value(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _candidate_model_ref_fold_window(candidate_model_ref: str) -> str | None:

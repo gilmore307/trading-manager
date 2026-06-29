@@ -55,7 +55,20 @@ class ModelGroupReplayTests(unittest.TestCase):
             / "after_cost_alpha_model_2016-01_2016-06.json"
         )
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
-        artifact_path.write_text('{"contract_type":"current_replay_placeholder_after_cost_alpha_model"}\n', encoding="utf-8")
+        artifact_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "current_replay_entry_utility_model_bundle",
+                    "training_summary": {
+                        "training_mode": "supervised_fit",
+                        "sample_count": 128,
+                    },
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         (
             storage_root.parent
             / "01_source_data"
@@ -730,6 +743,50 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "scripts/models/model_05_alpha_confidence/train_model_05_alpha_confidence.py"
                 )
             )
+
+    def test_no_supervised_fit_alpha_artifact_blocks_replay(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            alpha_model_path = (
+                storage_root.parent
+                / "03_model_artifacts"
+                / "runtime"
+                / "model_05_alpha_confidence"
+                / "after_cost_alpha_model_2016-01_2016-06.json"
+            )
+            alpha_model_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "current_replay_entry_utility_model_bundle",
+                        "training_summary": {
+                            "training_mode": "policy_bundle_no_supervised_fit",
+                            "sample_count": None,
+                        },
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_model_not_trained")
+            self.assertIn("no-supervised-fit", decision.reason)
 
     def test_explicit_training_target_handoff_does_not_run_canonical_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

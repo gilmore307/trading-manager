@@ -201,6 +201,28 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 }
             )
         decision_rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+        alpha_artifact_path = (
+            storage_root.parent
+            / "03_model_artifacts"
+            / "runtime"
+            / "model_05_alpha_confidence"
+            / "after_cost_alpha_model_2016-01_2016-06.json"
+        )
+        alpha_artifact_path.parent.mkdir(parents=True, exist_ok=True)
+        alpha_artifact_path.write_text(
+            json.dumps(
+                {
+                    "contract_type": "current_replay_entry_utility_model_bundle",
+                    "training_summary": {
+                        "training_mode": "supervised_fit",
+                        "sample_count": 128,
+                    },
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         replay_receipt_path = replay_run_root / "replay_execution_receipt.json"
         replay_receipt_path.write_text(
             json.dumps(
@@ -223,6 +245,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "position_sizing_policy": "rank_ordered_best_first_with_simultaneous_position_cap_target_allocation_floor_option_contract_round_up",
                     },
                     "decision_rows_ref": str(decision_rows_path),
+                    "after_cost_alpha_model_ref": str(alpha_artifact_path),
                 }
             )
             + "\n",
@@ -550,6 +573,39 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(decision.decision_status, "backoff")
             self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
             self.assertIn("deterministic crypto placeholder", decision.reason)
+
+    def test_no_supervised_fit_alpha_artifact_does_not_unlock_evaluation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_ready_replay_and_attribution(storage_root)
+            self._write_completed_fold(storage_root)
+            receipt_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "replay_execution_receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            alpha_artifact_path = Path(receipt["after_cost_alpha_model_ref"])
+            alpha_artifact_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "current_replay_entry_utility_model_bundle",
+                        "training_summary": {
+                            "training_mode": "policy_bundle_no_supervised_fit",
+                            "sample_count": None,
+                        },
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_evaluation_candidate_model_not_trained")
+            self.assertIn("no-supervised-fit", decision.reason)
 
     def test_stale_prior_fold_replay_receipt_does_not_unlock_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

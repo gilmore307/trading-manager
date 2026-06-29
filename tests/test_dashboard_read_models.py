@@ -17,6 +17,7 @@ from trading_manager_tasks.dashboard_read_models import (
     _close_global_nonblocking_agent_errors,
     _agent_error_summary,
     _compatible_replay_run_ids,
+    _mark_active_task_running,
     _mark_superseded_agent_errors,
     _model_group_replay_timeline_tasks,
     _runtime_activity_decision,
@@ -30,6 +31,54 @@ from trading_manager_tasks.task_progress import write_task_progress_node
 
 
 class DashboardReadModelProducerTests(unittest.TestCase):
+    def test_scheduler_backoff_runtime_activity_blocks_ready_task_instead_of_running(self):
+        status = SimpleNamespace(
+            lock=SimpleNamespace(status="active"),
+            blocked_reason="after-cost alpha artifact is a no-supervised-fit policy bundle",
+        )
+        task = {
+            "task_id": "model_group.replay",
+            "task_label": "Model Replay",
+            "month": "2016-fold2",
+            "status": "ready",
+            "task_state": "current",
+            "stage_type": "replay",
+            "layer_key": "model_group",
+            "worker_id": "evaluation_worker_1",
+            "target_symbol": None,
+            "detail": {
+                "progress": {
+                    "stage_id": "model_group.replay",
+                    "status": "ready",
+                    "expected_count": 60,
+                    "ready_count": 0,
+                }
+            },
+        }
+        runtime_activity = {
+            "activity_type": "scheduler_decision",
+            "decision_status": "backoff",
+            "selected_work": "model_group.replay",
+            "reason_code": "model_group_replay_after_cost_alpha_model_not_trained",
+            "reason": "after-cost alpha artifact is a no-supervised-fit policy bundle",
+            "updated_at_utc": "2026-06-29T04:20:32Z",
+        }
+
+        timeline, active = _mark_active_task_running(
+            status,
+            [task],
+            dict(task),
+            {"runtime_activity": runtime_activity},
+        )
+
+        self.assertIsNotNone(active)
+        assert active is not None
+        self.assertEqual(active["status"], "blocked")
+        self.assertEqual(active["reason"], runtime_activity["reason"])
+        self.assertEqual(active["detail"]["progress"]["status"], "blocked")
+        self.assertEqual(active["detail"]["runtime_activity"]["reason_code"], runtime_activity["reason_code"])
+        self.assertEqual(timeline[0]["status"], "blocked")
+
     def test_scheduler_decision_runtime_activity_describes_m06_missing_event_inputs(self):
         activity = _scheduler_decision_runtime_activity(
             {
