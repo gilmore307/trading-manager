@@ -3484,8 +3484,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("all layer-internal", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
         internal_stages = {stage["stage_id"]: stage for stage in task["detail"]["internal_stages"]}
-        self.assertEqual(internal_stages["model_02_target_state.data_acquisition"]["progress"]["ready_count"], 1)
-        self.assertEqual(internal_stages["model_02_target_state.feature_generation"]["progress"]["ready_count"], 1)
+        self.assertEqual(internal_stages["model_02_target_state.data_acquisition"]["progress"]["ready_count"], 18)
+        self.assertEqual(internal_stages["model_02_target_state.data_acquisition"]["progress"]["expected_count"], 18)
+        self.assertEqual(internal_stages["model_02_target_state.data_acquisition"]["progress"]["unit_label"], "source-month requests")
+        self.assertEqual(internal_stages["model_02_target_state.feature_generation"]["progress"]["ready_count"], 18)
+        self.assertEqual(internal_stages["model_02_target_state.feature_generation"]["progress"]["expected_count"], 18)
+        self.assertEqual(internal_stages["model_02_target_state.feature_generation"]["progress"]["unit_label"], "feature months")
         self.assertEqual(
             internal_stages["model_02_target_state.model_generation.train"]["progress"]["ready_count"],
             12,

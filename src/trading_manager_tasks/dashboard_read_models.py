@@ -3383,11 +3383,31 @@ def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status
     }
 
 
-def _internal_stage_weight(stage: Mapping[str, Any]) -> int:
+def _internal_stage_progress_contract(stage: Mapping[str, Any]) -> tuple[int, str, str]:
+    stage_type = str(stage.get("stage_type") or "")
     dataset_split = stage.get("dataset_split")
     split_name = str(dataset_split.get("split_name") or "") if isinstance(dataset_split, Mapping) else ""
     split_months_by_name = {name: months for name, months in ROLLING_FOLD_SPLIT_MONTHS}
-    return max(1, int(split_months_by_name.get(split_name, 1)))
+    if split_name:
+        expected_count = max(1, int(split_months_by_name.get(split_name, 1)))
+        return (
+            expected_count,
+            "dataset months",
+            f"{split_name} dataset split in the chronological 12+3+3 walk-forward fold",
+        )
+    if stage_type == "data_acquisition":
+        return (
+            MODEL_GENERATION_SPLIT_MONTH_COUNT,
+            "source-month requests",
+            "source partitions required by the chronological 12+3+3 walk-forward fold",
+        )
+    if stage_type == "feature_generation":
+        return (
+            MODEL_GENERATION_SPLIT_MONTH_COUNT,
+            "feature months",
+            "feature partitions required by the chronological 12+3+3 walk-forward fold",
+        )
+    return (1, "task units", "single internal stage required by the model task")
 
 
 def _internal_stage_progress(stage: Mapping[str, Any], *, is_active: bool = False) -> dict[str, Any]:
@@ -3397,27 +3417,19 @@ def _internal_stage_progress(stage: Mapping[str, Any], *, is_active: bool = Fals
     status = _raw_stage_status_for_aggregation(stage)
     if is_active and status in {"ready", "pending", "blocked", "unknown", ""}:
         status = "running"
-    expected_count = _internal_stage_weight(stage)
+    expected_count, unit_label, progress_basis = _internal_stage_progress_contract(stage)
     ready_count = expected_count if str(stage.get("status") or "") in terminal_statuses else 0
     failed_count = expected_count if str(stage.get("status") or "") == "failed" else 0
-    dataset_split = stage.get("dataset_split")
-    is_dataset_split = isinstance(dataset_split, Mapping)
-    split_name = str(dataset_split.get("split_name") or "") if is_dataset_split else ""
     if expected_count and ready_count == expected_count and failed_count == 0:
         progress_status = "complete"
     elif failed_count:
         progress_status = "failed"
     else:
         progress_status = status
-    progress_basis = (
-        f"{split_name} dataset split in the chronological 12+3+3 walk-forward fold"
-        if split_name
-        else "single internal stage required by the model task"
-    )
     return {
         "stage_id": stage_id,
         "status": progress_status,
-        "unit_label": "dataset months" if is_dataset_split else "task units",
+        "unit_label": unit_label,
         "expected_count": expected_count,
         "ready_count": ready_count,
         "active_count": ready_count,
