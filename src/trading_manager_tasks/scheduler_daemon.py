@@ -1753,6 +1753,8 @@ def handle_scheduler_progress_stall(
         stall_seconds=stall_seconds,
     ):
         return state
+    if state.last_stall_agent_error_ref:
+        return state
     last_alert = _parse_utc_iso(state.last_stall_agent_call_utc)
     if last_alert is not None and (now - last_alert).total_seconds() < stall_seconds:
         return state

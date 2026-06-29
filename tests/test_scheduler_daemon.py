@@ -403,6 +403,33 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(call["error_kind"], "scheduler_progress_stalled")
         self.assertIn("historical scheduler made no progress", call["summary"])
 
+    def test_scheduler_progress_stall_waits_for_progress_after_agent_error(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            state = SchedulerDaemonState(
+                start_month="2016-01",
+                end_month="2016-01",
+                last_decision_status="executed",
+                last_reason_code="workflow_stage_executed",
+                last_progress_utc="2026-01-01T00:00:00+00:00",
+                last_stall_agent_call_utc="2026-01-01T00:10:00+00:00",
+                last_stall_agent_error_ref="ERR-STALL",
+            )
+            with patch("trading_manager_tasks.scheduler_daemon.utc_now_iso") as now, patch(
+                "trading_manager_tasks.scheduler_daemon.handle_server_error"
+            ) as handler:
+                now.return_value = "2026-01-01T01:00:00+00:00"
+                updated = handle_scheduler_progress_stall(
+                    state,
+                    storage_root=tmp / "storage",
+                    state_path=tmp / "runtime" / "state.json",
+                    decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                    stall_seconds=600,
+                )
+
+        self.assertEqual(updated.last_stall_agent_error_ref, "ERR-STALL")
+        handler.assert_not_called()
+
     def test_scheduler_progress_stall_ignores_recent_active_task_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
