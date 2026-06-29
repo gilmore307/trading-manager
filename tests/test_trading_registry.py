@@ -3693,7 +3693,8 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("validate_realtime_model_input.py", rows["EXECUTION_REALTIME_MODEL_INPUT_VALIDATE"]["path"])
         self.assertIn("historical_feature_parity_required", rows["EXECUTION_REALTIME_MODEL_DECISION_HANDOFF_POLICY"]["payload"])
         self.assertIn("runtime_component_refs_required", rows["EXECUTION_REALTIME_MODEL_DECISION_HANDOFF_POLICY"]["payload"])
-        self.assertIn("placeholder_context_refs_use_placeholder_upstream_context_scheme", rows["EXECUTION_REALTIME_PLACEHOLDER_CONTEXT_REF_POLICY"]["payload"])
+        self.assertIn("promotion_readiness_model_input_context_bundle_required", rows["EXECUTION_REALTIME_CONTEXT_BUNDLE_POLICY"]["payload"])
+        self.assertIn("placeholder_context_refs_forbidden", rows["EXECUTION_REALTIME_CONTEXT_BUNDLE_POLICY"]["payload"])
         self.assertEqual(
             rows["EXECUTION_MODEL_DECISION_INPUT_READY_FOR_HISTORICAL_MODEL_DECISION_INPUT"]["payload"],
             "ready_for_historical_model_decision_input",

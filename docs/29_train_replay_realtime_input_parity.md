@@ -45,6 +45,13 @@ availability rule match the declared model input contract.
 | Replay | Frozen replay snapshot plus bounded on-demand replay cache | Replay must consume the same semantic families under a historical clock; missing on-demand data must be represented with the same missing/degraded states used by training or explicitly marked replay-only stress. |
 | Realtime | Current provider observations, realtime context refs, active model/config refs | Realtime may resolve current refs instead of historical artifacts, but the refs must map to the same semantic families and governance status before they can affect model decisions. |
 
+Promotion readiness is the handoff point into realtime/shadow execution. A
+promotion-readiness record must carry `model_input_context_bundle` with
+`historical_dataset_snapshot_ref`, `frozen_model_config_ref`, and M02-M06
+upstream context refs. Realtime feature snapshots consume that bundle instead
+of accepting placeholder context refs or requiring an operator to manually
+reconstruct the training/replay input lineage.
+
 ## Required Distinctions
 
 - Training sample breadth may exceed live routing breadth. That is valid only
