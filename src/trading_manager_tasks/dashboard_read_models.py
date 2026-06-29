@@ -5865,8 +5865,11 @@ def build_historical_task_progress_summary(
     public_active_task = _public_active_task(status, task_timeline)
     terminal_outcome_task = _public_terminal_outcome_task(task_timeline)
     runtime_active_work = _runtime_active_work(status, storage_root=storage_root)
-    if public_active_task is None:
-        public_active_task = _public_active_task_from_runtime(status, runtime_active_work)
+    runtime_projected_task = _public_active_task_from_runtime(status, runtime_active_work)
+    runtime_activity = runtime_active_work.get("runtime_activity") if isinstance(runtime_active_work, Mapping) else None
+    runtime_selected_work = str(runtime_activity.get("selected_work") or "") if isinstance(runtime_activity, Mapping) else ""
+    if public_active_task is None or (runtime_projected_task is not None and runtime_selected_work.startswith("model_worker.")):
+        public_active_task = runtime_projected_task
     task_timeline, public_active_task = _mark_active_task_running(
         status,
         task_timeline,
