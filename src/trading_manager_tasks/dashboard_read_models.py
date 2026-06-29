@@ -2415,7 +2415,7 @@ def _merge_task_progress_with_active_worker(
         value = active_progress.get(key)
         if value not in (None, "", []):
             merged[key] = value
-    for key in ("status", "stage_id", "nodes", "updated_at_utc", "worker_id", "current_activity", "activity_details", "log_refs"):
+    for key in ("status", "stage_id", "nodes", "updated_at_utc", "worker_id", "current_activity", "activity_details"):
         value = active_progress.get(key)
         if value not in (None, "", []):
             merged[key] = value
@@ -2482,100 +2482,6 @@ def _task_runtime_activity_from_worker(
         "task_period": task_period,
         "active_stage_id": active_stage_id or None,
     }
-
-
-def _task_log_tail_for_active_worker(
-    *,
-    storage_root: Path,
-    active_stage_id: str,
-    active_progress: Mapping[str, Any] | None,
-    max_lines_per_stream: int = 12,
-) -> dict[str, Any] | None:
-    if not active_stage_id:
-        return None
-    refs: list[tuple[str, Path]] = []
-    if isinstance(active_progress, Mapping):
-        raw_refs = active_progress.get("log_refs")
-        if isinstance(raw_refs, list):
-            for raw_ref in raw_refs:
-                path = _resolve_local_path(raw_ref)
-                if path is not None:
-                    stream = _stream_name_from_log_path(path)
-                    if stream != "task-progress":
-                        refs.append((stream, path))
-        extra = active_progress.get("extra")
-        if isinstance(extra, Mapping):
-            for key, stream in (("stdout_log", "stdout"), ("stderr_log", "stderr")):
-                path = _resolve_local_path(extra.get(key))
-                if path is not None:
-                    refs.append((stream, path))
-    if not refs:
-        stage_log_root = storage_root / "runtime" / "model_training_stage_logs" / active_stage_id.replace(".", "__")
-        if stage_log_root.exists():
-            for suffix, stream in (("*.stdout.log", "stdout"), ("*.stderr.log", "stderr")):
-                candidates = sorted(stage_log_root.glob(suffix), key=lambda path: path.stat().st_mtime if path.exists() else 0)
-                if candidates:
-                    refs.append((stream, candidates[-1]))
-    deduped: list[tuple[str, Path]] = []
-    seen: set[Path] = set()
-    for stream, path in refs:
-        if path in seen:
-            continue
-        seen.add(path)
-        deduped.append((stream, path))
-    entries: list[dict[str, Any]] = []
-    latest_mtime = 0.0
-    for stream, path in deduped:
-        if not path.exists() or not path.is_file():
-            continue
-        try:
-            stat = path.stat()
-            lines = _tail_text_lines(path, max_lines=max_lines_per_stream)
-        except OSError:
-            continue
-        if not lines:
-            continue
-        latest_mtime = max(latest_mtime, stat.st_mtime)
-        entries.append(
-            {
-                "stream": stream,
-                "path": str(path),
-                "updated_at_utc": datetime.fromtimestamp(stat.st_mtime, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-                "line_count": len(lines),
-                "lines": lines,
-            }
-        )
-    if not entries:
-        return None
-    return {
-        "contract_type": "manager_active_task_log_tail",
-        "stage_id": active_stage_id,
-        "updated_at_utc": datetime.fromtimestamp(latest_mtime, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-        if latest_mtime
-        else None,
-        "entries": entries,
-    }
-
-
-def _stream_name_from_log_path(path: Path) -> str:
-    name = path.name.lower()
-    if name.endswith(".log") and path.parent.name == "logs" and path.parent.parent.name == "task_progress":
-        return "task-progress"
-    if ".stderr." in name or name.endswith(".stderr.log"):
-        return "stderr"
-    if ".stdout." in name or name.endswith(".stdout.log"):
-        return "stdout"
-    return "log"
-
-
-def _tail_text_lines(path: Path, *, max_lines: int, max_chars: int = 360) -> list[str]:
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return []
-    lines = [line.rstrip() for line in text.splitlines() if line.strip()]
-    tail = lines[-max_lines:]
-    return [line if len(line) <= max_chars else f"{line[: max_chars - 1]}…" for line in tail]
 
 
 def _worker_window_label(extra: Mapping[str, Any]) -> str | None:
@@ -4119,21 +4025,6 @@ def _task_timeline(
                     active_progress=active_progress,
                     worker_info=worker_info,
                 )
-                active_stage_for_logs = str(
-                    (active_progress.get("stage_id") if isinstance(active_progress, Mapping) else None)
-                    or dashboard_stage.get("active_stage_id")
-                    or dashboard_stage.get("stage_id")
-                    or ""
-                )
-                live_log_tail = (
-                    _task_log_tail_for_active_worker(
-                        storage_root=storage_root,
-                        active_stage_id=active_stage_for_logs,
-                        active_progress=active_progress,
-                    )
-                    if (task_state == "current" or display_status == "running")
-                    else None
-                )
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
                     "task_number": None,
@@ -4181,7 +4072,6 @@ def _task_timeline(
                         "internal_stages": dashboard_stage.get("internal_stages") if isinstance(dashboard_stage.get("internal_stages"), list) else None,
                         "worker": worker_info,
                         "runtime_activity": runtime_activity,
-                        "log_tail": live_log_tail,
                     },
                     "_period_source": dashboard_stage.get("__dashboard_period_source"),
                 }

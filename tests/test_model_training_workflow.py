@@ -94,7 +94,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
         )
 
-    def test_foundation_catch_up_only_exposes_m01_and_m03_input_stages(self) -> None:
+    def test_foundation_catch_up_only_exposes_m01_input_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -107,8 +107,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertTrue(plan.foundation_catch_up_only)
         self.assertEqual(plan.foundation_catch_up_layers, FOUNDATION_CATCH_UP_LAYERS)
         self.assertEqual([stage.stage_type for stage in plan.layers[0].stages], ["data_acquisition", "feature_generation"])
-        self.assertEqual([stage.stage_type for stage in plan.layers[2].stages], ["data_acquisition"])
-        for layer in (plan.layers[1], plan.layers[3], plan.layers[4], plan.layers[5]):
+        for layer in (plan.layers[1], plan.layers[2], plan.layers[3], plan.layers[4], plan.layers[5]):
             self.assertEqual(layer.stages, ())
 
     def test_m01_acquisition_waits_for_task_key_preparation_then_auto_dispatch(self) -> None:

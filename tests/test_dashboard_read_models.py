@@ -748,14 +748,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             service, env, wrapper = self._write_service_files(tmp)
             decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
             decision_log.parent.mkdir(parents=True, exist_ok=True)
-            workflow_state = tmp / "storage" / "02_control_plane" / "runtime" / "model_training_workflow_state_2019-05.json"
+            workflow_state = tmp / "storage" / "02_control_plane" / "runtime" / "model_training_fold_state_aapl_2019-01_2020-06.json"
             workflow_state.parent.mkdir(parents=True, exist_ok=True)
             receipt_path = tmp / "storage" / "02_control_plane" / "runtime" / "example_stage_receipt.json"
             receipt_path.write_text(
                 json.dumps(
                     {
                         "contract_type": "component_completion_receipt",
-                        "manager_stage_id": "model_01_market_context.data_acquisition",
+                        "manager_stage_id": "model_01_background_context.data_acquisition",
                         "started_at": "2026-05-12T09:00:00Z",
                         "completed_at": "2026-05-12T09:30:00Z",
                         "status": "succeeded",
@@ -768,14 +768,15 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 json.dumps(
                     {
                         "contract_type": "manager_model_training_workflow_state",
-                        "start_month": "2019-05",
-                        "end_month": "2019-05",
+                        "start_month": "2019-01",
+                        "end_month": "2020-06",
+                        "target_symbol": "AAPL",
                         "stages": [
                             {
-                                "stage_id": "model_01_market_context.data_acquisition",
+                                "stage_id": "model_01_background_context.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 1,
-                                "layer_key": "model_01_market_context",
+                                "layer_key": "model_01_background_context",
                                 "status": "succeeded",
                                 "updated_utc": "2026-05-12T10:00:00Z",
                                 "last_reason": "stage coverage complete",
@@ -784,12 +785,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             {
                                 "stage_id": "model_02_target_state.data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 3,
+                                "layer": 2,
                                 "layer_key": "model_02_target_state",
                                 "status": "blocked",
                                 "updated_utc": "2026-05-12T11:00:00Z",
                                 "last_reason": "waiting for source rows",
-                                "blockers": ["model_01_sector_context.model_evaluation_complete"],
+                                "blockers": ["upstream_model_01_model_generation_complete"],
                             },
                             {
                                 "stage_id": "model_02_target_state.feature_generation",
@@ -814,7 +815,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_scheduler_decision",
                         "decision_status": "executed",
                         "selected_work": "model_02_target_state.data_acquisition",
-                        "start_month": "2019-05",
+                        "start_month": "2019-01",
+                        "end_month": "2020-06",
                         "execution_summary": {
                             "stage_execution": {
                                 "contract_type": "manager_stage_execution_summary",
@@ -849,7 +851,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 status,
                 stage_coverage={
                     "contract_type": "manager_stage_coverage",
-                    "stage_id": "model_01_market_context.data_acquisition",
+                    "stage_id": "model_01_background_context.data_acquisition",
                     "status": "partial_ready",
                     "expected_count": 19,
                     "ready_count": 3,
@@ -874,8 +876,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task_timeline = payload["chart_payload"]["task_timeline"]
         model_tasks = [task for task in task_timeline if task["stage_type"] == "model_task"]
         lifecycle_tasks = [task for task in task_timeline if str(task["task_id"]).startswith("model_group.")]
-        self.assertEqual([task["task_state"] for task in model_tasks], ["completed", "failed"])
-        self.assertEqual(lifecycle_tasks, [])
+        self.assertEqual([task["task_state"] for task in model_tasks], ["completed", "blocked"])
+        self.assertTrue(lifecycle_tasks)
+        self.assertTrue(all(task["task_state"] == "blocked" for task in lifecycle_tasks))
         self.assertEqual(task_timeline[1]["task_label"], "M02 Target State Vector Model")
         self.assertEqual(task_timeline[1]["month"], "2019-01..2020-06")
         self.assertEqual(
@@ -1112,26 +1115,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 node_label="Generating feature window 9 of 26",
                 current_activity="Generating AAPL 2016-03-01 target-state features",
                 activity_details=["Using target-local source rows"],
-                log_refs=[str(runtime / "logs" / "m02_feature_generation.stdout.log")],
                 extra={
                     "window_start": "2016-02-25T00:00:00-05:00",
                     "window_end": "2016-03-03T00:00:00-05:00",
                     "candidate_symbol_count": 50,
                     "sample_targets": ["AAPL", "BTC", "MSFT", "NVDA"],
                 },
-            )
-            log_path = runtime / "logs" / "m02_feature_generation.stdout.log"
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            log_path.write_text(
-                "\n".join(
-                    [
-                        "initializing feature context",
-                        "loading AAPL 2016-03-01 source rows",
-                        "writing target-state feature batch",
-                    ]
-                )
-                + "\n",
-                encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
@@ -1168,17 +1157,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(live_activity["sample_targets"], ["AAPL", "BTC", "MSFT", "NVDA"])
         self.assertIn("Candidate symbols 50", live_activity["activity_details"])
         self.assertIn("Using target-local source rows", live_activity["activity_details"])
-        log_tail = task["detail"]["log_tail"]
-        self.assertEqual(log_tail["stage_id"], "model_02_target_state.feature_generation")
-        self.assertEqual(log_tail["entries"][0]["stream"], "stdout")
-        self.assertEqual(
-            log_tail["entries"][0]["lines"],
-            [
-                "initializing feature context",
-                "loading AAPL 2016-03-01 source rows",
-                "writing target-state feature batch",
-            ],
-        )
 
     def test_completed_model_task_runtime_spans_internal_stage_receipts(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

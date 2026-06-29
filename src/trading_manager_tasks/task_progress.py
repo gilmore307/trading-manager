@@ -101,7 +101,6 @@ def write_task_progress_node(
     node_label: str | None = None,
     current_activity: str | None = None,
     activity_details: list[str] | None = None,
-    log_refs: list[str] | None = None,
     extra: Mapping[str, Any] | None = None,
 ) -> Path:
     """Write or replace one worker's active task-progress file."""
@@ -109,7 +108,6 @@ def write_task_progress_node(
     progress_root.mkdir(parents=True, exist_ok=True)
     path = worker_progress_path(progress_root, worker_id)
     now = utc_now_iso()
-    merged_log_refs = [str(ref) for ref in (log_refs or []) if str(ref).strip()]
     payload: dict[str, Any] = {
         "contract_type": "manager_worker_task_progress",
         "worker_id": worker_id,
@@ -125,7 +123,6 @@ def write_task_progress_node(
         "progress_source": "active_progress_file",
         "current_activity": current_activity,
         "activity_details": activity_details or [],
-        "log_refs": merged_log_refs,
         "nodes": [
             {
                 "node_id": node_id or stage_id,
@@ -167,7 +164,6 @@ def write_task_progress_from_env(
     node_label: str | None = None,
     current_activity: str | None = None,
     activity_details: list[str] | None = None,
-    log_refs: list[str] | None = None,
     extra: Mapping[str, Any] | None = None,
     env: Mapping[str, str] | None = None,
 ) -> Path:
@@ -210,7 +206,6 @@ def write_task_progress_from_env(
         node_label=node_label,
         current_activity=current_activity,
         activity_details=activity_details,
-        log_refs=log_refs,
         extra=merged_extra,
     )
 
@@ -382,7 +377,7 @@ def load_active_task_progress(progress_root: Path) -> dict[str, dict[str, Any]]:
         nodes = payload.get("nodes")
         if isinstance(nodes, list):
             progress["nodes"] = nodes
-        for key in ("current_activity", "activity_details", "log_refs"):
+        for key in ("current_activity", "activity_details"):
             value = payload.get(key)
             if value not in (None, "", []):
                 progress[key] = value

@@ -74,10 +74,9 @@ class TaskProgressTests(unittest.TestCase):
         self.assertEqual(progress["progress_source"], "active_progress_file")
         self.assertIn("train/validation/test", progress["progress_basis"])
 
-    def test_active_progress_preserves_specific_activity_and_real_logs(self):
+    def test_active_progress_preserves_specific_activity(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             progress_root = Path(raw_tmp) / "progress"
-            log_path = Path(raw_tmp) / "stage.stdout.log"
 
             write_task_progress_node(
                 progress_root=progress_root,
@@ -91,14 +90,12 @@ class TaskProgressTests(unittest.TestCase):
                 node_label="Generating AAPL target-state features",
                 current_activity="Generating AAPL 2016-03-01 target-state features",
                 activity_details=["Window 2016-02-26 to 2016-03-04", "Rows written 143,491"],
-                log_refs=[str(log_path)],
             )
             payloads = load_active_task_progress(progress_root)
 
         progress = payloads["2016-01..2017-06:model_02_target_state.feature_generation"]
         self.assertEqual(progress["current_activity"], "Generating AAPL 2016-03-01 target-state features")
         self.assertEqual(progress["activity_details"], ["Window 2016-02-26 to 2016-03-04", "Rows written 143,491"])
-        self.assertEqual(progress["log_refs"], [str(log_path)])
         self.assertFalse((progress_root / "logs").exists())
 
 

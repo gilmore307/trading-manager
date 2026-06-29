@@ -437,11 +437,8 @@ def execute_stage_process(
         node_id="stage_started",
         node_label="Stage process started",
         current_activity=f"Running {stage.stage_id}",
-        log_refs=[str(stdout_path), str(stderr_path)],
         extra={
             "progress_basis": progress_contract_for_stage(stage.stage_id)["progress_basis"],
-            "stdout_log": str(stdout_path),
-            "stderr_log": str(stderr_path),
             **({"dataset_split": stage.dataset_split} if stage.dataset_split is not None else {}),
         },
     )
