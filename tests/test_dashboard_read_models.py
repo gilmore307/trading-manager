@@ -1070,16 +1070,33 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 worker_id="model_worker_1",
                 task_uid="2016-01..2017-06:model_02_target_state.feature_generation",
                 stage_id="model_02_target_state.feature_generation",
+                unit_label="feature months",
                 processed_count=8,
                 expected_count=26,
                 node_id="feature_generation_window_started",
                 node_label="Generating feature window 9 of 26",
+                current_activity="Generating AAPL 2016-03-01 target-state features",
+                activity_details=["Using target-local source rows"],
+                log_refs=[str(runtime / "logs" / "m02_feature_generation.stdout.log")],
                 extra={
                     "window_start": "2016-02-25T00:00:00-05:00",
                     "window_end": "2016-03-03T00:00:00-05:00",
                     "candidate_symbol_count": 50,
                     "sample_targets": ["AAPL", "BTC", "MSFT", "NVDA"],
                 },
+            )
+            log_path = runtime / "logs" / "m02_feature_generation.stdout.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "initializing feature context",
+                        "loading AAPL 2016-03-01 source rows",
+                        "writing target-state feature batch",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
             )
             status = collect_historical_scheduler_status(
                 storage_root=tmp / "storage" / "02_control_plane",
@@ -1100,19 +1117,33 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["started_at_utc"], "2026-06-28T06:14:12Z")
         self.assertIsNone(task["ended_at_utc"])
         progress = task["detail"]["progress"]
-        self.assertEqual(progress["progress_source"], "model_task_internal_stages")
-        self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["ready_count"], 1)
-        self.assertEqual(progress["active_count"], 2)
-        self.assertEqual(progress["expected_count"], 20)
+        self.assertEqual(progress["progress_source"], "active_progress_file")
+        self.assertEqual(progress["progress_scope"], "active_stage")
+        self.assertEqual(progress["unit_label"], "feature months")
+        self.assertEqual(progress["ready_count"], 8)
+        self.assertEqual(progress["expected_count"], 26)
+        self.assertEqual(progress["parent_task_progress"]["progress_source"], "model_task_internal_stages")
+        self.assertEqual(progress["parent_task_progress"]["expected_count"], 20)
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(
             live_activity["activity_summary"],
-            "Generating feature window 9 of 26 · 2016-02-25 to 2016-03-03 · examples AAPL, BTC, MSFT, NVDA",
+            "Generating AAPL 2016-03-01 target-state features · 2016-02-25 to 2016-03-03 · examples AAPL, BTC, MSFT, NVDA",
         )
-        self.assertEqual(live_activity["progress_label"], "1/20 task units")
+        self.assertEqual(live_activity["progress_label"], "8/26 feature months")
         self.assertEqual(live_activity["sample_targets"], ["AAPL", "BTC", "MSFT", "NVDA"])
         self.assertIn("Candidate symbols 50", live_activity["activity_details"])
+        self.assertIn("Using target-local source rows", live_activity["activity_details"])
+        log_tail = task["detail"]["log_tail"]
+        self.assertEqual(log_tail["stage_id"], "model_02_target_state.feature_generation")
+        self.assertEqual(log_tail["entries"][0]["stream"], "stdout")
+        self.assertEqual(
+            log_tail["entries"][0]["lines"],
+            [
+                "initializing feature context",
+                "loading AAPL 2016-03-01 source rows",
+                "writing target-state feature batch",
+            ],
+        )
 
     def test_completed_model_task_runtime_spans_internal_stage_receipts(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3184,7 +3215,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["detail"]["progress"]["status"], "running")
         self.assertEqual(task["detail"]["progress"]["stage_id"], "model_02_target_state.feature_generation")
-        self.assertEqual(task["detail"]["runtime_activity"]["progress_label"], "1/2 task units")
+        self.assertEqual(task["detail"]["runtime_activity"]["progress_label"], "4/18 feature months")
 
     def test_reset_fold_waits_for_monthly_foundation_instead_of_showing_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3515,17 +3546,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["status"], "running")
-        self.assertEqual(progress["progress_source"], "model_task_internal_stages")
-        self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["expected_count"], 18)
-        self.assertEqual(progress["ready_count"], 12)
-        self.assertEqual(progress["active_count"], 15)
-        self.assertEqual(progress["pending_count"], 3)
+        self.assertEqual(progress["progress_source"], "active_progress_file")
+        self.assertEqual(progress["progress_scope"], "active_stage")
+        self.assertEqual(progress["unit_label"], "model rows")
+        self.assertEqual(progress["expected_count"], 1)
+        self.assertEqual(progress["ready_count"], 0)
+        self.assertEqual(progress["pending_count"], 1)
+        self.assertEqual(progress["parent_task_progress"]["progress_source"], "model_task_internal_stages")
+        self.assertEqual(progress["parent_task_progress"]["expected_count"], 18)
+        self.assertEqual(progress["parent_task_progress"]["ready_count"], 12)
         self.assertEqual(progress["stage_id"], "model_02_target_state.model_generation.validation")
         self.assertEqual(progress["nodes"][0]["node_id"], "stage_started")
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(live_activity["activity_summary"], "Stage process started")
-        self.assertEqual(live_activity["progress_label"], "12/18 task units")
+        self.assertEqual(live_activity["progress_label"], "0/1 model rows")
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -5702,9 +5736,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("2016-01..2017-06", timeline_months)
         self.assertEqual(fold_prep_tasks[0]["worker_label"], "Model Worker 1")
         self.assertEqual(fold_prep_tasks[0]["dataset_unit_months"], None)
-        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["ready_count"], 0)
-        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["expected_count"], 1)
-        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["unit_label"], "task units")
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["ready_count"], 40)
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["expected_count"], 100)
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["unit_label"], "rows")
+        self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["progress_source"], "active_progress_file")
         self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["nodes"][0]["processed_count"], 40)
         self.assertEqual(fold_prep_tasks[0]["detail"]["progress"]["nodes"][0]["expected_count"], 100)
 

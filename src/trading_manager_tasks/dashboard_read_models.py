@@ -2402,12 +2402,18 @@ def _merge_task_progress_with_active_worker(
     dashboard_progress: Mapping[str, Any],
     active_progress: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    """Keep task-level progress as the progress bar while attaching worker context."""
+    """Prefer active-stage worker counters while preserving task-level context."""
 
-    merged = dict(dashboard_progress)
     if not isinstance(active_progress, Mapping):
-        return merged
-    for key in ("status", "stage_id", "nodes", "updated_at_utc", "worker_id"):
+        return dict(dashboard_progress)
+    merged = dict(active_progress)
+    merged["parent_task_progress"] = dict(dashboard_progress)
+    merged.setdefault("progress_scope", "active_stage")
+    for key in ("progress_basis", "unit_label", "expected_count", "ready_count", "pending_count", "failed_count"):
+        value = active_progress.get(key)
+        if value not in (None, "", []):
+            merged[key] = value
+    for key in ("status", "stage_id", "nodes", "updated_at_utc", "worker_id", "current_activity", "activity_details", "log_refs"):
         value = active_progress.get(key)
         if value not in (None, "", []):
             merged[key] = value
@@ -2432,22 +2438,32 @@ def _task_runtime_activity_from_worker(
     active_stage_type = str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "")
     active_stage_label = _public_stage_name(active_stage_id, active_stage_type)
     node_label = str(node.get("node_label") or "") if isinstance(node, Mapping) else ""
+    current_activity = str(active_progress.get("current_activity") or "").strip()
     if not node_label:
         node_label = active_stage_label
+    if current_activity:
+        node_label = current_activity
     window_label = _worker_window_label(extra)
     sample_targets = _worker_sample_targets(extra)
     if window_label and window_label not in node_label:
         node_label = f"{node_label} · {window_label}"
     if sample_targets:
         node_label = f"{node_label} · examples {', '.join(sample_targets[:4])}"
+    row_count_label = _worker_rows_written_label(extra)
+    if row_count_label and row_count_label not in node_label:
+        node_label = f"{node_label} · {row_count_label}"
     progress_label = _progress_display_label(task_progress)
     worker_progress_label = _worker_completed_progress_label(active_progress) or _progress_display_label(worker_progress)
+    explicit_details = active_progress.get("activity_details")
+    explicit_details = [str(line) for line in explicit_details] if isinstance(explicit_details, list) else []
     activity_details = [
         f"Task progress {progress_label}" if progress_label else None,
         f"Worker completed {worker_progress_label}" if worker_progress_label else None,
         f"Window {window_label}" if window_label else None,
+        row_count_label,
         _worker_candidate_label(extra),
         str(worker_info.get("worker_label") or worker_info.get("worker_id") or "") or None,
+        *explicit_details,
     ]
     return {
         "activity_type": "task_worker_progress",
@@ -2464,6 +2480,94 @@ def _task_runtime_activity_from_worker(
         "task_period": task_period,
         "active_stage_id": active_stage_id or None,
     }
+
+
+def _task_log_tail_for_active_worker(
+    *,
+    storage_root: Path,
+    active_stage_id: str,
+    active_progress: Mapping[str, Any] | None,
+    max_lines_per_stream: int = 12,
+) -> dict[str, Any] | None:
+    if not active_stage_id:
+        return None
+    refs: list[tuple[str, Path]] = []
+    if isinstance(active_progress, Mapping):
+        raw_refs = active_progress.get("log_refs")
+        if isinstance(raw_refs, list):
+            for raw_ref in raw_refs:
+                path = _resolve_local_path(raw_ref)
+                if path is not None:
+                    refs.append((_stream_name_from_log_path(path), path))
+        extra = active_progress.get("extra")
+        if isinstance(extra, Mapping):
+            for key, stream in (("stdout_log", "stdout"), ("stderr_log", "stderr")):
+                path = _resolve_local_path(extra.get(key))
+                if path is not None:
+                    refs.append((stream, path))
+    if not refs:
+        stage_log_root = storage_root / "runtime" / "model_training_stage_logs" / active_stage_id.replace(".", "__")
+        if stage_log_root.exists():
+            for suffix, stream in (("*.stdout.log", "stdout"), ("*.stderr.log", "stderr")):
+                candidates = sorted(stage_log_root.glob(suffix), key=lambda path: path.stat().st_mtime if path.exists() else 0)
+                if candidates:
+                    refs.append((stream, candidates[-1]))
+    deduped: list[tuple[str, Path]] = []
+    seen: set[Path] = set()
+    for stream, path in refs:
+        if path in seen:
+            continue
+        seen.add(path)
+        deduped.append((stream, path))
+    entries: list[dict[str, Any]] = []
+    latest_mtime = 0.0
+    for stream, path in deduped:
+        if not path.exists() or not path.is_file():
+            continue
+        try:
+            stat = path.stat()
+            lines = _tail_text_lines(path, max_lines=max_lines_per_stream)
+        except OSError:
+            continue
+        latest_mtime = max(latest_mtime, stat.st_mtime)
+        entries.append(
+            {
+                "stream": stream,
+                "path": str(path),
+                "updated_at_utc": datetime.fromtimestamp(stat.st_mtime, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                "line_count": len(lines),
+                "lines": lines,
+            }
+        )
+    if not entries:
+        return None
+    return {
+        "contract_type": "manager_active_task_log_tail",
+        "stage_id": active_stage_id,
+        "updated_at_utc": datetime.fromtimestamp(latest_mtime, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        if latest_mtime
+        else None,
+        "entries": entries,
+    }
+
+
+def _stream_name_from_log_path(path: Path) -> str:
+    name = path.name.lower()
+    if ".stderr." in name or name.endswith(".stderr.log"):
+        return "stderr"
+    if ".stdout." in name or name.endswith(".stdout.log"):
+        return "stdout"
+    return "log"
+
+
+def _tail_text_lines(path: Path, *, max_lines: int, max_chars: int = 360) -> list[str]:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    lines = [line.rstrip() for line in text.splitlines() if line.strip()]
+    tail = lines[-max_lines:]
+    return [line if len(line) <= max_chars else f"{line[: max_chars - 1]}…" for line in tail]
 
 
 def _worker_window_label(extra: Mapping[str, Any]) -> str | None:
@@ -2497,6 +2601,17 @@ def _worker_candidate_label(extra: Mapping[str, Any]) -> str | None:
     if count <= 0:
         return None
     return f"Candidate symbols {count}"
+
+
+def _worker_rows_written_label(extra: Mapping[str, Any]) -> str | None:
+    value = extra.get("rows_written") or extra.get("row_count")
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    if count <= 0:
+        return None
+    return f"{count:,} rows written"
 
 
 def _public_stage_name(stage_id: object, stage_type: object) -> str:
@@ -3972,6 +4087,21 @@ def _task_timeline(
                     active_progress=active_progress,
                     worker_info=worker_info,
                 )
+                active_stage_for_logs = str(
+                    (active_progress.get("stage_id") if isinstance(active_progress, Mapping) else None)
+                    or dashboard_stage.get("active_stage_id")
+                    or dashboard_stage.get("stage_id")
+                    or ""
+                )
+                live_log_tail = (
+                    _task_log_tail_for_active_worker(
+                        storage_root=storage_root,
+                        active_stage_id=active_stage_for_logs,
+                        active_progress=active_progress,
+                    )
+                    if (task_state == "current" or display_status == "running")
+                    else None
+                )
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
                     "task_number": None,
@@ -4018,6 +4148,7 @@ def _task_timeline(
                         "internal_stages": dashboard_stage.get("internal_stages") if isinstance(dashboard_stage.get("internal_stages"), list) else None,
                         "worker": worker_info,
                         "runtime_activity": runtime_activity,
+                        "log_tail": live_log_tail,
                     },
                     "_period_source": dashboard_stage.get("__dashboard_period_source"),
                 }

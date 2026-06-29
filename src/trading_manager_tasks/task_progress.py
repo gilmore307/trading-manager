@@ -99,6 +99,9 @@ def write_task_progress_node(
     expected_seconds: float | None = None,
     node_id: str | None = None,
     node_label: str | None = None,
+    current_activity: str | None = None,
+    activity_details: list[str] | None = None,
+    log_refs: list[str] | None = None,
     extra: Mapping[str, Any] | None = None,
 ) -> Path:
     """Write or replace one worker's active task-progress file."""
@@ -119,6 +122,9 @@ def write_task_progress_node(
         "expected_seconds": expected_seconds,
         "updated_at_utc": now,
         "progress_source": "active_progress_file",
+        "current_activity": current_activity,
+        "activity_details": activity_details or [],
+        "log_refs": log_refs or [],
         "nodes": [
             {
                 "node_id": node_id or stage_id,
@@ -158,6 +164,9 @@ def write_task_progress_from_env(
     expected_seconds: float | None = None,
     node_id: str | None = None,
     node_label: str | None = None,
+    current_activity: str | None = None,
+    activity_details: list[str] | None = None,
+    log_refs: list[str] | None = None,
     extra: Mapping[str, Any] | None = None,
     env: Mapping[str, str] | None = None,
 ) -> Path:
@@ -198,6 +207,9 @@ def write_task_progress_from_env(
         expected_seconds=expected_seconds,
         node_id=node_id,
         node_label=node_label,
+        current_activity=current_activity,
+        activity_details=activity_details,
+        log_refs=log_refs,
         extra=merged_extra,
     )
 
@@ -369,6 +381,10 @@ def load_active_task_progress(progress_root: Path) -> dict[str, dict[str, Any]]:
         nodes = payload.get("nodes")
         if isinstance(nodes, list):
             progress["nodes"] = nodes
+        for key in ("current_activity", "activity_details", "log_refs"):
+            value = payload.get(key)
+            if value not in (None, "", []):
+                progress[key] = value
         extra = payload.get("extra")
         if isinstance(extra, Mapping):
             progress["extra"] = dict(extra)

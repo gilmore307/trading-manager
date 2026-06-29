@@ -30,6 +30,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expected-seconds", type=float, default=None)
     parser.add_argument("--node-id", default=None)
     parser.add_argument("--node-label", default=None)
+    parser.add_argument("--current-activity", default=None)
+    parser.add_argument("--activity-detail", action="append", default=[])
+    parser.add_argument("--log-ref", action="append", default=[])
     parser.add_argument("--extra-json", default=None)
     args = parser.parse_args(argv)
     write_task_progress_from_env(
@@ -41,6 +44,9 @@ def main(argv: list[str] | None = None) -> int:
         expected_seconds=args.expected_seconds,
         node_id=args.node_id,
         node_label=args.node_label,
+        current_activity=args.current_activity,
+        activity_details=args.activity_detail,
+        log_refs=args.log_ref,
         extra=_json_object(args.extra_json),
     )
     return 0

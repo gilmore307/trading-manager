@@ -74,6 +74,32 @@ class TaskProgressTests(unittest.TestCase):
         self.assertEqual(progress["progress_source"], "active_progress_file")
         self.assertIn("train/validation/test", progress["progress_basis"])
 
+    def test_active_progress_preserves_specific_activity_and_logs(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            progress_root = Path(raw_tmp) / "progress"
+            log_path = Path(raw_tmp) / "stage.stdout.log"
+
+            write_task_progress_node(
+                progress_root=progress_root,
+                worker_id="model_worker_1",
+                task_uid="2016-01..2017-06:model_02_target_state.feature_generation",
+                stage_id="model_02_target_state.feature_generation",
+                unit_label="feature months",
+                processed_count=8,
+                expected_count=18,
+                node_id="feature_window",
+                node_label="Generating AAPL target-state features",
+                current_activity="Generating AAPL 2016-03-01 target-state features",
+                activity_details=["Window 2016-02-26 to 2016-03-04", "Rows written 143,491"],
+                log_refs=[str(log_path)],
+            )
+            payloads = load_active_task_progress(progress_root)
+
+        progress = payloads["2016-01..2017-06:model_02_target_state.feature_generation"]
+        self.assertEqual(progress["current_activity"], "Generating AAPL 2016-03-01 target-state features")
+        self.assertEqual(progress["activity_details"], ["Window 2016-02-26 to 2016-03-04", "Rows written 143,491"])
+        self.assertEqual(progress["log_refs"], [str(log_path)])
+
 
 if __name__ == "__main__":
     unittest.main()
