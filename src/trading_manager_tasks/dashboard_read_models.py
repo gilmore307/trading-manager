@@ -986,9 +986,12 @@ def _latest_stage_execution(status: HistoricalSchedulerStatus) -> dict[str, Any]
     stage_execution = execution_summary.get("stage_execution")
     if not isinstance(stage_execution, Mapping):
         return None
-    stderr_excerpt = _failure_excerpt(stage_execution.get("stderr_path"))
-    stdout_excerpt = _failure_excerpt(stage_execution.get("stdout_path")) if stderr_excerpt is None else None
-    failure_detail = stderr_excerpt or stdout_excerpt or stage_execution.get("reason")
+    status = str(stage_execution.get("status") or "").lower()
+    failure_detail = None
+    if status == "failed":
+        stderr_excerpt = _failure_excerpt(stage_execution.get("stderr_path"))
+        stdout_excerpt = _failure_excerpt(stage_execution.get("stdout_path")) if stderr_excerpt is None else None
+        failure_detail = stderr_excerpt or stdout_excerpt or stage_execution.get("reason")
     return {
         "stage_id": stage_execution.get("stage_id"),
         "status": stage_execution.get("status"),
@@ -4091,7 +4094,12 @@ def _task_timeline(
                     task["detail"]["last_execution"] = {
                         "status": latest_execution.get("status"),
                         "return_code": latest_execution.get("return_code"),
-                        "reason": latest_execution.get("failure_detail") or latest_execution.get("reason"),
+                        "reason": (
+                            latest_execution.get("failure_detail")
+                            or latest_execution.get("reason")
+                            if str(latest_execution.get("status") or "").lower() == "failed"
+                            else None
+                        ),
                     }
                 tasks.append(task)
             continue
