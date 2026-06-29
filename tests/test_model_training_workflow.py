@@ -130,7 +130,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertTrue(acquisition.provider_calls_allowed)
         self.assertIn("scripts/tasks/dispatch_and_reconcile_provider_stage.py", acquisition.command)
 
-    def test_m02_target_state_uses_target_local_materializer_without_provider_dispatch(self) -> None:
+    def test_m02_target_state_waits_for_m01_even_with_target_local_feed(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
             _write_target_feed_artifact(root, symbol="AAPL", month="2016-01")
@@ -144,7 +144,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
 
         stage = {stage.stage_id: stage for stage in plan.layers[1].stages}["model_02_target_state.data_acquisition"]
-        self.assertEqual(stage.status, "ready")
+        self.assertEqual(stage.status, "blocked")
+        self.assertEqual(stage.blockers, ("upstream_model_01_model_generation_complete",))
         self.assertFalse(stage.provider_calls_allowed)
         self.assertTrue(stage.safe_without_provider_calls)
         self.assertIn("scripts/tasks/materialize_layer_three_target_state_inputs.py", stage.command)
@@ -182,9 +183,12 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
 
         stage = {stage.stage_id: stage for stage in plan.layers[1].stages}["model_02_target_state.data_acquisition"]
         self.assertEqual(stage.status, "blocked")
-        self.assertEqual(stage.blockers, (MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,))
+        self.assertEqual(
+            stage.blockers,
+            ("upstream_model_01_model_generation_complete", MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER),
+        )
 
-    def test_m03_event_state_input_waits_for_m01_foundation(self) -> None:
+    def test_m03_event_state_input_waits_for_upstream_models(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -196,7 +200,14 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             )
 
         stage = {stage.stage_id: stage for stage in plan.layers[2].stages}["model_03_event_state.data_acquisition"]
-        self.assertEqual(stage.blockers, ("model_01_background_context.feature_or_input_ready",))
+        self.assertEqual(
+            stage.blockers,
+            (
+                "upstream_model_01_model_generation_complete",
+                "upstream_model_02_model_generation_complete",
+                "model_01_background_context.feature_or_input_ready",
+            ),
+        )
         self.assertIn("scripts/tasks/materialize_layer_four_event_observation_inputs.py", stage.command)
 
     def test_m05_option_expression_owns_option_source_when_options_apply(self) -> None:

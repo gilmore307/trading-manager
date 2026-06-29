@@ -806,6 +806,10 @@ def _build_layer_workflow(
         end_month=end_month,
         selected_target_symbol=selected_target_symbol,
     )
+    upstream_model_blockers = _upstream_model_ready_blockers(
+        tuple(meta["depends_on_layers"]),
+        foundation_catch_up_only=foundation_catch_up_only,
+    )
 
     if layer == 1:
         acquisition_status, acquisition_blockers, acquisition_gate = _stage_status_for_provider_acquisition(
@@ -814,13 +818,15 @@ def _build_layer_workflow(
             preparation_blocker="model_01_task_key_preparation",
         )
     elif layer == 2:
-        acquisition_status = "blocked" if model_two_target_local_feed_blockers else "ready"
-        acquisition_blockers, acquisition_gate = model_two_target_local_feed_blockers, None
+        acquisition_blockers = upstream_model_blockers + model_two_target_local_feed_blockers
+        acquisition_status = "blocked" if acquisition_blockers else "ready"
+        acquisition_gate = None
     elif not meta.get("input_stage") and meta.get("feature_cli") is None:
         acquisition_status, acquisition_blockers, acquisition_gate = "not_applicable", (), None
     elif layer == 3:
-        acquisition_status = "blocked" if model_three_event_observation_blockers else "ready"
-        acquisition_blockers, acquisition_gate = model_three_event_observation_blockers, None
+        acquisition_blockers = upstream_model_blockers + model_three_event_observation_blockers
+        acquisition_status = "blocked" if acquisition_blockers else "ready"
+        acquisition_gate = None
     elif layer == 5:
         acquisition_blockers = (MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,) if target_option_overlay_required else ()
         acquisition_status = "blocked" if acquisition_blockers else "not_applicable"
@@ -953,7 +959,7 @@ def _build_layer_workflow(
                     command=feature,
                     dataset_unit=dataset_unit,
                     blockers=_with_target_blocker(
-                        (f"{key}.data_acquisition_complete",),
+                        (*upstream_model_blockers, f"{key}.data_acquisition_complete"),
                         layer=layer,
                         selected_target_symbol=selected_target_symbol,
                         stage_type="feature_generation",
@@ -1025,10 +1031,7 @@ def _build_layer_workflow(
         )
 
     dataset_splits = _rolling_fold_dataset_splits(start_month, end_month)
-    model_generation_blockers = _upstream_model_ready_blockers(
-        tuple(meta["depends_on_layers"]),
-        foundation_catch_up_only=foundation_catch_up_only,
-    ) + ((f"{key}.feature_or_input_ready",) if include_input_stage and layer != 5 else ())
+    model_generation_blockers = upstream_model_blockers + ((f"{key}.feature_or_input_ready",) if include_input_stage and layer != 5 else ())
     if layer == 5 and target_option_overlay_required:
         model_generation_blockers = model_generation_blockers + (f"{key}.feature_or_input_ready",)
     model_generation_description = (

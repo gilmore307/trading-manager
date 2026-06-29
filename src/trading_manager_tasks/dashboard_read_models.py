@@ -3467,7 +3467,7 @@ def _model_task_progress(layer_key: str, stages: list[Mapping[str, Any]], status
         None,
     )
     active_count = ready_count
-    if active_stage is not None and str(status or "") in {"running", "ready", "blocked", "pending"}:
+    if active_stage is not None and str(status or "") in {"running", "ready", "pending"}:
         active_count = min(expected_count, ready_count + stage_weight(active_stage))
     pending_count = max(expected_count - max(ready_count, active_count) - failed_count, 0)
     if expected_count and ready_count == expected_count and failed_count == 0:
@@ -4071,7 +4071,12 @@ def _task_timeline(
                     and str(dashboard_stage.get("stage_type") or "") == "model_task"
                 ):
                     progress = _merge_task_progress_with_active_worker(dashboard_progress, active_progress)
-                if progress is None and str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "") == "data_acquisition":
+                stage_is_blocked = str(stage_status or "").lower() == "blocked" or task_state == "blocked"
+                if (
+                    progress is None
+                    and not stage_is_blocked
+                    and str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "") == "data_acquisition"
+                ):
                     progress = _fold_stage_coverage_progress(
                         storage_root=storage_root,
                         stage_id=str(dashboard_stage.get("active_stage_id") or dashboard_stage.get("stage_id") or ""),
@@ -4079,12 +4084,13 @@ def _task_timeline(
                     )
                 if progress is None:
                     semantic_stage_type = str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "")
-                    progress = _semantic_stage_progress(
-                        stage_id=stage_id,
-                        stage_type=semantic_stage_type,
-                        stage_status=stage_status,
-                        task_period=task_month,
-                    )
+                    if not stage_is_blocked:
+                        progress = _semantic_stage_progress(
+                            stage_id=stage_id,
+                            stage_type=semantic_stage_type,
+                            stage_status=stage_status,
+                            task_period=task_month,
+                        )
                 if progress is None and dashboard_progress is not None:
                     progress = dashboard_progress
                 if progress is None:
@@ -4183,6 +4189,8 @@ def _task_timeline(
                     and (stage_id == coverage_stage_id or coverage_stage_id.startswith(f"{stage_id}."))
                     and stage_coverage is not None
                     and (not status.current_month or task_month == _public_task_period(status.current_month))
+                    and task_state == "current"
+                    and str(task.get("status") or "").lower() in {"ready", "running"}
                 ):
                     task["detail"]["progress"] = _stage_coverage_chart(stage_coverage)
                 latest_execution_stage = str(latest_execution.get("stage_id") or "")
