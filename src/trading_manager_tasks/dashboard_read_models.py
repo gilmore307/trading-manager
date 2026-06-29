@@ -1678,9 +1678,14 @@ def _public_active_task_from_runtime(status: HistoricalSchedulerStatus, runtime_
     label = _model_task_label(layer_key, layer) if layer_key.startswith("model_") else _public_stage_name(selected_work, stage_type)
     latest_decision = status.latest_decision if isinstance(status.latest_decision, Mapping) else {}
     daemon_state = status.daemon_state if isinstance(status.daemon_state, Mapping) else {}
+    latest_transition = getattr(status, "latest_workflow_transition", None)
+    latest_transition = latest_transition if isinstance(latest_transition, Mapping) else {}
     target_symbol = (
-        latest_decision.get("selected_target_symbol")
+        latest_transition.get("target_symbol")
+        or latest_transition.get("selected_target_symbol")
+        or latest_decision.get("selected_target_symbol")
         or daemon_state.get("selected_target_symbol")
+        or runtime_active_work.get("target_symbol")
         or runtime_activity.get("selected_target_symbol")
     )
     public_status = "blocked" if _runtime_activity_blocks_public_task(runtime_activity, status) else "running"
@@ -5329,7 +5334,7 @@ def _model_group_replay_timeline_tasks(
                 "layer_key": layer_key,
                 "dataset_unit_kind": "model_group_training_fold",
                 "dataset_unit_months": training_unit_months,
-                "target_symbol": None,
+                "target_symbol": str(selected_target_symbol).strip().upper() if selected_target_symbol else None,
                 "target_required": False,
                 **worker_info,
                 "updated_at_utc": generated_at_utc,

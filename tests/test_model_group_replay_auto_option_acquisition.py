@@ -18,12 +18,86 @@ assert _SPEC is not None and _SPEC.loader is not None
 _SPEC.loader.exec_module(_MODULE)
 
 
+def _write_supervised_alpha_model(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "contract_type": "after_cost_alpha_model",
+                "training_summary": {
+                    "training_mode": "supervised_fit",
+                    "sample_count": 128,
+                },
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
+    def test_no_fit_alpha_model_stops_before_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            alpha_model = tmp / "alpha.json"
+            alpha_model.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "current_replay_entry_utility_model_bundle",
+                        "model_type": "replay_entry_utility_policy_bundle",
+                        "score_policy": "derive_from_current_m02_m03_state",
+                        "training_summary": {
+                            "training_mode": "policy_bundle_no_supervised_fit",
+                            "sample_count": None,
+                        },
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            status_path = tmp / "status.jsonl"
+            latest_path = tmp / "latest.json"
+            replay_calls: list[str] = []
+
+            def fake_run_replay(args, *, run_id: str, database_url: str | None):
+                replay_calls.append(run_id)
+                return subprocess.CompletedProcess(args=["replay"], returncode=0, stdout="", stderr="")
+
+            original_run_replay = _MODULE._run_replay
+            try:
+                _MODULE._run_replay = fake_run_replay
+                result = _MODULE.main(
+                    [
+                        "--candidate-model-ref",
+                        "storage://fixture/model",
+                        "--after-cost-alpha-model-json",
+                        str(alpha_model),
+                        "--replay-month",
+                        "2021-02",
+                        "--status-jsonl",
+                        str(status_path),
+                        "--latest-status-json",
+                        str(latest_path),
+                    ]
+                )
+            finally:
+                _MODULE._run_replay = original_run_replay
+
+            self.assertEqual(result, 2)
+            self.assertEqual(replay_calls, [])
+            rows = [json.loads(line) for line in status_path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(rows[-1]["event"], "stopped")
+            self.assertEqual(rows[-1]["reason"], "model_group_replay_after_cost_alpha_model_not_trained")
+            latest = json.loads(latest_path.read_text(encoding="utf-8"))
+            self.assertEqual(latest["reason"], "model_group_replay_after_cost_alpha_model_not_trained")
+            self.assertEqual(latest["model_artifact_status"]["training_mode"], "policy_bundle_no_supervised_fit")
+
     def test_successful_replay_with_missing_contract_paths_drains_then_retries(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             alpha_model = tmp / "alpha.json"
-            alpha_model.write_text("{}\n", encoding="utf-8")
+            _write_supervised_alpha_model(alpha_model)
             status_path = tmp / "status.jsonl"
             latest_path = tmp / "latest.json"
             decision_rows = tmp / "decision_rows.jsonl"
@@ -116,7 +190,7 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             alpha_model = tmp / "alpha.json"
-            alpha_model.write_text("{}\n", encoding="utf-8")
+            _write_supervised_alpha_model(alpha_model)
             status_path = tmp / "status.jsonl"
             latest_path = tmp / "latest.json"
 
@@ -166,7 +240,7 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             alpha_model = tmp / "alpha.json"
-            alpha_model.write_text("{}\n", encoding="utf-8")
+            _write_supervised_alpha_model(alpha_model)
             status_path = tmp / "status.jsonl"
             latest_path = tmp / "latest.json"
             artifact = tmp / "option_feature_requirements.jsonl"
@@ -252,7 +326,7 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             alpha_model = tmp / "alpha.json"
-            alpha_model.write_text("{}\n", encoding="utf-8")
+            _write_supervised_alpha_model(alpha_model)
             status_path = tmp / "status.jsonl"
             latest_path = tmp / "latest.json"
             artifact = tmp / "option_feature_requirements.jsonl"

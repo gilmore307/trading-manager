@@ -43,6 +43,17 @@ def _first_string(*values: Any) -> str | None:
     return None
 
 
+def _load_json_mapping(path_ref: Any) -> Mapping[str, Any]:
+    path_text = _string(path_ref)
+    if not path_text:
+        return {}
+    try:
+        payload = json.loads(Path(path_text).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, Mapping) else {}
+
+
 def _extract_workflow_plan(row: Mapping[str, Any]) -> Mapping[str, Any]:
     execution_summary = _as_mapping(row.get("execution_summary"))
     return _as_mapping(execution_summary.get("workflow_plan"))
@@ -57,10 +68,14 @@ def _extract_scope(row: Mapping[str, Any]) -> dict[str, str | None]:
     workflow_plan = _extract_workflow_plan(row)
     fold_scope = _extract_fold_scope(row)
     execution_summary = _as_mapping(row.get("execution_summary"))
+    training_fold = _as_mapping(execution_summary.get("training_fold"))
+    evaluation_receipt = _load_json_mapping(execution_summary.get("model_group_evaluation_receipt"))
     start_month = _first_string(
         row.get("start_month"),
         row.get("month_start"),
         fold_scope.get("start_month"),
+        training_fold.get("start_month"),
+        evaluation_receipt.get("start_month"),
         execution_summary.get("start_month"),
         execution_summary.get("month_start"),
         workflow_plan.get("start_month"),
@@ -69,6 +84,8 @@ def _extract_scope(row: Mapping[str, Any]) -> dict[str, str | None]:
         row.get("end_month"),
         row.get("month_end"),
         fold_scope.get("end_month"),
+        training_fold.get("end_month"),
+        evaluation_receipt.get("end_month"),
         execution_summary.get("end_month"),
         execution_summary.get("month_end"),
         workflow_plan.get("end_month"),
@@ -78,13 +95,22 @@ def _extract_scope(row: Mapping[str, Any]) -> dict[str, str | None]:
         row.get("target_symbol"),
         row.get("target_ref"),
         fold_scope.get("target_symbol"),
+        training_fold.get("target_symbol"),
+        evaluation_receipt.get("target_symbol"),
+        evaluation_receipt.get("candidate_training_target"),
         execution_summary.get("selected_target_symbol"),
         execution_summary.get("target_symbol"),
         workflow_plan.get("selected_target_symbol"),
     )
     if target_symbol:
         target_symbol = target_symbol.upper()
-    fold_id = _first_string(row.get("fold_id"), fold_scope.get("fold_id"))
+    fold_id = _first_string(
+        row.get("fold_id"),
+        fold_scope.get("fold_id"),
+        training_fold.get("fold_id"),
+        evaluation_receipt.get("fold_id"),
+        evaluation_receipt.get("candidate_fold_id"),
+    )
     if not fold_id and start_month and end_month:
         fold_id = f"fold_{start_month}_{end_month}"
     return {
@@ -92,6 +118,53 @@ def _extract_scope(row: Mapping[str, Any]) -> dict[str, str | None]:
         "end_month": end_month,
         "fold_id": fold_id,
         "target_symbol": target_symbol,
+    }
+
+
+def _extract_candidate_scope(row: Mapping[str, Any], *, fold_id: str | None, target_symbol: str | None) -> dict[str, str | None]:
+    execution_summary = _as_mapping(row.get("execution_summary"))
+    training_fold = _as_mapping(execution_summary.get("training_fold"))
+    replay_receipt = _as_mapping(execution_summary.get("replay_execution_receipt"))
+    evaluation_receipt = _load_json_mapping(execution_summary.get("model_group_evaluation_receipt"))
+    candidate_model_ref = _first_string(
+        row.get("candidate_model_ref"),
+        execution_summary.get("candidate_model_ref"),
+        training_fold.get("candidate_model_ref"),
+        replay_receipt.get("candidate_model_ref"),
+        evaluation_receipt.get("candidate_model_ref"),
+        execution_summary.get("model_group_ref"),
+    )
+    candidate_fold_id = _first_string(
+        row.get("candidate_fold_id"),
+        execution_summary.get("candidate_fold_id"),
+        training_fold.get("candidate_fold_id"),
+        replay_receipt.get("candidate_fold_id"),
+        evaluation_receipt.get("candidate_fold_id"),
+        training_fold.get("fold_id"),
+        evaluation_receipt.get("fold_id"),
+        fold_id,
+    )
+    candidate_training_target = _first_string(
+        row.get("candidate_training_target"),
+        execution_summary.get("candidate_training_target"),
+        training_fold.get("candidate_training_target"),
+        replay_receipt.get("candidate_training_target"),
+        evaluation_receipt.get("candidate_training_target"),
+        target_symbol,
+    )
+    if candidate_training_target:
+        candidate_training_target = candidate_training_target.upper()
+    replay_execution_run_id = _first_string(
+        row.get("replay_execution_run_id"),
+        execution_summary.get("replay_execution_run_id"),
+        replay_receipt.get("replay_execution_run_id"),
+        evaluation_receipt.get("replay_execution_run_id"),
+    )
+    return {
+        "candidate_model_ref": candidate_model_ref,
+        "candidate_fold_id": candidate_fold_id,
+        "candidate_training_target": candidate_training_target,
+        "replay_execution_run_id": replay_execution_run_id,
     }
 
 
@@ -289,6 +362,11 @@ def transition_from_decision_row(row: Mapping[str, Any], *, recorded_at_utc: str
     decision_status = _string(row.get("decision_status")) or None
     reason_code = _string(row.get("reason_code")) or None
     task_status = _task_status(row)
+    candidate_scope = _extract_candidate_scope(
+        row,
+        fold_id=scope["fold_id"],
+        target_symbol=scope["target_symbol"],
+    )
     transition = {
         "contract_type": "manager_historical_workflow_transition",
         "schema_version": 1,
@@ -311,6 +389,10 @@ def transition_from_decision_row(row: Mapping[str, Any], *, recorded_at_utc: str
         "end_month": scope["end_month"],
         "fold_id": scope["fold_id"],
         "target_symbol": scope["target_symbol"],
+        "candidate_model_ref": candidate_scope["candidate_model_ref"],
+        "candidate_fold_id": candidate_scope["candidate_fold_id"],
+        "candidate_training_target": candidate_scope["candidate_training_target"],
+        "replay_execution_run_id": candidate_scope["replay_execution_run_id"],
         "provider_calls": int(row.get("provider_calls") or 0),
         "dispatch_performed": bool(row.get("dispatch_performed", False)),
         "model_activation_performed": bool(row.get("model_activation_performed", False)),

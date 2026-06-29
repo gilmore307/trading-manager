@@ -92,6 +92,12 @@ M06_EVENT_INPUT_MISSING_REASONS = {
 }
 MODEL_GROUP_REPLAY_NONPROGRESS_REASONS = {
     "model_group_replay_after_cost_alpha_model_not_trained",
+    "model_group_replay_after_cost_alpha_training_labels_missing",
+    "model_group_replay_after_cost_alpha_model_training_failed",
+    "model_group_replay_review_no_decision_rows",
+}
+MODEL_GROUP_REPLAY_BLOCKING_REASONS = MODEL_GROUP_REPLAY_NONPROGRESS_REASONS | {
+    "model_group_replay_scope_mismatch",
 }
 
 
@@ -672,6 +678,40 @@ def _latest_promotion_decision_status_mtime(storage_root: Path, *, state_path: P
     return status, mtime
 
 
+def _latest_blocking_model_group_transition_mtime(storage_root: Path, *, state_path: Path) -> float | None:
+    transition_log = storage_root / "runtime" / DEFAULT_WORKFLOW_TRANSITION_LOG_PATH.name
+    if not transition_log.exists():
+        return None
+    fold_scope = _fold_scope_from_state_path(state_path)
+    latest: float | None = None
+    try:
+        lines = transition_log.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines[-512:]:
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        task_id = str(payload.get("task_id") or "")
+        if task_id not in {"model_group.replay", "model_group.replay_review"}:
+            continue
+        if fold_scope["fold_id"] and str(payload.get("fold_id") or "") != fold_scope["fold_id"]:
+            continue
+        if fold_scope["target_symbol"] and str(payload.get("target_symbol") or "").upper() != fold_scope["target_symbol"]:
+            continue
+        reason_code = str(payload.get("reason_code") or "")
+        task_status = str(payload.get("task_status") or "")
+        if reason_code not in MODEL_GROUP_REPLAY_BLOCKING_REASONS and task_status != "failed":
+            continue
+        recorded = _parse_utc_iso(str(payload.get("recorded_at_utc") or payload.get("created_at_utc") or ""))
+        if recorded is None:
+            continue
+        timestamp = recorded.timestamp()
+        latest = timestamp if latest is None else max(latest, timestamp)
+    return latest
+
+
 def _promotion_decision_valid_for_fold_state(payload: dict[str, Any], *, decision_path: Path, state_path: Path) -> bool:
     fold_scope = _fold_scope_from_state_path(state_path)
     if fold_scope["fold_id"] and str(payload.get("fold_id") or "") != fold_scope["fold_id"]:
@@ -756,14 +796,16 @@ def _fold_model_group_lifecycle_complete(storage_root: Path, state_path: Path) -
         state_mtime = state_path.stat().st_mtime
     except OSError:
         return False
+    blocking_transition_mtime = _latest_blocking_model_group_transition_mtime(storage_root, state_path=state_path)
+    completion_floor_mtime = max(state_mtime, blocking_transition_mtime or state_mtime)
     if promotion_decision is not None:
         decision_status, decision_mtime = promotion_decision
-        if decision_mtime >= state_mtime and decision_status in {"review_required", "deferred", "rejected", "revoked", "superseded"}:
+        if decision_mtime >= completion_floor_mtime and decision_status in {"review_required", "deferred", "rejected", "revoked", "superseded"}:
             return True
     readiness_mtime = _latest_promotion_readiness_mtime(storage_root, state_path=state_path)
     if readiness_mtime is None:
         return False
-    return readiness_mtime >= state_mtime
+    return readiness_mtime >= completion_floor_mtime
 
 
 def _completed_pre_replay_fold_states(

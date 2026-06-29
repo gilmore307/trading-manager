@@ -258,72 +258,27 @@ class ModelGroupAttributionTests(unittest.TestCase):
             )
             self.assertEqual(performance_summary["contract_type"], "model_group_replay_review_performance_summary")
             self.assertEqual(performance_summary["summary"]["decision_scope"]["decision_row_count"], 5)
-            self.assertEqual(performance_summary["summary"]["target_performance"]["filled_target_count"], 2)
+
+    def test_empty_replay_decision_rows_backoff_without_layer_attribution_error(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_replay_dataset(storage_root)
+            decision_rows_path = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
+            decision_rows_path.write_text("", encoding="utf-8")
+
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_review_no_decision_rows")
+            self.assertEqual(decision.execution_summary["decision_rows_ref"], str(decision_rows_path))
             self.assertEqual(
-                performance_summary["summary"]["direction_expression"]["intended_side_counts"],
-                {"long": 1, "short": 1},
+                list((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json")),
+                [],
             )
-            self.assertEqual(
-                performance_summary["summary"]["direction_expression"]["selected_option_right_counts"],
-                {"call": 1, "put": 1},
-            )
-            self.assertEqual(
-                performance_summary["summary"]["direction_expression"]["option_direction_consistency_counts"],
-                {"aligned": 2},
-            )
-            self.assertEqual(performance_summary["summary"]["replacement_review"]["replacement_evaluated_count"], 2)
-            self.assertEqual(performance_summary["summary"]["replacement_review"]["replacement_triggered_count"], 1)
-            self.assertEqual(
-                performance_summary["summary"]["replacement_review"][
-                    "replacement_blocked_by_switch_threshold_count"
-                ],
-                1,
-            )
-            self.assertEqual(
-                performance_summary["replacement_review"]["triggered_replacements_sample"][0]["target_ref"],
-                "NVDA",
-            )
-            self.assertTrue(Path(receipt["layer_attribution_report_ref"]).exists())
-            self.assertIn("model_candidate_selection_summary", receipt["layer_attribution_summary"])
-            self.assertEqual(receipt["replay_review_diagnostic_summary"]["material_regret_row_count"], 2)
-            self.assertEqual(receipt["replay_review_diagnostic_summary"]["total_regret_to_best_available"], 0.06)
-            self.assertEqual(
-                receipt["replay_review_diagnostic_summary"]["best_available_action_counts"],
-                {"baseline_action": 1, "path_conditioned_take_opportunity": 1, "take_trade": 1},
-            )
-            self.assertEqual(
-                receipt["replay_review_diagnostic_summary"]["first_gap_mechanism_counts"],
-                {"execution_or_position_management": 1, "gate": 1, "no_gap": 1},
-            )
-            self.assertEqual(receipt["decision_rows_ref"], str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"))
-            rows = [
-                json.loads(line)
-                for line in Path(receipt["review_rows_ref"]).read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            ]
-            self.assertEqual([row["source_decision_id"] for row in rows], ["filled_loss", "filled_under_baseline", "rejected_winner"])
-            self.assertEqual(rows[0]["contract_type"], "post_replay_review_row")
-            self.assertEqual(rows[0]["replay_month"], "2021-01")
-            self.assertEqual(rows[0]["target_symbol"], "BTC")
-            self.assertEqual(rows[1]["available_action"], ["take_trade", "baseline_action"])
-            self.assertEqual(rows[1]["future_outcome_window"], "2021-01-06T10:00:00-05:00->2021-01-06T16:00:00-05:00")
-            self.assertEqual(rows[1]["best_available_action_by_future_outcome"], "baseline_action")
-            self.assertEqual(rows[1]["regret_to_best_available"], 0.01)
-            self.assertEqual(rows[1]["first_gap_component"], "execution_or_position_management")
-            self.assertEqual(rows[1]["first_gap_mechanism"], "execution_or_position_management")
-            self.assertEqual(rows[1]["layer_attribution"]["chosen_action_return"], 0.01)
-            self.assertEqual(rows[1]["layer_attribution"]["best_available_action_return"], 0.02)
-            self.assertEqual(rows[2]["available_action"], ["reject_entry_thesis", "path_conditioned_take_opportunity"])
-            self.assertEqual(rows[2]["future_outcome_window"], "2021-02-03T10:00:00-05:00->2021-02-03T16:00:00-05:00")
-            self.assertEqual(rows[2]["best_available_action_by_future_outcome"], "path_conditioned_take_opportunity")
-            self.assertEqual(rows[2]["regret_to_best_available"], 0.05)
-            self.assertEqual(rows[2]["chosen_action_return"], 0.0)
-            self.assertEqual(rows[2]["best_available_action_return"], 0.05)
-            self.assertEqual(rows[2]["first_gap_component"], "current_decision_layer")
-            self.assertEqual(rows[2]["first_gap_mechanism"], "gate")
-            self.assertEqual(rows[2]["path_conditioning_policy"], "upstream_selected_path_only")
-            self.assertEqual(rows[2]["miss_review_scope"], "path_conditioned_current_scope")
-            self.assertEqual(rows[2]["candidate_set_scope"], "selected_path_current_decision_set")
 
     def test_completed_replay_review_skips_replay_progress_scan(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

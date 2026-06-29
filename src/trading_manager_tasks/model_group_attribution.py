@@ -140,8 +140,32 @@ def run_model_group_replay_review_if_ready(
             },
         )
 
-    review_rows = tuple(_build_review_rows(decision_rows_path, max_rows=max_review_rows))
     decision_rows = tuple(_load_jsonl_objects(decision_rows_path))
+    if not decision_rows:
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_replay_review_no_decision_rows",
+            reason=(
+                "model-group replay completed without decision rows; candidate replay must be rerun or rejected "
+                "before replay review can produce attribution evidence"
+            ),
+            selected_work="model_group.replay_review",
+            command=command,
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "decision_rows_ref": str(decision_rows_path),
+                "replay_execution_run_id": replay_run_id,
+                "completed_replay_month_count": completed_month_count,
+                "ready_replay_month_count": len(ready_months),
+                "required_next_step": (
+                    "rerun model_group.replay with a trained fold-scoped candidate scorer; if replay still "
+                    "produces no decisions, reject the candidate instead of opening the next fold"
+                ),
+            },
+        )
+    review_rows = tuple(_build_review_rows(decision_rows_path, max_rows=max_review_rows))
     replay_receipt_path = (
         dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json"
         if replay_run_id
@@ -201,6 +225,10 @@ def run_model_group_replay_review_if_ready(
             "completed_at_utc": now.isoformat(),
             "decision_rows_ref": str(decision_rows_path),
             "replay_execution_run_id": replay_run_id,
+            "candidate_model_ref": replay_receipt.get("candidate_model_ref"),
+            "candidate_fold_id": replay_receipt.get("candidate_fold_id"),
+            "candidate_training_target": replay_receipt.get("candidate_training_target"),
+            "target_symbol": replay_receipt.get("target_symbol") or replay_receipt.get("candidate_training_target"),
             "replay_execution_receipt_ref": str(dataset_root / "replay_execution_runs" / replay_run_id / "replay_execution_receipt.json")
             if replay_run_id
             else None,
@@ -253,6 +281,11 @@ def run_model_group_replay_review_if_ready(
             "dataset_root": str(dataset_root),
             "decision_rows_ref": str(decision_rows_path),
             "post_replay_review_receipt": str(receipt_path),
+            "replay_execution_run_id": replay_run_id,
+            "candidate_model_ref": replay_receipt.get("candidate_model_ref"),
+            "candidate_fold_id": replay_receipt.get("candidate_fold_id"),
+            "candidate_training_target": replay_receipt.get("candidate_training_target"),
+            "target_symbol": replay_receipt.get("target_symbol") or replay_receipt.get("candidate_training_target"),
             "review_rows_ref": str(review_rows_path),
             "reviewed_failure_count": len(review_rows),
             "replay_review_performance_summary_ref": str(performance_summary_path),

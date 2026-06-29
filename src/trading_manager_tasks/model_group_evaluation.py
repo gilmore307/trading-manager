@@ -134,6 +134,35 @@ def run_model_group_evaluation_if_ready(
                 "replay_scope_status": replay_scope_status,
             },
         )
+    attribution_scope_status = _attribution_receipt_scope_status(
+        replay_receipt=replay_receipt,
+        attribution_receipt=attribution_receipt,
+    )
+    if not attribution_scope_status["compatible"]:
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
+        return _decision(
+            now=now,
+            decision_status="backoff",
+            reason_code="model_group_evaluation_attribution_scope_mismatch",
+            reason=str(attribution_scope_status["reason"]),
+            selected_work="model_group.evaluation",
+            command=[
+                python_executable,
+                "scripts/tasks/run_model_group_evaluation.py",
+                "--contract-id",
+                contract_id,
+                "--storage-root",
+                str(storage_root),
+            ],
+            execution_summary={
+                "contract_id": contract_id,
+                "dataset_root": str(dataset_root),
+                "training_fold": training_fold,
+                "replay_execution_receipt_ref": str(replay_receipt_path),
+                "residual_event_governance_receipt_ref": str(attribution_receipt_path),
+                "attribution_scope_status": attribution_scope_status,
+            },
+        )
     model_artifact_status = _replay_model_artifact_status(replay_receipt)
     if not model_artifact_status["compatible"]:
         now = (now_utc or datetime.now(UTC)).astimezone(UTC)
@@ -176,6 +205,23 @@ def run_model_group_evaluation_if_ready(
         return None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
+    candidate_fold_id = str(
+        replay_receipt.get("candidate_fold_id")
+        or attribution_receipt.get("candidate_fold_id")
+        or training_fold.get("fold_id")
+        or ""
+    )
+    candidate_training_target = str(
+        replay_receipt.get("candidate_training_target")
+        or attribution_receipt.get("candidate_training_target")
+        or training_fold.get("target_symbol")
+        or ""
+    ).strip().upper()
+    replay_execution_run_id = str(
+        replay_receipt.get("replay_execution_run_id")
+        or attribution_receipt.get("replay_execution_run_id")
+        or ""
+    )
     run_id = "model_group_evaluation_" + now.strftime("%Y%m%dT%H%M%SZ")
     settlement_root = dataset_root / "fold_settlement_runs" / run_id
     review_root = dataset_root / "promotion_review_runs" / run_id
@@ -235,6 +281,9 @@ def run_model_group_evaluation_if_ready(
             fold_id=str(training_fold["fold_id"]),
             target_symbol=str(training_fold.get("target_symbol") or ""),
             candidate_model_ref=str(training_fold["candidate_model_ref"]),
+            candidate_fold_id=candidate_fold_id,
+            candidate_training_target=candidate_training_target,
+            replay_execution_run_id=replay_execution_run_id,
             replay_contract_ref=f"trading-evaluation/replays/{contract_id}.json",
             replay_result_ref=str(replay_receipt_path),
             decision_rows=rows,
@@ -269,6 +318,9 @@ def run_model_group_evaluation_if_ready(
             "fold_id": str(training_fold["fold_id"]),
             "target_symbol": str(training_fold.get("target_symbol") or ""),
             "candidate_model_ref": str(training_fold["candidate_model_ref"]),
+            "candidate_fold_id": candidate_fold_id,
+            "candidate_training_target": candidate_training_target,
+            "replay_execution_run_id": replay_execution_run_id,
             "created_at_utc": now.isoformat(),
             "completed_at_utc": now.isoformat(),
             "evaluation_checks": check_summary["checks"],
@@ -306,6 +358,11 @@ def run_model_group_evaluation_if_ready(
             "promotion_evaluation_review_ref": str(review_path),
             "promotion_eligibility_decision_ref": str(decision_path),
             "ready_checks": check_summary["ready_checks"],
+            "candidate_model_ref": str(training_fold["candidate_model_ref"]),
+            "candidate_fold_id": candidate_fold_id,
+            "candidate_training_target": candidate_training_target,
+            "target_symbol": str(training_fold.get("target_symbol") or ""),
+            "replay_execution_run_id": replay_execution_run_id,
         },
     )
 
@@ -348,6 +405,9 @@ def _build_settlement_run(
     fold_id: str,
     target_symbol: str,
     candidate_model_ref: str,
+    candidate_fold_id: str | None = None,
+    candidate_training_target: str | None = None,
+    replay_execution_run_id: str | None = None,
     replay_contract_ref: str,
     replay_result_ref: str,
     decision_rows: Sequence[Mapping[str, Any]],
@@ -498,6 +558,9 @@ def _build_settlement_run(
         "fold_id": fold_id,
         "target_symbol": target_symbol,
         "candidate_model_ref": candidate_model_ref,
+        "candidate_fold_id": candidate_fold_id or fold_id,
+        "candidate_training_target": (candidate_training_target or target_symbol).strip().upper(),
+        "replay_execution_run_id": replay_execution_run_id or "",
         "replay_contract_ref": replay_contract_ref,
         "replay_result_ref": replay_result_ref,
         "baseline_ref": None,
@@ -2530,6 +2593,48 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         "candidate_model_ref": candidate_model_ref,
         "receipt_target_refs": sorted(target_refs),
     }
+
+
+def _attribution_receipt_scope_status(
+    *,
+    replay_receipt: Mapping[str, Any],
+    attribution_receipt: Mapping[str, Any],
+) -> dict[str, Any]:
+    expected = {
+        "replay_execution_run_id": str(replay_receipt.get("replay_execution_run_id") or "").strip(),
+        "candidate_model_ref": str(replay_receipt.get("candidate_model_ref") or "").strip(),
+        "candidate_fold_id": str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "").strip(),
+        "candidate_training_target": str(
+            replay_receipt.get("candidate_training_target") or replay_receipt.get("target_symbol") or ""
+        )
+        .strip()
+        .upper(),
+        "target_symbol": str(replay_receipt.get("target_symbol") or replay_receipt.get("candidate_training_target") or "")
+        .strip()
+        .upper(),
+    }
+    for key, expected_value in expected.items():
+        if not expected_value:
+            continue
+        observed_value = str(attribution_receipt.get(key) or "").strip()
+        if key in {"candidate_training_target", "target_symbol"}:
+            observed_value = observed_value.upper()
+        if not observed_value:
+            return {
+                "compatible": False,
+                "reason": f"M06 attribution receipt is missing {key} for replay candidate scope",
+                "field": key,
+                "expected": expected_value,
+            }
+        if observed_value != expected_value:
+            return {
+                "compatible": False,
+                "reason": f"M06 attribution receipt {key} does not match replay candidate scope",
+                "field": key,
+                "expected": expected_value,
+                "observed": observed_value,
+            }
+    return {"compatible": True, "reason": "M06 attribution receipt scope matches replay candidate"}
 
 
 def _replay_model_artifact_status(replay_receipt: Mapping[str, Any]) -> dict[str, Any]:

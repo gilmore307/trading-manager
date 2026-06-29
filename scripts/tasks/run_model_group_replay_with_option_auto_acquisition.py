@@ -18,6 +18,7 @@ from trading_manager_tasks.model_group_replay_option_features import (
     replay_option_feature_payload_from_text,
     run_model_group_replay_option_features_for_replay_backoff,
 )
+from trading_manager_tasks.model_group_replay import _after_cost_alpha_model_status
 from trading_manager_tasks.model_group_replay_contract_paths import run_model_group_replay_contract_paths
 
 DEFAULT_DATASET_ROOT = Path("/root/projects/trading-storage/storage/05_replay_datasets/promotion_replay_candidate_policy")
@@ -70,6 +71,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     _validate_args(parser, args)
+    model_artifact_status = _after_cost_alpha_model_status(args.after_cost_alpha_model_json)
+    if not model_artifact_status["compatible"]:
+        _emit(
+            {
+                "event": "stopped",
+                "reason": "model_group_replay_after_cost_alpha_model_not_trained",
+                "after_cost_alpha_model_ref": str(args.after_cost_alpha_model_json),
+                "model_artifact_status": model_artifact_status,
+                "required_next_step": "train a fold-specific supervised after-cost alpha model before model_group replay",
+            },
+            args=args,
+        )
+        return 2
     database_url = _database_url(args)
     started_monotonic = time.monotonic()
     provider_calls_used = 0

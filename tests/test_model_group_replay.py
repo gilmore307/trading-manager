@@ -744,7 +744,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                 )
             )
 
-    def test_current_entry_utility_policy_bundle_allows_replay(self):
+    def test_current_entry_utility_policy_bundle_blocks_replay_without_supervised_fit(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -774,23 +774,89 @@ class ModelGroupReplayTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            model_repo = tmp / "model-repo"
+            script = model_repo / "scripts" / "models" / "model_05_alpha_confidence" / "train_model_05_alpha_confidence.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text(
+                "import sys\nprint('after_cost_alpha_supervised_training_labels_missing', file=sys.stderr)\nsys.exit(2)\n",
+                encoding="utf-8",
+            )
 
             decision = run_model_group_replay_if_ready(
                 storage_root=storage_root,
                 runner_path=self._write_runner(tmp),
                 evaluation_repo_root=tmp,
                 execution_repo_root=tmp,
+                model_repo_root=model_repo,
                 python_executable=sys.executable,
                 selected_target_symbol="AAPL",
             )
 
             self.assertIsNotNone(decision)
             assert decision is not None
-            self.assertEqual(decision.decision_status, "executed")
-            self.assertEqual(decision.reason_code, "model_group_replay_executed")
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_training_labels_missing")
             self.assertEqual(
-                decision.execution_summary["model_artifact_status"]["reason"],
-                "after-cost alpha artifact is the accepted replay entry-utility policy bundle",
+                decision.execution_summary["stale_model_artifact_status"]["reason"],
+                "after-cost alpha artifact lacks fold-specific supervised training evidence",
+            )
+
+    def test_no_fit_alpha_artifact_attempts_training_and_blocks_on_training_failure(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            self._write_dataset(storage_root)
+            self._write_completed_fold(storage_root)
+            alpha_model_path = (
+                storage_root.parent
+                / "03_model_artifacts"
+                / "runtime"
+                / "model_05_alpha_confidence"
+                / "after_cost_alpha_model_2016-01_2016-06.json"
+            )
+            alpha_model_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "current_replay_entry_utility_model_bundle",
+                        "model_type": "replay_entry_utility_policy_bundle",
+                        "score_policy": "derive_from_current_m02_m03_state",
+                        "training_summary": {
+                            "training_mode": "policy_bundle_no_supervised_fit",
+                            "sample_count": None,
+                        },
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            model_repo = tmp / "model-repo"
+            script = model_repo / "scripts" / "models" / "model_05_alpha_confidence" / "train_model_05_alpha_confidence.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text(
+                "import sys\nprint('after_cost_alpha_supervised_training_labels_missing', file=sys.stderr)\nsys.exit(2)\n",
+                encoding="utf-8",
+            )
+
+            decision = run_model_group_replay_if_ready(
+                storage_root=storage_root,
+                runner_path=self._write_runner(tmp),
+                evaluation_repo_root=tmp,
+                execution_repo_root=tmp,
+                model_repo_root=model_repo,
+                python_executable=sys.executable,
+                selected_target_symbol="AAPL",
+            )
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_training_labels_missing")
+            self.assertIn("after_cost_alpha_supervised_training_labels_missing", decision.reason)
+            self.assertEqual(
+                decision.execution_summary["stale_model_artifact_status"]["training_mode"],
+                "policy_bundle_no_supervised_fit",
             )
 
     def test_incomplete_alpha_artifact_without_accepted_policy_bundle_blocks_replay(self):
@@ -821,12 +887,20 @@ class ModelGroupReplayTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            model_repo = tmp / "model-repo"
+            script = model_repo / "scripts" / "models" / "model_05_alpha_confidence" / "train_model_05_alpha_confidence.py"
+            script.parent.mkdir(parents=True, exist_ok=True)
+            script.write_text(
+                "import sys\nprint('after_cost_alpha_supervised_training_labels_missing', file=sys.stderr)\nsys.exit(2)\n",
+                encoding="utf-8",
+            )
 
             decision = run_model_group_replay_if_ready(
                 storage_root=storage_root,
                 runner_path=self._write_runner(tmp),
                 evaluation_repo_root=tmp,
                 execution_repo_root=tmp,
+                model_repo_root=model_repo,
                 python_executable=sys.executable,
                 selected_target_symbol="AAPL",
             )
@@ -834,8 +908,8 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "backoff")
-            self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_model_not_trained")
-            self.assertIn("not an accepted replay policy bundle", decision.reason)
+            self.assertEqual(decision.reason_code, "model_group_replay_after_cost_alpha_training_labels_missing")
+            self.assertIn("after_cost_alpha_supervised_training_labels_missing", decision.reason)
 
     def test_explicit_training_target_handoff_does_not_run_canonical_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

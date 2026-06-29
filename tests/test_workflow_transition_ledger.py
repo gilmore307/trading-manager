@@ -46,6 +46,76 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
         self.assertEqual(transition["ended_at"], "2026-06-29T01:00:00+00:00")
         self.assertEqual(transition["status_updated_at"], "2026-06-29T01:00:00+00:00")
 
+    def test_transition_extracts_model_group_training_fold_scope(self) -> None:
+        transition = transition_from_decision_row(
+            {
+                "decision_status": "backoff",
+                "reason_code": "model_group_replay_after_cost_alpha_training_labels_missing",
+                "reason": "recent after-cost alpha supervised training label rejection is active",
+                "selected_work": "model_group.replay",
+                "next_internal_stage": "model_group_replay",
+                "execution_summary": {
+                    "training_fold": {
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-07_2016-12",
+                        "target_symbol": "AAPL",
+                        "start_month": "2016-07",
+                        "end_month": "2016-12",
+                        "fold_id": "fold_2016-07_2016-12",
+                    },
+                    "replay_execution_run_id": "model_group_replay_2016_fold2_complete",
+                    "required_next_step": "repair or populate fold-scoped labels",
+                },
+            },
+            recorded_at_utc="2026-06-29T01:02:00+00:00",
+        )
+
+        self.assertEqual(transition["event_type"], "task_waiting")
+        self.assertEqual(transition["task_status"], "waiting")
+        self.assertEqual(transition["task_id"], "model_group.replay")
+        self.assertEqual(transition["target_symbol"], "AAPL")
+        self.assertEqual(transition["start_month"], "2016-07")
+        self.assertEqual(transition["end_month"], "2016-12")
+        self.assertEqual(transition["fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-07_2016-12")
+        self.assertEqual(transition["candidate_fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["candidate_training_target"], "AAPL")
+        self.assertEqual(transition["replay_execution_run_id"], "model_group_replay_2016_fold2_complete")
+
+    def test_transition_falls_back_to_evaluation_receipt_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            receipt_path = Path(raw_tmp) / "model_group_evaluation_receipt.json"
+            receipt_path.write_text(
+                json.dumps(
+                    {
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-07_2016-12",
+                        "candidate_fold_id": "fold_2016-07_2016-12",
+                        "candidate_training_target": "AAPL",
+                        "replay_execution_run_id": "model_group_replay_2016_fold2_complete",
+                        "target_symbol": "AAPL",
+                        "fold_id": "fold_2016-07_2016-12",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            transition = transition_from_decision_row(
+                {
+                    "decision_status": "executed",
+                    "reason_code": "model_group_evaluation_executed",
+                    "selected_work": "model_group.evaluation",
+                    "execution_summary": {
+                        "model_group_evaluation_receipt": str(receipt_path),
+                    },
+                },
+                recorded_at_utc="2026-06-29T01:03:00+00:00",
+            )
+
+        self.assertEqual(transition["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-07_2016-12")
+        self.assertEqual(transition["fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["target_symbol"], "AAPL")
+        self.assertEqual(transition["candidate_fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["candidate_training_target"], "AAPL")
+        self.assertEqual(transition["replay_execution_run_id"], "model_group_replay_2016_fold2_complete")
+
     def test_append_transition_writes_log_and_latest(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

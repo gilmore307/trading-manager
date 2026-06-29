@@ -229,8 +229,10 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 {
                     "contract_type": "evaluation_replay_execution_run",
                     "created_at_utc": "2026-05-28T00:00:00+00:00",
+                    "replay_execution_run_id": "model_group_replay_fixture",
                     "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
                     "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_training_target": "AAPL",
                     "target_symbol": "AAPL",
                     "pre_replay_target_refs": ["AAPL"],
                     "target_refs": ["AAPL"],
@@ -290,6 +292,11 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "event_evidence_consumed": True,
                     "event_observation_count": 1,
                     "event_candidate_count": 1,
+                    "replay_execution_run_id": "model_group_replay_fixture",
+                    "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                    "candidate_fold_id": "fold_2016-01_2016-06",
+                    "candidate_training_target": "AAPL",
+                    "target_symbol": "AAPL",
                     "replay_review_scope_status": "passed",
                     "control_analysis_status": "passed",
                 }
@@ -368,6 +375,9 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["ready_check_count"], 5)
+            self.assertEqual(receipt["candidate_fold_id"], "fold_2016-01_2016-06")
+            self.assertEqual(receipt["candidate_training_target"], "AAPL")
+            self.assertEqual(receipt["replay_execution_run_id"], "model_group_replay_fixture")
             self.assertIn("residual_event_governance_event_focus_proposal", receipt["ready_checks"])
             review = json.loads(review_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(review["agent_invocation_status"], "completed")
@@ -377,6 +387,9 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             metrics = settlement["metrics"]
             self.assertEqual(eligibility["contract_type"], "promotion_eligibility_decision")
             self.assertEqual(settlement["target_symbol"], "AAPL")
+            self.assertEqual(settlement["candidate_fold_id"], "fold_2016-01_2016-06")
+            self.assertEqual(settlement["candidate_training_target"], "AAPL")
+            self.assertEqual(settlement["replay_execution_run_id"], "model_group_replay_fixture")
             self.assertEqual(eligibility["target_symbol"], "AAPL")
             self.assertEqual(settlement["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2016-06")
             self.assertEqual(eligibility["decision_status"], "deferred")
@@ -473,6 +486,11 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "event_evidence_consumed": True,
                         "event_observation_count": 1,
                         "event_candidate_count": 2,
+                        "replay_execution_run_id": "model_group_replay_fixture",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2016-06",
+                        "candidate_fold_id": "fold_2016-01_2016-06",
+                        "candidate_training_target": "AAPL",
+                        "target_symbol": "AAPL",
                         "replay_review_scope_status": "passed",
                         "control_analysis_status": "passed",
                     }
@@ -636,6 +654,31 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
+
+    def test_unscoped_m06_attribution_receipt_blocks_evaluation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            storage_root.mkdir(parents=True)
+            dataset_root = self._write_ready_replay_and_attribution(storage_root)
+            self._write_completed_fold(storage_root)
+            receipt_path = (
+                dataset_root
+                / "post_replay_attribution_runs"
+                / "post_replay_attribution_fixture"
+                / "post_replay_attribution_receipt.json"
+            )
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt.pop("candidate_fold_id", None)
+            receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
+
+            decision = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
+
+            self.assertIsNotNone(decision)
+            assert decision is not None
+            self.assertEqual(decision.decision_status, "backoff")
+            self.assertEqual(decision.reason_code, "model_group_evaluation_attribution_scope_mismatch")
+            self.assertIn("candidate_fold_id", decision.reason)
 
     def test_decision_variable_audit_does_not_infer_side_from_outcome(self):
         rows = [
