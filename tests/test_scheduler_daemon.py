@@ -548,6 +548,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             "model_group_m06_event_evidence_missing",
             "model_group_residual_event_evidence_missing",
             "model_group_m06_event_feed_backfill_running",
+            "model_group_replay_after_cost_alpha_model_not_trained",
         ):
             with self.subTest(reason_code=reason_code):
                 state = SchedulerDaemonState(

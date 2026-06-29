@@ -90,6 +90,9 @@ M06_EVENT_INPUT_MISSING_REASONS = {
     "model_group_residual_event_evidence_missing",
     "model_group_m06_event_feed_backfill_running",
 }
+MODEL_GROUP_REPLAY_NONPROGRESS_REASONS = {
+    "model_group_replay_after_cost_alpha_model_not_trained",
+}
 
 
 def previous_month(month: str) -> str:
@@ -1694,6 +1697,7 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
         "model_group_m06_event_inputs_incomplete",
         "model_group_m06_event_inputs_required",
         "model_group_replay_option_feature_drain_lock_active",
+        *MODEL_GROUP_REPLAY_NONPROGRESS_REASONS,
     }
     return state.last_work_selection_reason in known_nonprogress_reasons or state.last_reason_code in known_nonprogress_reasons
 
