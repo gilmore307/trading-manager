@@ -536,6 +536,62 @@ def _agent_error_summary(
     return summary_rows
 
 
+def _enabled_model_worker_target_symbols(storage_root: Path) -> set[str]:
+    summary = _target_queue_summary(storage_root)
+    if not summary:
+        return set()
+    raw_targets = summary.get("enabled_targets")
+    if not isinstance(raw_targets, list):
+        return set()
+    return {str(symbol or "").strip().upper() for symbol in raw_targets if str(symbol or "").strip()}
+
+
+def _agent_error_target_symbols(row: Mapping[str, Any]) -> set[str]:
+    text_parts: list[str] = []
+    for field in (
+        "summary",
+        "error_scope",
+        "root_cause",
+        "retry_recommendation",
+        "request_path",
+        "diagnosis_path",
+    ):
+        value = row.get(field)
+        if value:
+            text_parts.append(str(value))
+    files_changed = row.get("files_changed")
+    if isinstance(files_changed, list):
+        text_parts.extend(str(item) for item in files_changed if item)
+    text = " ".join(text_parts)
+    targets: set[str] = set()
+    for match in re.finditer(r"model_training_fold_state_([a-z0-9]+)_\d{4}-\d{2}_\d{4}-\d{2}", text, re.IGNORECASE):
+        targets.add(match.group(1).upper())
+    for match in re.finditer(r"mgrreq_[a-z0-9_]*_([a-z]{1,8})_\d{4}_\d{2}", text, re.IGNORECASE):
+        targets.add(match.group(1).upper())
+    for match in re.finditer(r"\b(?:for|For)\s+([A-Z]{1,8})\s+(?:historical|\d{4}-\d{2})", text):
+        targets.add(match.group(1).upper())
+    for match in re.finditer(r"\b([A-Z]{1,8})\s+\d{4}-\d{2}\.\.\d{4}-\d{2}", text):
+        targets.add(match.group(1).upper())
+    return targets
+
+
+def _filter_agent_errors_for_target_queue(
+    agent_errors: list[dict[str, Any]],
+    *,
+    storage_root: Path,
+) -> list[dict[str, Any]]:
+    enabled_targets = _enabled_model_worker_target_symbols(storage_root)
+    if not enabled_targets:
+        return agent_errors
+    filtered: list[dict[str, Any]] = []
+    for row in agent_errors:
+        error_targets = _agent_error_target_symbols(row)
+        if error_targets and error_targets.isdisjoint(enabled_targets):
+            continue
+        filtered.append(row)
+    return filtered
+
+
 def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timeline: list[dict[str, Any]]) -> list[dict[str, Any]]:
     current_task_ids = {str(task.get("task_id") or "") for task in task_timeline}
     has_current_residual_event_governance = any(
@@ -5728,7 +5784,10 @@ def build_historical_task_progress_summary(
     task_timeline = _strip_task_timeline_internal_fields(task_timeline)
     task_timeline = _sort_task_timeline(task_timeline)
     agent_error_summary = _mark_superseded_agent_errors(
-        _agent_error_summary(storage_root, database_url=database_url),
+        _filter_agent_errors_for_target_queue(
+            _agent_error_summary(storage_root, database_url=database_url),
+            storage_root=storage_root,
+        ),
         task_timeline,
     )
     task_timeline = _attach_task_error_context(

@@ -180,7 +180,7 @@ Manager may run M02+ historical model-worker training as target-scoped fold chai
 
 When no target is pinned by the service command, the scheduler reads the ordered runtime target queue and selects the first target with an open or unstarted six-month fold. If the current target has completed all eligible folds through the latest fully completed training fold, manager skips it and starts the next target from the earliest ready fold, normally `2016-01`.
 
-The target queue is an execution-routing queue, not promotion evidence and not a replacement for M02 candidate-policy replay. The model-worker queue admits reviewed optionable equity targets only. Crypto spot and other structurally non-optionable symbols may remain in replay/context universes, but they do not enter autonomous model-worker training because they cannot exercise the option-expression surface. Promotion still requires evaluation-owned replay evidence over the accepted candidate policy and option-availability metric slices.
+The target queue is an explicit execution-routing queue, not promotion evidence and not a replacement for M02 candidate-policy replay. Accepted target-context mappings validate requested queue entries but are not auto-added as training targets. The model-worker queue admits reviewed optionable equity targets only. Crypto spot and other structurally non-optionable symbols may remain in replay/context universes, but they do not enter autonomous model-worker training because they cannot exercise the option-expression surface. Promotion still requires evaluation-owned replay evidence over the accepted candidate policy and option-availability metric slices.
 
 ## D214 - Model group reruns start from the earliest affected workflow cutpoint
 

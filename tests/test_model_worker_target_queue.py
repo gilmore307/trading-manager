@@ -15,7 +15,7 @@ build_target_queue = _MODULE.build_target_queue
 
 
 class ModelWorkerTargetQueueTests(unittest.TestCase):
-    def test_queue_uses_bootstrap_then_accepted_mapping_targets_without_duplicates(self):
+    def test_queue_uses_explicit_bootstrap_targets_only(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             mapping = Path(raw_tmp) / "mapping.csv"
             with mapping.open("w", newline="", encoding="utf-8") as handle:
@@ -28,10 +28,11 @@ class ModelWorkerTargetQueueTests(unittest.TestCase):
             payload = build_target_queue(bootstrap_targets=["AAPL"], mapping_csv=mapping, generated_at_utc="2026-05-20T00:00:00Z")
 
         self.assertEqual(payload["contract_type"], "manager_model_training_target_queue")
-        self.assertEqual([row["symbol"] for row in payload["targets"]], ["AAPL", "AAOI"])
+        self.assertEqual([row["symbol"] for row in payload["targets"]], ["AAPL"])
+        self.assertEqual(payload["targets"][0]["training_target_source"], "explicit_bootstrap_target")
         self.assertFalse(payload["promotion_evidence"])
 
-    def test_queue_drops_bootstrap_targets_without_accepted_mapping(self):
+    def test_queue_drops_bootstrap_targets_without_accepted_mapping_and_does_not_auto_add_mapping_targets(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             mapping = Path(raw_tmp) / "mapping.csv"
             with mapping.open("w", newline="", encoding="utf-8") as handle:
@@ -41,7 +42,7 @@ class ModelWorkerTargetQueueTests(unittest.TestCase):
 
             payload = build_target_queue(bootstrap_targets=["AAPL"], mapping_csv=mapping, generated_at_utc="2026-05-20T00:00:00Z")
 
-        self.assertEqual([row["symbol"] for row in payload["targets"]], ["AAOI"])
+        self.assertEqual(payload["targets"], [])
 
     def test_queue_excludes_crypto_targets_from_model_worker_training(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

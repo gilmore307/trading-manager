@@ -135,14 +135,17 @@ Accepted queue shape:
 
 If the first target has completed all eligible substrate windows through the completed-fold cutoff and its current fold lifecycle has completed maintenance/readiness handoff, the scheduler skips it and starts the next queued target from the earliest ready window, usually `2016-01`. The queue controls data-preparation routing only; it does not become fixed-target promotion evidence and does not replace component-led candidate selection replay.
 
-The runtime queue can be prepared from reviewed target context mappings. The
-prepared queue excludes crypto spot and other structurally non-optionable
+The runtime queue is explicit. The preparation script validates each requested
+bootstrap target against reviewed target context mappings, but it does not
+auto-add every accepted mapping target. Mapping acceptance means the system
+knows how to contextualize a target; it is not permission to train that target.
+The prepared queue excludes crypto spot and other structurally non-optionable
 targets. Those symbols may be used by replay/context paths, but the autonomous
-model-worker lane only trains targets that can support the option-expression
-surface.
+model-worker lane only trains explicit reviewed targets that can support the
+option-expression surface.
 
 ```bash
-PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --write
+PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --bootstrap-target AAPL --write
 ```
 
 ## Residual Event Governance
