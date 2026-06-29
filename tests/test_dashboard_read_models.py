@@ -3101,6 +3101,91 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["pending_count"], 18)
         self.assertIn("12+3+3 walk-forward fold", progress["progress_basis"])
 
+    def test_task_timeline_ignores_stale_non_eighteen_month_fold_state_for_live_progress(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            env.write_text(
+                "TRADING_MANAGER_HISTORICAL_INTERVAL_SECONDS=300\nTRADING_MANAGER_SELECTED_TARGET_SYMBOL=AAPL\n",
+                encoding="utf-8",
+            )
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            stale_payload = {
+                "contract_type": "manager_model_training_workflow_state",
+                "start_month": "2016-01",
+                "end_month": "2016-12",
+                "stages": [
+                    {
+                        "stage_id": "model_02_target_state.feature_generation",
+                        "stage_type": "feature_generation",
+                        "layer": 3,
+                        "layer_key": "model_02_target_state",
+                        "status": "ready",
+                    }
+                ],
+            }
+            current_payload = {
+                "contract_type": "manager_model_training_workflow_state",
+                "start_month": "2016-01",
+                "end_month": "2017-06",
+                "stages": [
+                    {
+                        "stage_id": "model_02_target_state.data_acquisition",
+                        "stage_type": "data_acquisition",
+                        "layer": 3,
+                        "layer_key": "model_02_target_state",
+                        "status": "succeeded",
+                    },
+                    {
+                        "stage_id": "model_02_target_state.feature_generation",
+                        "stage_type": "feature_generation",
+                        "layer": 3,
+                        "layer_key": "model_02_target_state",
+                        "status": "ready",
+                    },
+                ],
+            }
+            (runtime / "model_training_fold_state_aapl_2016-01_2016-12.json").write_text(
+                json.dumps(stale_payload) + "\n",
+                encoding="utf-8",
+            )
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
+                json.dumps(current_payload) + "\n",
+                encoding="utf-8",
+            )
+            write_task_progress_node(
+                progress_root=runtime / "task_progress",
+                worker_id="model_worker_1",
+                task_uid="2016-01..2017-06:model_02_target_state.feature_generation",
+                stage_id="model_02_target_state.feature_generation",
+                unit_label="feature months",
+                processed_count=4,
+                expected_count=18,
+                node_id="feature_generation_window_started",
+                node_label="Feature generation running",
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-06-29T19:59:30Z")
+
+        timeline = payload["chart_payload"]["task_timeline"]
+        self.assertFalse(any(task["month"] == "2016-01..2016-12" for task in timeline))
+        task = next(task for task in timeline if task["task_id"] == "model_02_target_state")
+        self.assertEqual(task["month"], "2016-01..2017-06")
+        self.assertEqual(task["status"], "running")
+        self.assertEqual(task["task_state"], "current")
+        self.assertEqual(task["detail"]["progress"]["status"], "running")
+        self.assertEqual(task["detail"]["progress"]["stage_id"], "model_02_target_state.feature_generation")
+        self.assertEqual(task["detail"]["runtime_activity"]["progress_label"], "1/2 task units")
+
     def test_reset_fold_waits_for_monthly_foundation_instead_of_showing_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
@@ -3453,7 +3538,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2018-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.model_generation.train",
@@ -4033,7 +4118,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                     {
                         "contract_type": "manager_model_training_workflow_state",
                         "start_month": "2016-01",
-                        "end_month": "2018-06",
+                        "end_month": "2017-06",
                         "stages": [
                             {
                                 "stage_id": "model_02_target_state.option_chain_data_acquisition",
@@ -4064,7 +4149,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "contract_type": "manager_stage_coverage",
                         "stage_id": "model_02_target_state.option_chain_data_acquisition",
                         "start_month": "2016-01",
-                        "end_month": "2018-06",
+                        "end_month": "2017-06",
                         "status": "partial_ready",
                         "expected_count": 10,
                         "ready_count": 0,

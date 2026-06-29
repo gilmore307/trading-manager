@@ -3694,6 +3694,8 @@ def _task_timeline(
             fold_target_symbol = _target_symbol_from_fold_stages(raw_stages)
             fold_start = str(fold_payload.get("start_month") or "")
             fold_end = str(fold_payload.get("end_month") or "")
+            if fold_start and fold_end and _month_span_count(fold_start, fold_end) != MONTHS_PER_MODEL_FOLD:
+                continue
             if selected_target_symbol:
                 selected_symbol = selected_target_symbol.upper()
                 target_scoped_path = runtime_root / f"model_training_fold_state_{selected_symbol.lower()}_{fold_start}_{fold_end}.json"
@@ -3954,6 +3956,13 @@ def _task_timeline(
                     and task_state == "current"
                     and semantic_stage_type == "data_acquisition"
                     and _progress_shows_incomplete_active_work(progress if isinstance(progress, Mapping) else None)
+                ):
+                    display_status = "running"
+                if (
+                    display_status == "ready"
+                    and task_state == "current"
+                    and isinstance(progress, Mapping)
+                    and str(progress.get("status") or "") == "running"
                 ):
                     display_status = "running"
                 runtime_activity = _task_runtime_activity_from_worker(
