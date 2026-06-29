@@ -24,7 +24,7 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
                 "next_internal_stage": "autonomous_target_local_provider_acquisition",
                 "worker_id": "model_worker_1",
                 "selected_target_symbol": "btc",
-                "fold_id": "fold_2016-01_2017-06",
+                "fold_id": "fold_aapl_2016",
                 "execution_summary": {
                     "workflow_plan": {"start_month": "2016-01", "end_month": "2016-06"},
                 },
@@ -39,7 +39,7 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
         self.assertEqual(transition["target_symbol"], "BTC")
         self.assertEqual(transition["start_month"], "2016-01")
         self.assertEqual(transition["end_month"], "2016-06")
-        self.assertEqual(transition["fold_id"], "fold_2016-01_2017-06")
+        self.assertEqual(transition["fold_id"], "fold_aapl_2016")
         self.assertEqual(transition["task_id"], "model_02_target_state")
         self.assertEqual(transition["created_at"], "2026-06-29T01:00:00+00:00")
         self.assertEqual(transition["started_at"], "2026-06-29T01:00:00+00:00")
@@ -56,11 +56,11 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
                 "next_internal_stage": "model_group_replay",
                 "execution_summary": {
                     "training_fold": {
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-07_2016-12",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "target_symbol": "AAPL",
-                        "start_month": "2016-07",
-                        "end_month": "2016-12",
-                        "fold_id": "fold_2016-07_2016-12",
+                        "start_month": "2016-01",
+                        "end_month": "2017-06",
+                        "fold_id": "fold_aapl_2016",
                     },
                     "replay_execution_run_id": "model_group_replay_2016_fold2_complete",
                     "required_next_step": "repair or populate fold-scoped labels",
@@ -73,11 +73,11 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
         self.assertEqual(transition["task_status"], "waiting")
         self.assertEqual(transition["task_id"], "model_group.replay")
         self.assertEqual(transition["target_symbol"], "AAPL")
-        self.assertEqual(transition["start_month"], "2016-07")
-        self.assertEqual(transition["end_month"], "2016-12")
-        self.assertEqual(transition["fold_id"], "fold_2016-07_2016-12")
-        self.assertEqual(transition["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-07_2016-12")
-        self.assertEqual(transition["candidate_fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["start_month"], "2016-01")
+        self.assertEqual(transition["end_month"], "2017-06")
+        self.assertEqual(transition["fold_id"], "fold_aapl_2016")
+        self.assertEqual(transition["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2017-06")
+        self.assertEqual(transition["candidate_fold_id"], "fold_aapl_2016")
         self.assertEqual(transition["candidate_training_target"], "AAPL")
         self.assertEqual(transition["replay_execution_run_id"], "model_group_replay_2016_fold2_complete")
 
@@ -87,12 +87,12 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
             receipt_path.write_text(
                 json.dumps(
                     {
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-07_2016-12",
-                        "candidate_fold_id": "fold_2016-07_2016-12",
+                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                        "candidate_fold_id": "fold_aapl_2016",
                         "candidate_training_target": "AAPL",
                         "replay_execution_run_id": "model_group_replay_2016_fold2_complete",
                         "target_symbol": "AAPL",
-                        "fold_id": "fold_2016-07_2016-12",
+                        "fold_id": "fold_aapl_2016",
                     }
                 ),
                 encoding="utf-8",
@@ -109,10 +109,10 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
                 recorded_at_utc="2026-06-29T01:03:00+00:00",
             )
 
-        self.assertEqual(transition["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-07_2016-12")
-        self.assertEqual(transition["fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["candidate_model_ref"], "storage://trading-manager/model_group/aapl/2016-01_2017-06")
+        self.assertEqual(transition["fold_id"], "fold_aapl_2016")
         self.assertEqual(transition["target_symbol"], "AAPL")
-        self.assertEqual(transition["candidate_fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["candidate_fold_id"], "fold_aapl_2016")
         self.assertEqual(transition["candidate_training_target"], "AAPL")
         self.assertEqual(transition["replay_execution_run_id"], "model_group_replay_2016_fold2_complete")
 
@@ -161,8 +161,8 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
         transition = transition_from_work_selection(
             {
                 "reason_code": "resume_open_model_worker_fold",
-                "start_month": "2016-07",
-                "end_month": "2016-12",
+                "start_month": "2016-01",
+                "end_month": "2017-06",
             },
             selected_target_symbol="AAPL",
             recorded_at_utc="2026-06-29T02:00:00+00:00",
@@ -174,7 +174,7 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
         self.assertEqual(transition["selected_work"], "model_worker.fold")
         self.assertEqual(transition["next_internal_stage"], "model_worker_1")
         self.assertEqual(transition["target_symbol"], "AAPL")
-        self.assertEqual(transition["fold_id"], "fold_2016-07_2016-12")
+        self.assertEqual(transition["fold_id"], "fold_aapl_2016")
         self.assertEqual(transition["task_id"], "model_worker")
         self.assertEqual(transition["created_at"], "2026-06-29T02:00:00+00:00")
         self.assertEqual(transition["started_at"], "2026-06-29T02:00:00+00:00")

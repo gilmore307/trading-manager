@@ -17,6 +17,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal, TextIO
 
+from .fold_naming import model_worker_fold_id
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root, model_runtime_root
@@ -696,7 +697,7 @@ def _after_cost_alpha_checkpoint_command(
         "--target-symbol",
         target,
         "--fold-id",
-        f"fold_{start_month}_{end_month}",
+        model_worker_fold_id(target_symbol=target, start_month=start_month),
         "--output-json",
         str(output_path),
     ]

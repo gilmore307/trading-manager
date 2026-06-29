@@ -276,7 +276,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "created_at_utc": "2026-05-28T00:00:00+00:00",
                     "replay_execution_run_id": "model_group_replay_fixture",
                     "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                    "candidate_fold_id": "fold_2016-01_2017-06",
+                    "candidate_fold_id": "fold_aapl_2016",
                     "candidate_training_target": "AAPL",
                     "target_symbol": "AAPL",
                     "pre_replay_target_refs": ["AAPL"],
@@ -339,7 +339,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                     "event_candidate_count": 1,
                     "replay_execution_run_id": "model_group_replay_fixture",
                     "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                    "candidate_fold_id": "fold_2016-01_2017-06",
+                    "candidate_fold_id": "fold_aapl_2016",
                     "candidate_training_target": "AAPL",
                     "target_symbol": "AAPL",
                     "replay_review_scope_status": "passed",
@@ -420,7 +420,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["ready_check_count"], 5)
-            self.assertEqual(receipt["candidate_fold_id"], "fold_2016-01_2017-06")
+            self.assertEqual(receipt["candidate_fold_id"], "fold_aapl_2016")
             self.assertEqual(receipt["candidate_training_target"], "AAPL")
             self.assertEqual(receipt["replay_execution_run_id"], "model_group_replay_fixture")
             self.assertIn("residual_event_governance_event_focus_proposal", receipt["ready_checks"])
@@ -432,7 +432,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             metrics = settlement["metrics"]
             self.assertEqual(eligibility["contract_type"], "promotion_eligibility_decision")
             self.assertEqual(settlement["target_symbol"], "AAPL")
-            self.assertEqual(settlement["candidate_fold_id"], "fold_2016-01_2017-06")
+            self.assertEqual(settlement["candidate_fold_id"], "fold_aapl_2016")
             self.assertEqual(settlement["candidate_training_target"], "AAPL")
             self.assertEqual(settlement["replay_execution_run_id"], "model_group_replay_fixture")
             self.assertEqual(eligibility["target_symbol"], "AAPL")
@@ -533,7 +533,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "event_candidate_count": 2,
                         "replay_execution_run_id": "model_group_replay_fixture",
                         "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                        "candidate_fold_id": "fold_2016-01_2017-06",
+                        "candidate_fold_id": "fold_aapl_2016",
                         "candidate_training_target": "AAPL",
                         "target_symbol": "AAPL",
                         "replay_review_scope_status": "passed",

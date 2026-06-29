@@ -25,6 +25,7 @@ from .request_handoff import DEFAULT_TRADING_DATA_SRC
 from .scheduler_locks import DEFAULT_DAEMON_LOCK_PATH, scheduler_lock_plan
 from .event_feed_backfill import prepare_event_feed_backfill
 from .event_feed_dispatch import dispatch_event_feed_backfill
+from .fold_naming import date_range_fold_id, model_worker_fold_id, safe_target_token
 from .model_group_attribution import run_model_group_replay_review_if_ready
 from .model_group_evaluation import run_model_group_evaluation_if_ready
 from .model_group_residual_event_governance import run_model_group_residual_event_governance_if_ready
@@ -546,7 +547,7 @@ class ModelWorkerFoldSelection:
     """Model-worker selection for the next complete 12+3+3 walk-forward fold."""
 
     contract_type: str = "manager_model_worker_fold_selection"
-    fold_id: str = "fold_2016-01_2017-06"
+    fold_id: str = "fold_aapl_2016"
     start_month: str = "2016-01"
     end_month: str = "2017-06"
     fold_months: tuple[str, ...] = ()
@@ -586,11 +587,7 @@ def _advance_fold_start_month(start_month: str, *, month_count: int = ROLLING_FO
 
 
 def _safe_target_token(target_symbol: str | None) -> str | None:
-    if not target_symbol:
-        return None
-    token = "".join(char.lower() if char.isalnum() else "_" for char in target_symbol.strip().upper())
-    token = "_".join(part for part in token.split("_") if part)
-    return token or None
+    return safe_target_token(target_symbol)
 
 
 def model_worker_fold_state_path(
@@ -608,8 +605,8 @@ def model_worker_fold_state_path(
     return root / f"model_training_fold_state_{start_month}_{end_month}.json"
 
 
-def _model_worker_fold_id(start_month: str, end_month: str) -> str:
-    return f"fold_{start_month}_{end_month}"
+def _model_worker_fold_id(start_month: str, end_month: str, *, target_symbol: str | None) -> str:
+    return model_worker_fold_id(target_symbol=target_symbol, start_month=start_month)
 
 
 def _workflow_payload_all_stages_complete(payload: dict[str, Any]) -> bool:
@@ -713,7 +710,9 @@ def _latest_blocking_model_group_transition_mtime(storage_root: Path, *, state_p
         task_id = str(payload.get("task_id") or "")
         if task_id not in {"model_group.replay", "model_group.replay_review"}:
             continue
-        if fold_scope["fold_id"] and str(payload.get("fold_id") or "") != fold_scope["fold_id"]:
+        payload_fold_id = str(payload.get("fold_id") or "")
+        expected_fold_ids = {value for value in (fold_scope["fold_id"], fold_scope.get("legacy_fold_id", "")) if value}
+        if expected_fold_ids and payload_fold_id not in expected_fold_ids:
             continue
         if fold_scope["target_symbol"] and str(payload.get("target_symbol") or "").upper() != fold_scope["target_symbol"]:
             continue
@@ -731,7 +730,8 @@ def _latest_blocking_model_group_transition_mtime(storage_root: Path, *, state_p
 
 def _promotion_decision_valid_for_fold_state(payload: dict[str, Any], *, decision_path: Path, state_path: Path) -> bool:
     fold_scope = _fold_scope_from_state_path(state_path)
-    if fold_scope["fold_id"] and str(payload.get("fold_id") or "") != fold_scope["fold_id"]:
+    expected_fold_ids = {value for value in (fold_scope["fold_id"], fold_scope.get("legacy_fold_id", "")) if value}
+    if expected_fold_ids and str(payload.get("fold_id") or "") not in expected_fold_ids:
         return False
     replay_validation_ref = str(payload.get("replay_validation_ref") or "").strip()
     if not replay_validation_ref:
@@ -746,7 +746,7 @@ def _promotion_decision_valid_for_fold_state(payload: dict[str, Any], *, decisio
     if "current_deterministic_crypto_policy" in candidate_model_ref:
         return False
     receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "")
-    if receipt_fold_id and fold_scope["fold_id"] and receipt_fold_id != fold_scope["fold_id"]:
+    if receipt_fold_id and expected_fold_ids and receipt_fold_id not in expected_fold_ids:
         return False
     return True
 
@@ -764,7 +764,8 @@ def _promotion_readiness_valid_for_fold_state(payload: dict[str, Any], *, state_
     payload_fold_id = str(payload.get("fold_id") or payload.get("candidate_fold_id") or "").strip()
     if payload_fold_id:
         scoped = True
-        if fold_scope["fold_id"] and payload_fold_id != fold_scope["fold_id"]:
+        expected_fold_ids = {value for value in (fold_scope["fold_id"], fold_scope.get("legacy_fold_id", "")) if value}
+        if expected_fold_ids and payload_fold_id not in expected_fold_ids:
             return False
 
     payload_targets = _string_set(
@@ -793,7 +794,8 @@ def _fold_scope_from_state_path(state_path: Path) -> dict[str, str]:
     if not target_symbol and match:
         target_symbol = match.group(1).upper()
     return {
-        "fold_id": f"fold_{start_month}_{end_month}" if start_month and end_month else "",
+        "fold_id": model_worker_fold_id(target_symbol=target_symbol, start_month=start_month) if start_month and target_symbol else "",
+        "legacy_fold_id": date_range_fold_id(start_month=start_month, end_month=end_month) if start_month and end_month else "",
         "target_symbol": target_symbol,
     }
 
@@ -1000,7 +1002,7 @@ def _open_model_worker_fold_for_target(
             continue
         candidates.append(
             ModelWorkerFoldSelection(
-                fold_id=_model_worker_fold_id(start_month, end_month),
+                fold_id=_model_worker_fold_id(start_month, end_month, target_symbol=selected_target_symbol),
                 start_month=start_month,
                 end_month=end_month,
                 fold_months=rolling_fold_months(start_month),
@@ -1053,7 +1055,7 @@ def _open_any_model_worker_fold(
             continue
         target_symbol = _fold_scope_from_state_path(path).get("target_symbol") or None
         selection = ModelWorkerFoldSelection(
-            fold_id=_model_worker_fold_id(start_month, end_month),
+            fold_id=_model_worker_fold_id(start_month, end_month, target_symbol=target_symbol),
             start_month=start_month,
             end_month=end_month,
             fold_months=rolling_fold_months(start_month),
@@ -1200,7 +1202,7 @@ def select_model_worker_fold(
                     and _fold_payload_has_ready_model_worker_stage(payload)
                 ):
                     return ModelWorkerFoldSelection(
-                        fold_id=_model_worker_fold_id(candidate, end_month),
+                        fold_id=_model_worker_fold_id(candidate, end_month, target_symbol=selected_target_symbol),
                         start_month=candidate,
                         end_month=end_month,
                         fold_months=months,
@@ -1209,7 +1211,7 @@ def select_model_worker_fold(
                     )
             else:
                 return ModelWorkerFoldSelection(
-                    fold_id=_model_worker_fold_id(candidate, end_month),
+                    fold_id=_model_worker_fold_id(candidate, end_month, target_symbol=selected_target_symbol),
                     start_month=candidate,
                     end_month=end_month,
                     fold_months=months,

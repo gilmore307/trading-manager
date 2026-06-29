@@ -262,7 +262,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "contract_type": "evaluation_replay_execution_run",
                     "replay_execution_run_id": run_id,
                     "candidate_model_ref": candidate_model_ref,
-                    "candidate_fold_id": "fold_2016-01_2017-06",
+                    "candidate_fold_id": "fold_aapl_2016",
                     "decision_rows_ref": str(decision_rows_ref),
                     "candidate_handoff_status": "available",
                     "candidate_handoff_source": "fixed_current_snapshot_historical_candidate_universe",
@@ -314,7 +314,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                     "replay_month": month,
                     "decision_rows_ref": str(decision_rows_path),
                     "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                    "candidate_fold_id": "fold_2016-01_2017-06",
+                    "candidate_fold_id": "fold_aapl_2016",
                     "target_refs": ["AAPL"],
                     "asset_class_counts": {"us_equity": 1},
                     "candidate_handoff_status": "available",
@@ -509,7 +509,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "replay_execution_run_id": "previous_run",
                         "decision_rows_ref": str(decision_rows_path),
                         "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                        "candidate_fold_id": "fold_2016-01_2017-06",
+                        "candidate_fold_id": "fold_aapl_2016",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
@@ -772,7 +772,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "replay_execution_run_id": run_id,
                         "replay_month": "2021-02",
                         "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                        "candidate_fold_id": "fold_2016-01_2017-06",
+                        "candidate_fold_id": "fold_aapl_2016",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
@@ -1226,7 +1226,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "contract_type": "evaluation_replay_execution_run",
                         "replay_execution_run_id": run_id,
                         "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                        "candidate_fold_id": "fold_2016-01_2017-06",
+                        "candidate_fold_id": "fold_aapl_2016",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",
@@ -1479,7 +1479,7 @@ class ModelGroupReplayTests(unittest.TestCase):
             dataset_root = self._write_dataset(storage_root)
             manifest_path = dataset_root / "dataset_manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["candidate_fold_id"] = "fold_2017-01_2018-06"
+            manifest["candidate_fold_id"] = "fold_aapl_2017"
             manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
             self._write_completed_fold(storage_root)
 
@@ -1741,7 +1741,7 @@ class ModelGroupReplayTests(unittest.TestCase):
                         "decision_rows_ref": str(decision_rows_path),
                         "progress_ref": str(progress_path),
                         "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                        "candidate_fold_id": "fold_2016-01_2017-06",
+                        "candidate_fold_id": "fold_aapl_2016",
                         "target_refs": ["AAPL"],
                         "asset_class_counts": {"us_equity": 1},
                         "candidate_handoff_status": "available",

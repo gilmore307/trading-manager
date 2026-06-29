@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Mapping
 
+from .fold_naming import date_range_fold_id, model_worker_fold_id
 from .storage_paths import manager_storage_root
 
 DEFAULT_RUNTIME_DIR = manager_storage_root() / "runtime"
@@ -111,8 +112,12 @@ def _extract_scope(row: Mapping[str, Any]) -> dict[str, str | None]:
         evaluation_receipt.get("fold_id"),
         evaluation_receipt.get("candidate_fold_id"),
     )
-    if not fold_id and start_month and end_month:
-        fold_id = f"fold_{start_month}_{end_month}"
+    if not fold_id and start_month and end_month and start_month != end_month:
+        fold_id = (
+            model_worker_fold_id(target_symbol=target_symbol, start_month=start_month)
+            if target_symbol
+            else date_range_fold_id(start_month=start_month, end_month=end_month)
+        )
     return {
         "start_month": start_month,
         "end_month": end_month,
@@ -311,8 +316,12 @@ def transition_from_work_selection(
     if target_symbol:
         target_symbol = target_symbol.upper()
     fold_id = _first_string(selection.get("fold_id"))
-    if not fold_id and start_month and end_month:
-        fold_id = f"fold_{start_month}_{end_month}"
+    if not fold_id and start_month and end_month and start_month != end_month:
+        fold_id = (
+            model_worker_fold_id(target_symbol=target_symbol, start_month=start_month)
+            if target_symbol
+            else date_range_fold_id(start_month=start_month, end_month=end_month)
+        )
     row = {
         "now_utc": recorded,
         "selected_work": selected_work,

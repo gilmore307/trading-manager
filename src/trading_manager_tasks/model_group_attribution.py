@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
+from .fold_naming import parse_model_worker_fold_id
 from .model_group_layer_attribution import build_model_group_layer_attribution
 from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -522,9 +523,17 @@ def _matching_fold_state_path(
     candidate_training_target: str,
 ) -> Path | None:
     parts = candidate_fold_id.split("_")
-    if len(parts) != 3 or parts[0] != "fold":
+    parsed_current = parse_model_worker_fold_id(candidate_fold_id)
+    if parsed_current is not None:
+        target_token, training_year = parsed_current
+        start_month = f"{training_year}-01"
+        end_month = f"{int(training_year) + 1:04d}-06"
+        expected_target = candidate_training_target.strip().lower() or target_token
+    elif len(parts) == 3 and parts[0] == "fold":
+        start_month, end_month = parts[1], parts[2]
+        expected_target = candidate_training_target.strip().lower()
+    else:
         return None
-    start_month, end_month = parts[1], parts[2]
     runtime_root = storage_root / "runtime"
     if not runtime_root.exists():
         return None
@@ -538,7 +547,7 @@ def _matching_fold_state_path(
             or payload.get("target_ref")
             or ""
         ).strip().upper()
-        if candidate_training_target and target and target != candidate_training_target:
+        if expected_target and target and target.lower() != expected_target:
             continue
         return path
     return None

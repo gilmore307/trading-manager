@@ -83,7 +83,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             append_decision_log(
                 decision_log,
                 decision,
-                extra_row={"worker_id": "model_worker_1", "selected_target_symbol": "AAPL", "fold_id": "fold_2016-01_2017-06"},
+                extra_row={"worker_id": "model_worker_1", "selected_target_symbol": "AAPL", "fold_id": "fold_aapl_2016"},
             )
 
             transitions = [
@@ -101,7 +101,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         updated = apply_model_worker_selection_to_state(
             SchedulerDaemonState(start_month="2016-07", end_month="2016-07"),
             selection=ModelWorkerFoldSelection(
-                fold_id="fold_2016-01_2017-06",
+                fold_id="fold_aapl_2016",
                 start_month="2016-01",
                 end_month="2017-06",
                 fold_months=rolling_fold_months("2016-01"),
@@ -1183,7 +1183,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             )
             self.assertIsNotNone(selection)
             assert selection is not None
-            self.assertEqual(selection.fold_id, "fold_2016-01_2017-06")
+            self.assertEqual(selection.fold_id, "fold_aapl_2016")
             self.assertEqual(selection.reason_code, "complete_foundation_fold_ready")
             self.assertEqual(selection.fold_months, rolling_fold_months("2016-01"))
 
@@ -1608,7 +1608,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         assert result is not None
         target_selection, model_decision = result
         self.assertEqual(target_selection.selected_target_symbol, "AAPL")
-        self.assertEqual(target_selection.fold_selection.fold_id, "fold_2016-01_2017-06")
+        self.assertEqual(target_selection.fold_selection.fold_id, "fold_aapl_2016")
         self.assertEqual(model_decision.selected_work, "model_01_market_context.model_generation")
         self.assertEqual(run_once.call_args.kwargs["selected_target_symbol"], "AAPL")
         self.assertTrue(run_once.call_args.kwargs["execute_autonomous_provider_stages"])
@@ -1624,6 +1624,41 @@ class SchedulerDaemonTests(unittest.TestCase):
             selection = select_model_worker_fold(storage_root=storage_root, default_start_month="2016-01", max_month="2017-06")
 
         self.assertIsNone(selection)
+
+    def test_model_worker_does_not_start_previous_year_fold_before_july_first(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            for month in rolling_fold_months("2016-01")[:12]:
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+
+            train_only_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2016-12",
+                selected_target_symbol="AAPL",
+            )
+
+            for month in rolling_fold_months("2016-01")[12:]:
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+
+            before_july_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2017-05",
+                selected_target_symbol="AAPL",
+            )
+            eligible_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2017-06",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertIsNone(train_only_selection)
+        self.assertIsNone(before_july_selection)
+        self.assertIsNotNone(eligible_selection)
+        assert eligible_selection is not None
+        self.assertEqual(eligible_selection.fold_id, "fold_aapl_2016")
 
     def test_model_worker_uses_cumulative_walk_forward_12_3_3_folds(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -1687,7 +1722,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertIsNone(next_selection)
         self.assertIsNotNone(next_selection_after_lifecycle)
         assert next_selection_after_lifecycle is not None
-        self.assertEqual(next_selection_after_lifecycle.fold_id, "fold_2017-01_2018-06")
+        self.assertEqual(next_selection_after_lifecycle.fold_id, "fold_aapl_2017")
         self.assertEqual(next_selection_after_lifecycle.fold_months, rolling_fold_months("2017-01"))
 
     def test_model_worker_does_not_leapfrog_missing_foundation_month_gap(self):
@@ -1772,7 +1807,7 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNotNone(selection)
         assert selection is not None
-        self.assertEqual(selection.fold_id, "fold_2016-01_2017-06")
+        self.assertEqual(selection.fold_id, "fold_aapl_2016")
         self.assertEqual(selection.reason_code, "resume_open_model_worker_fold")
 
     def test_completed_model_generation_splits_close_fold_even_with_failed_prep_stage(self):
@@ -1962,7 +1997,7 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNotNone(selection)
         assert selection is not None
-        self.assertEqual(selection.fold_id, "fold_2016-01_2017-06")
+        self.assertEqual(selection.fold_id, "fold_aapl_2016")
         self.assertEqual(selection.reason_code, "blocked_model_worker_fold_holds_target_lane")
 
     def test_completed_pre_replay_fold_holds_next_fold_until_model_group_lifecycle_completes(self):
@@ -2026,7 +2061,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(blocked_month_ingest, ())
         self.assertIsNotNone(unblocked_next_fold)
         assert unblocked_next_fold is not None
-        self.assertEqual(unblocked_next_fold.fold_id, "fold_2017-01_2018-06")
+        self.assertEqual(unblocked_next_fold.fold_id, "fold_aapl_2017")
 
     def test_other_fold_promotion_readiness_does_not_unblock_current_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2103,7 +2138,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 if start_month == "2016-01":
                     self._write_promotion_readiness_after(storage_root=storage_root, state_path=state_path)
             third_selection = ModelWorkerFoldSelection(
-                fold_id="fold_2018-01_2019-06",
+                fold_id="fold_aapl_2018",
                 start_month="2018-01",
                 end_month="2019-06",
                 fold_months=rolling_fold_months("2018-01"),
@@ -2181,7 +2216,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(blocked_historical_work.blocked_target_symbol, "AAPL")
         self.assertIsNotNone(unblocked_next_fold)
         assert unblocked_next_fold is not None
-        self.assertEqual(unblocked_next_fold.fold_id, "fold_2017-01_2018-06")
+        self.assertEqual(unblocked_next_fold.fold_id, "fold_aapl_2017")
 
     def test_next_historical_work_pauses_on_incomplete_model_group_lifecycle(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2513,7 +2548,7 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNotNone(selection)
         assert selection is not None
-        self.assertEqual(selection.fold_id, "fold_2016-01_2017-06")
+        self.assertEqual(selection.fold_id, "fold_aapl_2016")
         self.assertEqual(selection.reason_code, "resume_open_model_worker_fold")
 
     def test_auto_work_selection_jumps_past_externally_completed_months(self):
@@ -2576,7 +2611,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(latest["source"], "historical_work_selection")
         self.assertEqual(latest["selected_work"], "model_worker.fold")
         self.assertEqual(latest["target_symbol"], "AAPL")
-        self.assertEqual(latest["fold_id"], "fold_2016-01_2017-06")
+        self.assertEqual(latest["fold_id"], "fold_aapl_2016")
 
 
     def test_daemon_auto_selects_next_work_without_user_month_instruction(self):

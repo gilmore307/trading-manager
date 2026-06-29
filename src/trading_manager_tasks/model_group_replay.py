@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
+from .fold_naming import date_range_fold_id, model_worker_fold_id
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
@@ -245,6 +246,7 @@ def run_model_group_replay_if_ready(
         after_cost_alpha_model_path,
         parent_checkpoint_ref=str(previous_after_cost_alpha_model_path) if previous_after_cost_alpha_model_path else None,
         fold_id=str(training_fold.get("fold_id") or "").strip() or None,
+        legacy_fold_id=str(training_fold.get("legacy_fold_id") or "").strip() or None,
         target_symbol=str(training_fold.get("target_symbol") or "").strip().upper() or None,
     )
     if not model_artifact_status["compatible"]:
@@ -319,6 +321,7 @@ def run_model_group_replay_if_ready(
                 after_cost_alpha_model_path,
                 parent_checkpoint_ref=str(previous_after_cost_alpha_model_path) if previous_after_cost_alpha_model_path else None,
                 fold_id=str(training_fold.get("fold_id") or "").strip() or None,
+                legacy_fold_id=str(training_fold.get("legacy_fold_id") or "").strip() or None,
                 target_symbol=str(training_fold.get("target_symbol") or "").strip().upper() or None,
             )
             if model_artifact_status["compatible"]:
@@ -1126,6 +1129,7 @@ def _after_cost_alpha_model_status(
     *,
     parent_checkpoint_ref: str | None = None,
     fold_id: str | None = None,
+    legacy_fold_id: str | None = None,
     target_symbol: str | None = None,
 ) -> dict[str, Any]:
     artifact = _load_json_object(path)
@@ -1154,12 +1158,14 @@ def _after_cost_alpha_model_status(
             "model_type": model_type or None,
             "score_policy": score_policy or None,
         }
-    if fold_id and artifact_fold_id != fold_id:
+    expected_fold_ids = {value for value in (fold_id, legacy_fold_id) if value}
+    if expected_fold_ids and artifact_fold_id not in expected_fold_ids:
         return {
             "compatible": False,
             "reason": "after-cost alpha artifact fold scope does not match completed training fold",
             "after_cost_alpha_model_ref": str(path),
             "expected_fold_id": fold_id,
+            "expected_legacy_fold_id": legacy_fold_id,
             "artifact_fold_id": artifact_fold_id or None,
             "training_mode": training_mode or None,
             "sample_count": sample_count,
@@ -1469,7 +1475,8 @@ def _completed_training_folds(*, storage_root: Path, selected_target_symbol: str
         target_symbol = _fold_state_target_symbol(path, payload)
         candidates.append(
             {
-                "fold_id": f"fold_{start_month}_{end_month}",
+                "fold_id": model_worker_fold_id(target_symbol=target_symbol, start_month=start_month),
+                "legacy_fold_id": date_range_fold_id(start_month=start_month, end_month=end_month),
                 "fold_label": _fold_label(start_month, end_month),
                 "start_month": start_month,
                 "end_month": end_month,
@@ -1549,6 +1556,7 @@ def _fold_state_target_symbol(path: Path, payload: Mapping[str, Any]) -> str | N
 
 def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, Any], training_fold: Mapping[str, Any]) -> dict[str, Any]:
     fold_id = str(training_fold.get("fold_id") or "")
+    legacy_fold_id = str(training_fold.get("legacy_fold_id") or "")
     manifest_fold_id = str(manifest.get("candidate_fold_id") or manifest.get("fold_id") or "").strip()
     target_refs = _replay_dataset_target_refs(dataset_root=dataset_root, manifest=manifest)
     return {
@@ -1557,6 +1565,7 @@ def _replay_dataset_scope_status(*, dataset_root: Path, manifest: Mapping[str, A
         "dataset_target_refs": sorted(target_refs),
         "dataset_candidate_fold_id": manifest_fold_id or None,
         "training_fold_id": fold_id or None,
+        "training_legacy_fold_id": legacy_fold_id or None,
     }
 
 
@@ -1778,7 +1787,9 @@ def _replay_receipt_scope_status(*, replay_receipt: Mapping[str, Any], training_
         return {"compatible": False, "reason": "deterministic crypto placeholder policy"}
     receipt_fold_id = str(replay_receipt.get("candidate_fold_id") or replay_receipt.get("fold_id") or "")
     fold_id = str(training_fold.get("fold_id") or "")
-    if receipt_fold_id and fold_id and receipt_fold_id != fold_id:
+    legacy_fold_id = str(training_fold.get("legacy_fold_id") or "")
+    expected_fold_ids = {value for value in (fold_id, legacy_fold_id) if value}
+    if receipt_fold_id and expected_fold_ids and receipt_fold_id not in expected_fold_ids:
         return {"compatible": False, "reason": "replay fold mismatch"}
     target_refs = _string_set(replay_receipt.get("target_refs") or replay_receipt.get("pre_replay_target_refs"))
     asset_class_counts = replay_receipt.get("asset_class_counts")

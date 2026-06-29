@@ -54,9 +54,12 @@ scaffold. Month checkpoints, fold states, and downstream blocked stages remain
 internal scheduler evidence. The dashboard may show completed history and the
 single current fold- or month-scoped task, with child partitions inside detail,
 but it must not project later M03-M06 dependencies as independent Future
-Tasks rows. A 12+3+3 walk-forward fold opens only after its final test-window
-calendar month has completed in `America/New_York`; child months that already
-have source data do not make the fold eligible early.
+Tasks rows. Current fold ids use the source and training year, such as
+`fold_aapl_2016`; coverage windows such as `2016-01..2017-06` are evidence
+ranges, not fold names. A 12+3+3 walk-forward fold opens only after its final
+test-window calendar month has completed in `America/New_York`; child months
+that already have source data do not make the fold eligible early, so
+`fold_aapl_2016` is not eligible before `2017-07-01`.
 Runtime execution advances one canonical month at a time. Historical scheduler
 inputs may retain compatibility fields such as `month_ingest_workers`, but they
 must not open multiple month lanes or project parallel month work into Tasks.
