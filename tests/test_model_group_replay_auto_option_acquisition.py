@@ -39,6 +39,56 @@ def _write_supervised_alpha_model(path: Path) -> None:
 
 
 class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
+    def test_legacy_fold_id_normalizes_before_replay(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            alpha_model = tmp / "alpha.json"
+            _write_supervised_alpha_model(alpha_model)
+            status_path = tmp / "status.jsonl"
+            latest_path = tmp / "latest.json"
+            replay_calls: list[tuple[str, str, str]] = []
+
+            def fake_run_replay(args, *, run_id: str, database_url: str | None):
+                replay_calls.append((run_id, args.candidate_fold_id, args.candidate_training_target))
+                return subprocess.CompletedProcess(args=["replay"], returncode=0, stdout="", stderr="")
+
+            def fake_receipt(args, *, run_id: str):
+                return {
+                    "decision_rows_ref": str(tmp / "decision_rows.jsonl"),
+                    "option_replay_coverage": {"selected_option_path_missing_count": 0},
+                }
+
+            original_run_replay = _MODULE._run_replay
+            original_replay_receipt = _MODULE._replay_receipt
+            try:
+                _MODULE._run_replay = fake_run_replay
+                _MODULE._replay_receipt = fake_receipt
+                result = _MODULE.main(
+                    [
+                        "--candidate-model-ref",
+                        "storage://trading-manager/model_group/aapl/2017-01_2018-06",
+                        "--candidate-fold-id",
+                        "fold_2017-01_2018-06",
+                        "--after-cost-alpha-model-json",
+                        str(alpha_model),
+                        "--replay-month",
+                        "2021-02",
+                        "--status-jsonl",
+                        str(status_path),
+                        "--latest-status-json",
+                        str(latest_path),
+                    ]
+                )
+            finally:
+                _MODULE._run_replay = original_run_replay
+                _MODULE._replay_receipt = original_replay_receipt
+
+            self.assertEqual(result, 0)
+            self.assertEqual(len(replay_calls), 1)
+            self.assertTrue(replay_calls[0][0].startswith("model_group_replay_fold_aapl_2017_"))
+            self.assertEqual(replay_calls[0][1], "fold_aapl_2017")
+            self.assertEqual(replay_calls[0][2], "AAPL")
+
     def test_no_fit_alpha_model_stops_before_replay(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

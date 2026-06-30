@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -73,6 +74,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     _validate_args(parser, args)
+    _normalize_candidate_scope(args)
     model_artifact_status = _after_cost_alpha_model_status(args.after_cost_alpha_model_json)
     if not model_artifact_status["compatible"]:
         _emit(
@@ -453,6 +455,50 @@ def _run_id_prefix(args: argparse.Namespace) -> str:
     if fold_token and args.run_id_prefix == "model_group_replay_auto_option":
         return f"model_group_replay_{fold_token}"
     return args.run_id_prefix
+
+
+def _normalize_candidate_scope(args: argparse.Namespace) -> None:
+    target = str(args.candidate_training_target or "").strip().upper() or _candidate_training_target_from_model_ref(
+        str(args.candidate_model_ref or "")
+    )
+    if target:
+        args.candidate_training_target = target
+    explicit_fold = str(args.candidate_fold_id or "").strip().lower()
+    if re.fullmatch(r"fold_[a-z0-9]+_\d{4}", explicit_fold):
+        args.candidate_fold_id = explicit_fold
+        return
+    target_token = _safe_token(target)
+    legacy = re.fullmatch(r"fold_(\d{4})-\d{2}_(\d{4})-\d{2}", explicit_fold)
+    if legacy and target_token:
+        args.candidate_fold_id = f"fold_{target_token}_{legacy.group(1)}"
+        return
+    from_ref = _candidate_fold_id_from_model_ref(str(args.candidate_model_ref or ""))
+    if from_ref:
+        args.candidate_fold_id = from_ref
+
+
+def _candidate_training_target_from_model_ref(candidate_model_ref: str) -> str:
+    parts = _candidate_model_ref_parts(candidate_model_ref)
+    return parts[0].upper() if len(parts) >= 2 else ""
+
+
+def _candidate_fold_id_from_model_ref(candidate_model_ref: str) -> str:
+    parts = _candidate_model_ref_parts(candidate_model_ref)
+    if len(parts) < 2:
+        return ""
+    target_token = _safe_token(parts[0])
+    match = re.fullmatch(r"(\d{4})-\d{2}_(\d{4})-\d{2}", parts[1])
+    if not target_token or not match:
+        return ""
+    return f"fold_{target_token}_{match.group(1)}"
+
+
+def _candidate_model_ref_parts(candidate_model_ref: str) -> tuple[str, ...]:
+    marker = "/model_group/"
+    if marker not in candidate_model_ref:
+        return ()
+    tail = candidate_model_ref.split(marker, 1)[1].strip("/")
+    return tuple(part for part in tail.split("/") if part)
 
 
 def _safe_token(value: str) -> str:
