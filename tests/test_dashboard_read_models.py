@@ -20,6 +20,7 @@ from trading_manager_tasks.dashboard_read_models import (
     _mark_active_task_running,
     _mark_superseded_agent_errors,
     _model_group_replay_timeline_tasks,
+    _public_task_period_for_training_month,
     _runtime_activity_decision,
     _scheduler_decision_runtime_activity,
     _stage_id_from_error_row,
@@ -772,6 +773,45 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "stages": stages,
                     }
                 )
+            + "\n",
+            encoding="utf-8",
+        )
+        return fold_state
+
+    def _write_completed_training_fold_state(self, runtime: Path, *, start: str, end: str, symbol: str = "AAPL") -> Path:
+        stages = []
+        for layer in range(1, 7):
+            for split_name in ("train", "validation", "test"):
+                stages.append(
+                    {
+                        "stage_id": f"model_{layer:02d}_fixture.model_generation.{split_name}",
+                        "stage_type": "model_generation",
+                        "layer": layer,
+                        "layer_key": f"model_{layer:02d}_fixture",
+                        "status": "succeeded",
+                        "dataset_split": {"split_name": split_name},
+                        "dataset_unit": {
+                            "unit_kind": "twelve_month_target_fold",
+                            "unit_months": 18,
+                            "start_month": start,
+                            "end_month": end,
+                            "target_required": layer >= 3,
+                            "target_symbol": symbol if layer >= 3 else None,
+                        },
+                    }
+                )
+        fold_state = runtime / f"model_training_fold_state_{symbol.lower()}_{start}_{end}.json"
+        fold_state.parent.mkdir(parents=True, exist_ok=True)
+        fold_state.write_text(
+            json.dumps(
+                {
+                    "contract_type": "manager_model_training_workflow_state",
+                    "start_month": start,
+                    "end_month": end,
+                    "target_symbol": symbol,
+                    "stages": stages,
+                }
+            )
             + "\n",
             encoding="utf-8",
         )
@@ -3774,6 +3814,38 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["progress_display_mode"], "percent_only")
         self.assertEqual(progress["progress_percent"], 100.0)
         self.assertNotIn("artifact_count", progress)
+
+    def test_public_training_period_assigns_overlap_month_to_earliest_open_fold(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            (storage_root / "runtime").mkdir(parents=True, exist_ok=True)
+
+            period = _public_task_period_for_training_month(
+                "2024-02",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                max_month="2026-05",
+                active_fold_window=("2023-01", "2024-06"),
+            )
+
+        self.assertEqual(period, "2023-01..2024-06")
+
+    def test_public_training_period_releases_overlap_month_after_previous_fold_complete(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage" / "02_control_plane"
+            runtime = storage_root / "runtime"
+            self._write_completed_training_fold_state(runtime, start="2022-01", end="2023-06", symbol="AAPL")
+
+            period = _public_task_period_for_training_month(
+                "2023-02",
+                storage_root=storage_root,
+                selected_target_symbol="AAPL",
+                max_month="2026-05",
+            )
+
+        self.assertEqual(period, "2023-01..2024-06")
 
     def test_model_group_promotion_review_uses_review_artifact(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

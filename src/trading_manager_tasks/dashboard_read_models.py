@@ -1642,6 +1642,9 @@ def _runtime_work_period(latest_decision: Mapping[str, Any], status: HistoricalS
                 if fold_label:
                     return fold_label
                 start_month = str(training_fold.get("start_month") or "").strip()
+                end_month = str(training_fold.get("end_month") or "").strip()
+                if start_month and end_month:
+                    return _fold_period_label(start_month, end_month)
                 if start_month:
                     return _public_task_period(start_month)
     return latest_decision.get("start_month") or status.current_month
@@ -1773,7 +1776,13 @@ def _public_active_task_summary(task: Mapping[str, Any] | None) -> dict[str, Any
     }
 
 
-def _public_active_task_from_runtime(status: HistoricalSchedulerStatus, runtime_active_work: Mapping[str, Any] | None) -> dict[str, Any] | None:
+def _public_active_task_from_runtime(
+    status: HistoricalSchedulerStatus,
+    runtime_active_work: Mapping[str, Any] | None,
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+) -> dict[str, Any] | None:
     if status.lock.status != "active" or not isinstance(runtime_active_work, Mapping):
         return None
     runtime_activity = runtime_active_work.get("runtime_activity")
@@ -1800,10 +1809,21 @@ def _public_active_task_from_runtime(status: HistoricalSchedulerStatus, runtime_
         or runtime_activity.get("selected_target_symbol")
     )
     public_status = "blocked" if _runtime_activity_blocks_public_task(runtime_activity, status) else "running"
+    selected_worker_fold = select_model_worker_fold(storage_root=storage_root, max_month=completed_historical_month_cutoff())
+    active_fold_window = (
+        (selected_worker_fold.start_month, selected_worker_fold.end_month) if selected_worker_fold is not None else None
+    )
+    task_period = _public_task_period_for_training_month(
+        str(runtime_active_work.get("month") or status.current_month or ""),
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+        max_month=completed_historical_month_cutoff(),
+        active_fold_window=active_fold_window,
+    )
     return {
         "task_id": layer_key,
         "task_label": label,
-        "month": _public_task_period(str(runtime_active_work.get("month") or status.current_month or "")),
+        "month": task_period,
         "status": public_status,
         "task_state": "current",
         "stage_type": "model_task" if layer_key.startswith("model_") else stage_type,
@@ -2029,11 +2049,27 @@ def _mark_active_task_running(
     return updated_timeline, running_task
 
 
-def _public_current_period(status: HistoricalSchedulerStatus, public_active_task: Mapping[str, Any] | None) -> str | None:
+def _public_current_period(
+    status: HistoricalSchedulerStatus,
+    public_active_task: Mapping[str, Any] | None,
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+) -> str | None:
     if public_active_task is not None:
         value = public_active_task.get("month")
         return str(value) if value else None
-    candidate = _public_task_period(status.current_month)
+    selected_worker_fold = select_model_worker_fold(storage_root=storage_root, max_month=completed_historical_month_cutoff())
+    active_fold_window = (
+        (selected_worker_fold.start_month, selected_worker_fold.end_month) if selected_worker_fold is not None else None
+    )
+    candidate = _public_task_period_for_training_month(
+        status.current_month,
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+        max_month=completed_historical_month_cutoff(),
+        active_fold_window=active_fold_window,
+    )
     if candidate and _public_period_visible_by_completed_cutoff(candidate, max_month=completed_historical_month_cutoff()):
         return candidate
     return None
@@ -3292,6 +3328,83 @@ def _public_task_period(period: str | None) -> str | None:
     return _fold_label_for_month(str(period)) or str(period)
 
 
+def _matching_training_fold_state_payload(
+    *,
+    storage_root: Path,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> dict[str, Any] | None:
+    runtime_root = storage_root / "runtime"
+    if not runtime_root.exists():
+        return None
+    selected_symbol = str(selected_target_symbol or "").strip().upper()
+    candidates: list[tuple[int, dict[str, Any]]] = []
+    for fold_path in sorted(runtime_root.glob("model_training_fold_state_*.json")):
+        try:
+            payload = _load_json_object(fold_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if str(payload.get("start_month") or "") != start_month or str(payload.get("end_month") or "") != end_month:
+            continue
+        target_symbol = (_fold_state_target_symbol(payload, fold_path) or "").upper()
+        if selected_symbol and target_symbol and target_symbol != selected_symbol:
+            continue
+        candidates.append((0 if selected_symbol and target_symbol == selected_symbol else 1, payload))
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item[0])[0][1]
+
+
+def _public_task_period_for_training_month(
+    period: str | None,
+    *,
+    storage_root: Path,
+    selected_target_symbol: str | None,
+    max_month: str,
+    active_fold_window: tuple[str, str] | None = None,
+) -> str | None:
+    """Map month-scoped training substrate to the owning training-year fold.
+
+    The 12+3+3 folds overlap for January through June. During catch-up, those
+    months first belong to the previous training-year fold's validation/test
+    window; only after that fold is complete may they become training substrate
+    for the next fold.
+    """
+
+    if not period:
+        return None
+    text = str(period)
+    if FOLD_LABEL_RE.fullmatch(text) or ".." in text:
+        return text
+    if not _is_month_key(text):
+        return text
+    try:
+        month_year = int(text[:4])
+    except ValueError:
+        return _public_task_period(text)
+    candidates: list[tuple[str, str]] = []
+    for year in range(BASE_TASK_YEAR, month_year + 1):
+        start_month = f"{year:04d}-01"
+        end_month = _add_months(start_month, MONTHS_PER_MODEL_FOLD - 1)
+        if end_month is None:
+            continue
+        if start_month <= text <= end_month and _month_visible_by_completed_cutoff(end_month, max_month=max_month):
+            candidates.append((start_month, end_month))
+    for start_month, end_month in candidates:
+        payload = _matching_training_fold_state_payload(
+            storage_root=storage_root,
+            start_month=start_month,
+            end_month=end_month,
+            selected_target_symbol=selected_target_symbol,
+        )
+        if payload is not None and not _is_completed_training_fold_state(payload):
+            return _fold_period_label(start_month, end_month)
+        if payload is None and active_fold_window == (start_month, end_month):
+            return _fold_period_label(start_month, end_month)
+    return _public_task_period(text)
+
+
 def _display_period_label(period: str | None) -> str | None:
     fold_start = _fold_start_month(period)
     if fold_start:
@@ -4094,13 +4207,27 @@ def _task_timeline(
         max_month=max_dashboard_month,
     )
     lane_worker_by_month = {month: _month_ingest_worker_info_for_lane(index + 1) for index, month in enumerate(lane_months)}
+    selected_target_symbol = _selected_target_symbol(status)
+    selected_worker_fold = select_model_worker_fold(storage_root=storage_root, max_month=max_dashboard_month)
+    active_fold_window = (
+        (selected_worker_fold.start_month, selected_worker_fold.end_month) if selected_worker_fold is not None else None
+    )
+
+    def public_task_period(period: str | None) -> str | None:
+        return _public_task_period_for_training_month(
+            period,
+            storage_root=storage_root,
+            selected_target_symbol=selected_target_symbol,
+            max_month=max_dashboard_month,
+            active_fold_window=active_fold_window,
+        )
+
     active_public_periods = {
         period
-        for period in [_public_task_period(status.current_month), *(_public_task_period(month) for month in lane_months)]
+        for period in [public_task_period(status.current_month), *(public_task_period(month) for month in lane_months)]
         if period
     }
     runtime_root = storage_root / "runtime"
-    selected_target_symbol = _selected_target_symbol(status)
     has_persisted_fold_state = False
     if runtime_root.exists():
         fold_entries: list[tuple[str, list[Any], str | None, Path]] = []
@@ -4167,7 +4294,7 @@ def _task_timeline(
         raw_stages = payload.get("stages")
         if isinstance(raw_stages, list):
             raw_month = str(payload.get("start_month") or month)
-            month_key = _public_task_period(raw_month)
+            month_key = public_task_period(raw_month)
             if has_persisted_fold_state and month_key != raw_month:
                 continue
             if month_key and month_key not in included_months and _public_period_visible_by_completed_cutoff(month_key, max_month=max_dashboard_month):
@@ -4182,7 +4309,7 @@ def _task_timeline(
         raw_stages = payload.get("stages") if payload is not None else _planned_stage_rows(status, month=month)
         if isinstance(raw_stages, list):
             raw_month = str(payload.get("start_month") or month) if payload is not None else month
-            month_key = _public_task_period(raw_month)
+            month_key = public_task_period(raw_month)
             if has_persisted_fold_state and month_key != raw_month:
                 continue
             if month_key and month_key not in included_months and _public_period_visible_by_completed_cutoff(month_key, max_month=max_dashboard_month):
@@ -4201,10 +4328,10 @@ def _task_timeline(
     active_month, active_stages = _active_month_stages(status, storage_root)
     if (
         active_stages
-        and _public_task_period(active_month) not in included_months
-        and _public_period_visible_by_completed_cutoff(_public_task_period(active_month), max_month=max_dashboard_month)
+        and public_task_period(active_month) not in included_months
+        and _public_period_visible_by_completed_cutoff(public_task_period(active_month), max_month=max_dashboard_month)
     ):
-        month_stage_sets.append((_public_task_period(active_month), active_stages, True))
+        month_stage_sets.append((public_task_period(active_month), active_stages, True))
     if not month_stage_sets:
         return []
     public_stage_sets = [
@@ -4217,7 +4344,7 @@ def _task_timeline(
     latest_failed_stage = latest_execution.get("stage_id") if latest_execution.get("status") == "failed" else None
     latest_failed_month = None
     if latest_failed_stage and isinstance(status.latest_decision, Mapping):
-        latest_failed_month = _public_task_period(str(status.latest_decision.get("start_month") or "")) or None
+        latest_failed_month = public_task_period(str(status.latest_decision.get("start_month") or "")) or None
     current_lane_heads: set[tuple[str | None, str]] = set()
     current_model_heads: set[tuple[str | None, str]] = set()
     active_model_fold_key = _active_model_worker_fold_key(status)
@@ -4271,7 +4398,7 @@ def _task_timeline(
                     continue
             elif str(raw_stage.get("stage_type") or "") not in FOLD_MODEL_STAGE_TYPES:
                 continue
-            task_month = _public_task_period(str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "")) or None
+            task_month = public_task_period(str(raw_stage.get("month") or raw_stage.get("start_month") or timeline_month or "")) or None
             current_model_heads.add((task_month, stage_id))
             break
     tasks: list[dict[str, Any]] = []
@@ -4289,7 +4416,7 @@ def _task_timeline(
                 timestamp_fields = _task_timestamp_fields(dashboard_stage, storage_root=storage_root)
                 stage_status = _effective_dashboard_stage_status(dashboard_stage, timestamp_fields)
                 is_terminal = stage_status in {"succeeded", "not_applicable"}
-                task_month_for_state = _public_task_period(str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "")) or None
+                task_month_for_state = public_task_period(str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "")) or None
                 is_current = bool((task_month_for_state, stage_id) in current_lane_heads and not is_terminal)
                 if not is_current:
                     is_current = bool((task_month_for_state, stage_id) in current_model_heads and not is_terminal)
@@ -4333,7 +4460,7 @@ def _task_timeline(
                 dataset_unit = dashboard_stage.get("dataset_unit") if isinstance(dashboard_stage.get("dataset_unit"), Mapping) else None
                 target_scope = _target_scope_for_task(dashboard_stage.get("layer"), dataset_unit)
                 instrument_scope = _instrument_scope_for_task(dashboard_stage.get("layer"))
-                task_month = _public_task_period(str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "")) or None
+                task_month = public_task_period(str(dashboard_stage.get("month") or dashboard_stage.get("start_month") or timeline_month or "")) or None
                 child_partitions = _child_partitions_for_period(task_month)
                 worker_info = lane_worker_by_month.get(task_month) or _worker_info_for_stage(
                     dashboard_stage, month=task_month, month_ingest_worker_count=month_ingest_worker_count
@@ -4490,7 +4617,7 @@ def _task_timeline(
                     coverage_stage_id
                     and (stage_id == coverage_stage_id or coverage_stage_id.startswith(f"{stage_id}."))
                     and stage_coverage is not None
-                    and (not status.current_month or task_month == _public_task_period(status.current_month))
+                    and (not status.current_month or task_month == public_task_period(status.current_month))
                     and task_state == "current"
                     and str(task.get("status") or "").lower() in {"ready", "running"}
                 ):
@@ -6572,7 +6699,12 @@ def build_historical_task_progress_summary(
     public_active_task = _public_active_task(status, task_timeline)
     terminal_outcome_task = _public_terminal_outcome_task(task_timeline)
     runtime_active_work = _runtime_active_work(status, storage_root=storage_root)
-    runtime_projected_task = _public_active_task_from_runtime(status, runtime_active_work)
+    runtime_projected_task = _public_active_task_from_runtime(
+        status,
+        runtime_active_work,
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
     runtime_activity = runtime_active_work.get("runtime_activity") if isinstance(runtime_active_work, Mapping) else None
     runtime_selected_work = str(runtime_activity.get("selected_work") or "") if isinstance(runtime_activity, Mapping) else ""
     if public_active_task is None or (runtime_projected_task is not None and runtime_selected_work.startswith("model_worker.")):
@@ -6595,7 +6727,12 @@ def build_historical_task_progress_summary(
         terminal_outcome_task=terminal_outcome_task if public_active_task is None else None,
     )
     active_blocker = _active_blocker(status, public_active_task)
-    current_period = _public_current_period(status, public_active_task)
+    current_period = _public_current_period(
+        status,
+        public_active_task,
+        storage_root=storage_root,
+        selected_target_symbol=selected_target_symbol,
+    )
     chart_payload: dict[str, Any] = {
         "current_month": current_period,
         "current_period_label": _display_period_label(current_period),

@@ -70,6 +70,10 @@ ranges, not fold names. A 12+3+3 walk-forward fold opens only after its final
 test-window calendar month has completed in `America/New_York`; child months
 that already have source data do not make the fold eligible early, so
 `fold_aapl_2016` is not eligible before `2017-07-01`.
+January-June overlap months are owned by the earliest open training-year fold
+that contains them; for example, `2024-01` through `2024-06` remain
+`fold_aapl_2023` substrate until that fold closes and must not make
+`fold_aapl_2024` appear first.
 Runtime execution advances one canonical month at a time. Historical scheduler
 inputs may retain compatibility fields such as `month_ingest_workers`, but they
 must not open multiple month lanes or project parallel month work into Tasks.
