@@ -11,6 +11,7 @@ from trading_manager_tasks.stage_reconcile import (
     classify_provider_failure,
     discover_stage_receipts,
     exclude_accepted_failure_rows,
+    normalize_stage_receipts,
     propose_failure_register_rows,
     reconcile_provider_stage,
 )
@@ -420,6 +421,22 @@ class StageReconcileTests(unittest.TestCase):
             )
 
         self.assertEqual(rows, ())
+
+    def test_stage_reconcile_normalizes_prior_success_as_effective_terminal_state(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            _write_success_then_failed_receipt(root, symbol="SPY")
+            refs = discover_stage_receipts(
+                stage_id="model_01_background_context.data_acquisition",
+                start_month="2016-01",
+                end_month="2016-01",
+                component_storage_root=root,
+            )
+            rows = normalize_stage_receipts(refs)
+
+        self.assertEqual([row["status"] for row in rows.run_manifests], ["succeeded"])
+        self.assertEqual([row["status"] for row in rows.ready_signals], ["ready"])
+        self.assertEqual(rows.ready_signals[0]["blocking_reason"], None)
 
     def test_option_chain_reconcile_ignores_stale_layer_three_requests(self) -> None:
         current_request_id = "mgrreq_option_chain_window_aapl_2021_06_2021_06_14_0930"

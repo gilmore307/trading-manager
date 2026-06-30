@@ -217,15 +217,32 @@ def _is_success_status(run: Mapping[str, Any]) -> bool:
     return _status(run.get("status") or "failed") in {"succeeded", "success", "completed", "complete", "ready"}
 
 
+def _effective_stage_receipt(receipt: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Return the stage-effective receipt for coverage reconciliation.
+
+    A provider retry may append a later transient failure after an earlier
+    durable success. For stage coverage, any successful run with output evidence
+    satisfies the request; later retry failures remain in the component receipt
+    but must not demote the manager task-summary row back to failed.
+    """
+
+    runs = _receipt_runs(receipt)
+    successful_runs = [run for run in runs if _is_success_status(run)]
+    if not successful_runs:
+        return receipt
+    return {**dict(receipt), "runs": successful_runs}
+
+
 def normalize_stage_receipts(refs: Sequence[StageReceiptRef]) -> CompletionReceiptRows:
     """Normalize discovered receipt files into manager control-plane rows."""
 
     normalized = []
     for ref in refs:
         receipt = _read_receipt(ref.receipt_path)
+        effective_receipt = _effective_stage_receipt(receipt)
         normalized.append(
             normalize_completion_receipt(
-                receipt,
+                effective_receipt,
                 request_id=ref.request_id,
                 component_id=OPTION_CHAIN_TARGET_COMPONENT_ID if ref.receipt_path.as_posix().find(OPTION_CHAIN_SOURCE_ID) >= 0 else "01_feed_alpaca_bars",
                 component_kind="data_source" if ref.receipt_path.as_posix().find(OPTION_CHAIN_SOURCE_ID) >= 0 else "data_feed",
