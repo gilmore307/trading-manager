@@ -160,6 +160,84 @@ class StageExecutorTests(unittest.TestCase):
             self.assertTrue(Path(summary.agent_error_diagnosis_path or "").exists())
             self.assertIn("progress stalled", Path(summary.stderr_path or "").read_text(encoding="utf-8"))
 
+    def test_stage_process_memory_guard_stops_runaway_child(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            stage = StageProgress(
+                stage_id="model_01_background_context.feature_generation",
+                layer=1,
+                layer_key="model_01_market_context",
+                stage_type="feature_generation",
+                status="ready",
+                command=["python3", "-c", "import time; time.sleep(5)"],
+                blockers=(),
+            )
+            with patch.dict(
+                "os.environ",
+                {
+                    "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl",
+                    "MANAGER_AGENT_ERROR_AUTOCALL": "false",
+                    "TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "10",
+                    "TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS": "10",
+                    "TRADING_MANAGER_STAGE_PROGRESS_POLL_SECONDS": "0.05",
+                    "TRADING_MANAGER_STAGE_MAX_RSS_MB": "64",
+                    "TRADING_MANAGER_STAGE_MIN_AVAILABLE_MEMORY_MB": "0",
+                },
+                clear=False,
+            ), patch("trading_manager_tasks.stage_executor._process_tree_rss_mb", return_value=65):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
+
+            self.assertEqual(summary.status, "failed")
+            self.assertIsNone(summary.return_code)
+            self.assertIn("memory guard", summary.reason or "")
+            self.assertIn("observed_rss_mb=65", Path(summary.stderr_path or "").read_text(encoding="utf-8"))
+
+    def test_stage_process_host_memory_guard_stops_before_machine_starves(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            stage = StageProgress(
+                stage_id="model_01_background_context.feature_generation",
+                layer=1,
+                layer_key="model_01_market_context",
+                stage_type="feature_generation",
+                status="ready",
+                command=["python3", "-c", "import time; time.sleep(5)"],
+                blockers=(),
+            )
+            with patch.dict(
+                "os.environ",
+                {
+                    "MANAGER_AGENT_ERROR_CATALOG_STORAGE": "jsonl",
+                    "MANAGER_AGENT_ERROR_AUTOCALL": "false",
+                    "TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "10",
+                    "TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS": "10",
+                    "TRADING_MANAGER_STAGE_PROGRESS_POLL_SECONDS": "0.05",
+                    "TRADING_MANAGER_STAGE_MAX_RSS_MB": "0",
+                    "TRADING_MANAGER_STAGE_MIN_AVAILABLE_MEMORY_MB": "4096",
+                },
+                clear=False,
+            ), patch("trading_manager_tasks.stage_executor._read_available_memory_mb", return_value=2048):
+                summary = execute_stage_process(
+                    stage,
+                    manager_root=tmp,
+                    trading_data_root=tmp,
+                    trading_model_root=tmp,
+                    receipt_root=tmp / "receipts",
+                    log_root=tmp / "logs",
+                )
+
+            self.assertEqual(summary.status, "failed")
+            self.assertIsNone(summary.return_code)
+            self.assertIn("host memory guard", summary.reason or "")
+            self.assertIn("observed_available_memory_mb=2048", Path(summary.stderr_path or "").read_text(encoding="utf-8"))
+
     def test_long_database_feature_generation_uses_total_timeout_not_progress_stall(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

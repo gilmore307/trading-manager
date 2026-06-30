@@ -37,6 +37,16 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler.py --live-runtime-
 | Storage lifecycle mutation | Archive/delete/rehydrate | Requires accepted lifecycle decision. |
 | Broker/account mutation | Orders, fills, positions, account state | Not allowed in manager. |
 
+Safe offline stages must be restartable, receipt-backed, and bounded by the
+stage executor resource guard. Large source, feature, model-generation, replay,
+review, and evaluation stages must stream or batch database inputs rather than
+loading full fold datasets into process memory. The executor kills a stage
+process group when its process-tree RSS exceeds
+`TRADING_MANAGER_STAGE_MAX_RSS_MB` or when host free memory falls below
+`TRADING_MANAGER_STAGE_MIN_AVAILABLE_MEMORY_MB`; the checked-in service template
+also carries systemd memory and swap caps so a faulty stage fails the task
+instead of freezing the development server.
+
 ## Normal Commands
 
 ```bash

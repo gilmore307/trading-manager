@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -38,6 +39,8 @@ DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 30
 DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS = 60 * 60 * 4
 DEFAULT_STAGE_PROGRESS_STALL_SECONDS = 60 * 10
 DEFAULT_STAGE_PROGRESS_POLL_SECONDS = 5.0
+DEFAULT_STAGE_MAX_RSS_MB = 16 * 1024
+DEFAULT_STAGE_MIN_AVAILABLE_MEMORY_MB = 4096
 LONG_DATABASE_STAGE_IDS = {
     "model_02_target_state.feature_generation",
     "model_05_option_expression.feature_generation",
@@ -325,14 +328,85 @@ def _progress_marker(path: Path) -> tuple[int, int] | None:
     return stat.st_mtime_ns, stat.st_size
 
 
+def _read_available_memory_mb() -> int | None:
+    meminfo = Path("/proc/meminfo")
+    if not meminfo.exists():
+        return None
+    try:
+        lines = meminfo.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        if line.startswith("MemAvailable:"):
+            parts = line.split()
+            if len(parts) >= 2:
+                return int(parts[1]) // 1024
+    return None
+
+
+def _proc_children(pid: int) -> list[int]:
+    children_path = Path(f"/proc/{pid}/task/{pid}/children")
+    try:
+        text = children_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return []
+    if not text:
+        return []
+    children: list[int] = []
+    for raw in text.split():
+        try:
+            children.append(int(raw))
+        except ValueError:
+            continue
+    return children
+
+
+def _process_tree_pids(pid: int) -> list[int]:
+    pending = [pid]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        pending.extend(child for child in _proc_children(current) if child not in seen)
+    return sorted(seen)
+
+
+def _process_rss_mb(pid: int) -> int:
+    status_path = Path(f"/proc/{pid}/status")
+    try:
+        lines = status_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return 0
+    for line in lines:
+        if line.startswith("VmRSS:"):
+            parts = line.split()
+            if len(parts) >= 2:
+                return int(parts[1]) // 1024
+    return 0
+
+
+def _process_tree_rss_mb(pid: int) -> int:
+    return sum(_process_rss_mb(process_pid) for process_pid in _process_tree_pids(pid))
+
+
 def _stop_stage_process(process: subprocess.Popen[Any]) -> None:
     if process.poll() is not None:
         return
-    process.terminate()
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except OSError:
+        process.terminate()
     try:
         process.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        process.kill()
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            process.kill()
         process.wait(timeout=10)
 
 
@@ -352,6 +426,8 @@ def _run_stage_subprocess_with_progress_guard(
     if stall_seconds is None:
         stall_seconds = _env_float("TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS", DEFAULT_STAGE_PROGRESS_STALL_SECONDS)
     poll_seconds = _env_float("TRADING_MANAGER_STAGE_PROGRESS_POLL_SECONDS", DEFAULT_STAGE_PROGRESS_POLL_SECONDS)
+    max_rss_mb = _env_int("TRADING_MANAGER_STAGE_MAX_RSS_MB", DEFAULT_STAGE_MAX_RSS_MB)
+    min_available_memory_mb = _env_int("TRADING_MANAGER_STAGE_MIN_AVAILABLE_MEMORY_MB", DEFAULT_STAGE_MIN_AVAILABLE_MEMORY_MB)
     poll_seconds = max(0.05, poll_seconds)
     started_monotonic = time.monotonic()
     last_progress_monotonic = started_monotonic
@@ -364,12 +440,26 @@ def _run_stage_subprocess_with_progress_guard(
             text=True,
             stdout=stdout_handle,
             stderr=stderr_handle,
+            start_new_session=True,
         )
         while True:
             return_code = process.poll()
             if return_code is not None:
                 return return_code, None
             now = time.monotonic()
+            if max_rss_mb > 0:
+                rss_mb = _process_tree_rss_mb(process.pid)
+                if rss_mb > max_rss_mb:
+                    _stop_stage_process(process)
+                    return None, f"stage memory guard exceeded max_rss_mb={max_rss_mb} observed_rss_mb={rss_mb}"
+            if min_available_memory_mb > 0:
+                available_mb = _read_available_memory_mb()
+                if available_mb is not None and available_mb < min_available_memory_mb:
+                    _stop_stage_process(process)
+                    return None, (
+                        "stage host memory guard triggered "
+                        f"min_available_memory_mb={min_available_memory_mb} observed_available_memory_mb={available_mb}"
+                    )
             marker = _progress_marker(progress_path)
             if marker is not None and marker != last_marker:
                 last_marker = marker
@@ -482,11 +572,16 @@ def execute_stage_process(
     provider_calls = _provider_call_count_from_stdout(stdout) if return_code == 0 else 0
     agent_error_result: Mapping[str, Any] | None = None
     if return_code != 0 and not repair_retry_attempted:
+        error_kind = "stage_command_failed"
+        if guard_failure_reason and "progress stalled" in guard_failure_reason:
+            error_kind = "stage_progress_stalled"
+        elif guard_failure_reason and "memory guard" in guard_failure_reason:
+            error_kind = "stage_resource_guard_triggered"
         agent_error_result = handle_server_error(
             source_component="trading-manager.stage_executor",
             source_repo="trading-manager",
             error_scope="server.model_training_stage",
-            error_kind="stage_progress_stalled" if guard_failure_reason and "progress stalled" in guard_failure_reason else "stage_command_failed",
+            error_kind=error_kind,
             severity="error",
             summary=f"model training stage {stage.stage_id} {failure_reason}",
             command=execution_command,
