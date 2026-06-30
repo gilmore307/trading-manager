@@ -2464,7 +2464,14 @@ def _task_runtime_activity_from_worker(
     row_count_label = _worker_rows_written_label(extra)
     if row_count_label and row_count_label not in node_label:
         node_label = f"{node_label} · {row_count_label}"
-    progress_label = _progress_display_label(task_progress)
+    display_progress = task_progress
+    parent_task_progress = task_progress.get("parent_task_progress") if isinstance(task_progress, Mapping) else None
+    if (
+        str(dashboard_stage.get("stage_type") or "") == "model_task"
+        and isinstance(parent_task_progress, Mapping)
+    ):
+        display_progress = parent_task_progress
+    progress_label = _progress_display_label(display_progress)
     explicit_details = active_progress.get("activity_details")
     explicit_details = [str(line) for line in explicit_details] if isinstance(explicit_details, list) else []
     activity_details = [
@@ -2480,7 +2487,7 @@ def _task_runtime_activity_from_worker(
         "activity_summary": node_label,
         "activity_details": [line for line in activity_details if line],
         "progress_label": progress_label,
-        "progress_hint": str(task_progress.get("progress_basis") or "") if isinstance(task_progress, Mapping) else None,
+        "progress_hint": str(display_progress.get("progress_basis") or "") if isinstance(display_progress, Mapping) else None,
         "updated_at_utc": active_progress.get("updated_at_utc"),
         "started_at_utc": dashboard_stage.get("started_at_utc") or dashboard_stage.get("started_at"),
         "elapsed_seconds": active_progress.get("elapsed_seconds"),
@@ -3507,6 +3514,60 @@ def _internal_stage_progress(stage: Mapping[str, Any], *, is_active: bool = Fals
     }
 
 
+def _model_task_progress_from_internal_stages(
+    layer_key: str,
+    internal_stages: list[Mapping[str, Any]] | None,
+    status: str,
+) -> dict[str, Any] | None:
+    if not internal_stages:
+        return None
+    terminal_statuses = {"complete", "succeeded", "not_applicable"}
+    expected_count = 0
+    ready_count = 0
+    failed_count = 0
+    accepted_failed_count = 0
+    unit_labels: set[str] = set()
+    for stage in internal_stages:
+        progress = stage.get("progress")
+        if not isinstance(progress, Mapping):
+            continue
+        expected = _int_field(progress, "expected_count")
+        if expected <= 0:
+            continue
+        expected_count += expected
+        ready_count += min(_int_field(progress, "ready_count"), expected)
+        failed_count += min(_int_field(progress, "failed_count"), expected)
+        accepted_failed_count += min(_int_field(progress, "accepted_failed_count"), expected)
+        label = str(progress.get("unit_label") or "").strip()
+        if label:
+            unit_labels.add(label)
+    if expected_count <= 0:
+        return None
+    effective_ready = min(ready_count + accepted_failed_count, expected_count)
+    pending_count = max(expected_count - effective_ready - max(failed_count - accepted_failed_count, 0), 0)
+    if effective_ready >= expected_count and failed_count == accepted_failed_count:
+        progress_status = "complete"
+    elif failed_count > accepted_failed_count:
+        progress_status = "failed"
+    else:
+        progress_status = status
+    unit_basis = ", ".join(sorted(unit_labels)) if unit_labels else "child progress units"
+    return {
+        "stage_id": layer_key,
+        "status": progress_status,
+        "unit_label": "internal units",
+        "expected_count": expected_count,
+        "ready_count": effective_ready,
+        "active_count": effective_ready,
+        "pending_count": pending_count,
+        "failed_count": failed_count,
+        "accepted_failed_count": accepted_failed_count,
+        "can_unlock_downstream": bool(effective_ready >= expected_count and failed_count == accepted_failed_count),
+        "progress_source": "model_task_internal_stages",
+        "progress_basis": f"sum of layer-internal child progress denominators: {unit_basis}",
+    }
+
+
 def _enrich_internal_stages(
     internal_stages: object,
     *,
@@ -3532,7 +3593,7 @@ def _enrich_internal_stages(
         if is_active and _active_progress_has_counter(active_progress):
             progress = dict(active_progress)  # type: ignore[arg-type]
             progress.setdefault("progress_scope", "active_stage")
-        elif is_active and stage_type == "data_acquisition":
+        elif stage_type == "data_acquisition":
             progress = _fold_stage_coverage_progress(
                 storage_root=storage_root,
                 stage_id=stage_id,
@@ -4133,12 +4194,32 @@ def _task_timeline(
                     active_progress = active_task_progress.get(
                         _stable_task_uid({"stage_id": dashboard_stage.get("active_stage_id")}, task_period=task_month)
                     )
+                internal_stages = _enrich_internal_stages(
+                    dashboard_stage.get("internal_stages"),
+                    task_period=task_month,
+                    active_progress=active_progress,
+                    worker_info=worker_info,
+                    storage_root=storage_root,
+                    active_stage_id_hint=str(dashboard_stage.get("active_stage_id") or ""),
+                )
                 progress = active_progress if _active_progress_has_counter(active_progress) else None
                 dashboard_progress = (
                     dict(dashboard_stage["dashboard_progress"])
                     if isinstance(dashboard_stage.get("dashboard_progress"), Mapping)
                     else None
                 )
+                if (
+                    str(dashboard_stage.get("stage_type") or "") == "model_task"
+                    and isinstance(dashboard_progress, Mapping)
+                    and str(dashboard_progress.get("progress_source") or "") == "model_task_internal_stages"
+                ):
+                    enriched_progress = _model_task_progress_from_internal_stages(
+                        stage_id,
+                        internal_stages,
+                        str(stage_status or ""),
+                    )
+                    if enriched_progress is not None:
+                        dashboard_progress = enriched_progress
                 if (
                     progress is None
                     and dashboard_progress is not None
@@ -4205,14 +4286,6 @@ def _task_timeline(
                         progress=progress if isinstance(progress, Mapping) else None,
                         worker_info=worker_info,
                     )
-                internal_stages = _enrich_internal_stages(
-                    dashboard_stage.get("internal_stages"),
-                    task_period=task_month,
-                    active_progress=active_progress,
-                    worker_info=worker_info,
-                    storage_root=storage_root,
-                    active_stage_id_hint=str(dashboard_stage.get("active_stage_id") or ""),
-                )
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,
                     "task_number": None,

@@ -964,9 +964,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task_timeline[0]["ended_at_utc"], "2026-05-12T09:30:00Z")
         self.assertEqual(task_timeline[0]["status_updated_at_utc"], "2026-05-12T10:00:00Z")
         self.assertEqual(task_timeline[0]["detail"]["progress"]["ready_count"], 18)
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["unit_label"], "task units")
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["expected_count"], 2)
-        self.assertEqual(task_timeline[1]["detail"]["progress"]["pending_count"], 2)
+        self.assertEqual(task_timeline[1]["detail"]["progress"]["unit_label"], "internal units")
+        self.assertEqual(task_timeline[1]["detail"]["progress"]["expected_count"], 36)
+        self.assertEqual(task_timeline[1]["detail"]["progress"]["pending_count"], 36)
         self.assertIn("M02 feed artifacts", payload["chart_payload"]["last_stage_execution"]["failure_detail"])
         self.assertTrue(any(ref.get("issue_type") == "historical_stage_execution_failed" for ref in payload["issue_refs"]))
         self.assertTrue(any(ref.get("ref_type") == "manager_stage_execution_summary" for ref in payload["diagnostic_refs"]))
@@ -1197,13 +1197,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["ready_count"], 8)
         self.assertEqual(progress["expected_count"], 26)
         self.assertEqual(progress["parent_task_progress"]["progress_source"], "model_task_internal_stages")
-        self.assertEqual(progress["parent_task_progress"]["expected_count"], 20)
+        self.assertEqual(progress["parent_task_progress"]["unit_label"], "internal units")
+        self.assertEqual(progress["parent_task_progress"]["expected_count"], 62)
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(
             live_activity["activity_summary"],
             "Generating AAPL 2016-03-01 target-state features · 2016-02-25 to 2016-03-03 · targets AAPL, BTC, MSFT, NVDA",
         )
-        self.assertEqual(live_activity["progress_label"], "8/26 feature months")
+        self.assertEqual(live_activity["progress_label"], "26/62 internal units")
         self.assertEqual(live_activity["sample_targets"], ["AAPL", "BTC", "MSFT", "NVDA"])
         self.assertIn("Candidate symbols 50", live_activity["activity_details"])
         self.assertIn("Using target-local source rows", live_activity["activity_details"])
@@ -3278,7 +3279,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(task["task_state"], "current")
         self.assertEqual(task["detail"]["progress"]["status"], "running")
         self.assertEqual(task["detail"]["progress"]["stage_id"], "model_02_target_state.feature_generation")
-        self.assertEqual(task["detail"]["runtime_activity"]["progress_label"], "4/18 feature months")
+        self.assertEqual(task["detail"]["runtime_activity"]["progress_label"], "22/36 internal units")
 
     def test_reset_fold_waits_for_monthly_foundation_instead_of_showing_ready(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3526,12 +3527,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
-        self.assertEqual(progress["unit_label"], "task units")
-        self.assertEqual(progress["expected_count"], 20)
-        self.assertEqual(progress["ready_count"], 14)
-        self.assertEqual(progress["active_count"], 14)
+        self.assertEqual(progress["unit_label"], "internal units")
+        self.assertEqual(progress["expected_count"], 54)
+        self.assertEqual(progress["ready_count"], 48)
+        self.assertEqual(progress["active_count"], 48)
         self.assertEqual(progress["pending_count"], 6)
-        self.assertIn("all layer-internal", progress["progress_basis"])
+        self.assertIn("sum of layer-internal child progress denominators", progress["progress_basis"])
         self.assertEqual(task["detail"]["active_stage_id"], "model_02_target_state.model_generation.validation")
         internal_stages = {stage["stage_id"]: stage for stage in task["detail"]["internal_stages"]}
         self.assertEqual(internal_stages["model_02_target_state.data_acquisition"]["progress"]["ready_count"], 18)
@@ -3628,12 +3629,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
-        self.assertEqual(progress["unit_label"], "task units")
+        self.assertEqual(progress["unit_label"], "internal units")
         self.assertEqual(progress["expected_count"], 18)
         self.assertEqual(progress["ready_count"], 12)
         live_activity = task["detail"]["runtime_activity"]
         self.assertEqual(live_activity["activity_summary"], "Stage process started")
-        self.assertEqual(live_activity["progress_label"], "12/18 task units")
+        self.assertEqual(live_activity["progress_label"], "12/18 internal units")
         self.assertFalse(any("Worker completed" in line for line in live_activity["activity_details"]))
         internal_stages = {stage["stage_id"]: stage for stage in task["detail"]["internal_stages"]}
         validation_stage = internal_stages["model_02_target_state.model_generation.validation"]
@@ -3716,7 +3717,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_02_target_state")
         progress = task["detail"]["progress"]
         self.assertEqual(progress["progress_source"], "model_task_internal_stages")
-        self.assertEqual(progress["unit_label"], "task units")
+        self.assertEqual(progress["unit_label"], "internal units")
         self.assertEqual(progress["expected_count"], 18)
         self.assertEqual(progress["ready_count"], 18)
         self.assertEqual(progress["pending_count"], 0)
