@@ -1567,6 +1567,8 @@ def _scheduler_decision_runtime_activity(latest_decision: Mapping[str, Any]) -> 
     reason = str(latest_decision.get("reason") or "").strip()
     reason_code = str(latest_decision.get("reason_code") or "").strip()
     decision_status = str(latest_decision.get("decision_status") or latest_decision.get("task_status") or "").strip()
+    if decision_status.lower() in {"executed", "complete", "completed", "succeeded", "success"}:
+        return None
     execution_summary = latest_decision.get("execution_summary")
     execution_summary = execution_summary if isinstance(execution_summary, Mapping) else {}
     label = _scheduler_work_activity_label(selected_work, latest_decision.get("next_internal_stage"))
@@ -1747,6 +1749,24 @@ def _runtime_activity_blocks_public_task(
     return True
 
 
+def _runtime_activity_matches_public_task(runtime_activity: Mapping[str, Any] | None, task: Mapping[str, Any]) -> bool:
+    if not isinstance(runtime_activity, Mapping):
+        return False
+    task_id = str(task.get("task_id") or "").strip()
+    activity_type = str(runtime_activity.get("activity_type") or "").strip()
+    if task_id == "model_group.replay" and activity_type in {"replay_execution", "replay_option_feature_drain"}:
+        return True
+    selected_work = str(runtime_activity.get("selected_work") or "").strip()
+    if not selected_work or not task_id:
+        return False
+    if selected_work == task_id or selected_work.startswith(f"{task_id}."):
+        return True
+    return task_id == "model_group.replay" and selected_work in {
+        "model_group.replay",
+        "model_group.replay_option_features",
+    }
+
+
 def _month_key_from_replay_time_pointer(value: object) -> str | None:
     text = str(value or "").strip()
     month = text[:7]
@@ -1828,12 +1848,13 @@ def _mark_active_task_running(
     replay_progress_activity = (
         runtime_active_work.get("replay_progress_activity") if isinstance(runtime_active_work, Mapping) else None
     )
+    runtime_activity_matches_task = _runtime_activity_matches_public_task(runtime_activity, public_active_task)
     if status.blocked_reason and not _is_transient_active_scheduler_backoff(status) and not isinstance(runtime_activity, Mapping):
         return task_timeline, public_active_task
     if str(public_active_task.get("task_state") or "") != "current":
         return task_timeline, public_active_task
     public_status = str(public_active_task.get("status") or "")
-    if isinstance(runtime_activity, Mapping) and _runtime_activity_blocks_public_task(runtime_activity, status):
+    if runtime_activity_matches_task and _runtime_activity_blocks_public_task(runtime_activity, status):
         active_key = _public_task_identity(public_active_task)
 
         def with_blocked_activity(task: dict[str, Any]) -> dict[str, Any]:
@@ -1865,7 +1886,7 @@ def _mark_active_task_running(
         return updated_timeline, blocked_task
     if (
         public_status == "blocked"
-        and isinstance(runtime_activity, Mapping)
+        and runtime_activity_matches_task
         and runtime_activity.get("activity_type") == "scheduler_decision"
     ):
         return task_timeline, public_active_task
@@ -1874,7 +1895,7 @@ def _mark_active_task_running(
     active_key = _public_task_identity(public_active_task)
     def with_running_activity(task: dict[str, Any]) -> dict[str, Any]:
         updated = {**task, "status": "running"}
-        if isinstance(runtime_activity, Mapping):
+        if runtime_activity_matches_task:
             detail = dict(updated.get("detail") or {})
             detail["runtime_activity"] = dict(runtime_activity)
             progress = detail.get("progress")
@@ -2465,6 +2486,49 @@ def _task_runtime_activity_from_worker(
         "elapsed_seconds": active_progress.get("elapsed_seconds"),
         "required_next_step": active_stage_id or None,
         "sample_targets": sample_targets or ([str(dashboard_stage.get("target_symbol"))] if dashboard_stage.get("target_symbol") else []),
+        "task_period": task_period,
+        "active_stage_id": active_stage_id or None,
+    }
+
+
+def _stage_coverage_runtime_activity(
+    *,
+    dashboard_stage: Mapping[str, Any],
+    task_period: str | None,
+    progress: Mapping[str, Any] | None,
+    worker_info: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    if not isinstance(progress, Mapping) or progress.get("progress_source") != "fold_stage_coverage":
+        return None
+    expected = _int_field(progress, "expected_count")
+    ready = _int_field(progress, "ready_count")
+    pending = _int_field(progress, "pending_count")
+    failed = _int_field(progress, "failed_count")
+    covered_partitions = _int_field(progress, "covered_partition_count")
+    expected_partitions = _int_field(progress, "expected_partition_count")
+    active_stage_id = str(progress.get("stage_id") or dashboard_stage.get("active_stage_id") or dashboard_stage.get("stage_id") or "")
+    active_stage_type = str(dashboard_stage.get("active_stage_type") or dashboard_stage.get("stage_type") or "")
+    active_stage_label = _public_stage_name(active_stage_id, active_stage_type)
+    summary_parts = [f"{active_stage_label} · {ready}/{expected} source-month requests ready"]
+    if expected_partitions:
+        summary_parts.append(f"partitions {covered_partitions}/{expected_partitions}")
+    details = [
+        f"Pending {pending}",
+        f"Failed {failed}",
+        str(worker_info.get("worker_label") or worker_info.get("worker_id") or "") or None,
+    ]
+    return {
+        "activity_type": "stage_coverage_progress",
+        "activity_label": active_stage_label,
+        "activity_summary": " · ".join(summary_parts),
+        "activity_details": [line for line in details if line],
+        "progress_label": _progress_display_label(progress),
+        "progress_hint": str(progress.get("progress_basis") or ""),
+        "updated_at_utc": dashboard_stage.get("updated_utc") or dashboard_stage.get("status_updated_at_utc"),
+        "started_at_utc": dashboard_stage.get("started_at_utc") or dashboard_stage.get("started_at"),
+        "elapsed_seconds": None,
+        "required_next_step": active_stage_id or None,
+        "sample_targets": [str(dashboard_stage.get("target_symbol"))] if dashboard_stage.get("target_symbol") else [],
         "task_period": task_period,
         "active_stage_id": active_stage_id or None,
     }
@@ -3449,10 +3513,14 @@ def _enrich_internal_stages(
     task_period: str | None,
     active_progress: Mapping[str, Any] | None,
     worker_info: Mapping[str, Any],
+    storage_root: Path,
+    active_stage_id_hint: str | None = None,
 ) -> list[dict[str, Any]] | None:
     if not isinstance(internal_stages, list):
         return None
     active_stage_id = str(active_progress.get("stage_id") or "") if isinstance(active_progress, Mapping) else ""
+    if not active_stage_id:
+        active_stage_id = str(active_stage_id_hint or "")
     rows: list[dict[str, Any]] = []
     for raw_stage in internal_stages:
         if not isinstance(raw_stage, Mapping):
@@ -3464,6 +3532,12 @@ def _enrich_internal_stages(
         if is_active and _active_progress_has_counter(active_progress):
             progress = dict(active_progress)  # type: ignore[arg-type]
             progress.setdefault("progress_scope", "active_stage")
+        elif is_active and stage_type == "data_acquisition":
+            progress = _fold_stage_coverage_progress(
+                storage_root=storage_root,
+                stage_id=stage_id,
+                task_period=task_period,
+            ) or _internal_stage_progress(stage, is_active=is_active)
         else:
             progress = _internal_stage_progress(stage, is_active=is_active)
         runtime_activity = None
@@ -3473,6 +3547,13 @@ def _enrich_internal_stages(
                 task_period=task_period,
                 task_progress=progress,
                 active_progress=active_progress,
+                worker_info=worker_info,
+            )
+        if runtime_activity is None and is_active:
+            runtime_activity = _stage_coverage_runtime_activity(
+                dashboard_stage={**stage, "active_stage_id": stage_id, "active_stage_type": stage_type},
+                task_period=task_period,
+                progress=progress,
                 worker_info=worker_info,
             )
         stage.update(
@@ -4117,11 +4198,20 @@ def _task_timeline(
                     active_progress=active_progress,
                     worker_info=worker_info,
                 )
+                if runtime_activity is None:
+                    runtime_activity = _stage_coverage_runtime_activity(
+                        dashboard_stage=dashboard_stage,
+                        task_period=task_month,
+                        progress=progress if isinstance(progress, Mapping) else None,
+                        worker_info=worker_info,
+                    )
                 internal_stages = _enrich_internal_stages(
                     dashboard_stage.get("internal_stages"),
                     task_period=task_month,
                     active_progress=active_progress,
                     worker_info=worker_info,
+                    storage_root=storage_root,
+                    active_stage_id_hint=str(dashboard_stage.get("active_stage_id") or ""),
                 )
                 task: dict[str, Any] = {
                     "sequence": len(tasks) + 1,

@@ -114,6 +114,56 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertIn("Checked 2 event input paths", activity["activity_details"])
 
+    def test_scheduler_executed_decision_is_not_live_activity(self):
+        activity = _scheduler_decision_runtime_activity(
+            {
+                "decision_status": "executed",
+                "reason_code": "workflow_stage_executed",
+                "reason": "executed one ready workflow stage and recorded its receipt/state",
+                "selected_work": "model_04_unified_decision.model_generation.test",
+                "next_internal_stage": "model_generation",
+                "now_utc": "2026-06-29T23:42:52Z",
+            }
+        )
+
+        self.assertIsNone(activity)
+
+    def test_runtime_activity_does_not_attach_to_different_current_task(self):
+        status = SimpleNamespace(lock=SimpleNamespace(status="active"), blocked_reason=None)
+        task = {
+            "task_id": "model_05_option_expression",
+            "task_label": "M05 Option Expression Model",
+            "month": "2016-01..2017-06",
+            "status": "ready",
+            "task_state": "current",
+            "stage_type": "model_task",
+            "layer_key": "model_05_option_expression",
+            "worker_id": "model_worker_1",
+            "target_symbol": "AAPL",
+            "detail": {"progress": {"stage_id": "model_05_option_expression", "status": "ready"}},
+        }
+        runtime_activity = {
+            "activity_type": "scheduler_decision",
+            "decision_status": "backoff",
+            "selected_work": "model_04_unified_decision.model_generation.test",
+            "reason_code": "some_model_04_reason",
+            "reason": "M04 is blocked",
+            "updated_at_utc": "2026-06-29T23:42:52Z",
+        }
+
+        timeline, active = _mark_active_task_running(
+            status,
+            [task],
+            dict(task),
+            {"runtime_activity": runtime_activity},
+        )
+
+        self.assertIsNotNone(active)
+        assert active is not None
+        self.assertEqual(active["status"], "running")
+        self.assertNotIn("runtime_activity", active["detail"])
+        self.assertNotIn("runtime_activity", timeline[0]["detail"])
+
     def test_runtime_activity_decision_falls_back_to_decision_log_tail(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             decision_log_path = Path(raw_tmp) / "historical_scheduler_decisions.jsonl"
