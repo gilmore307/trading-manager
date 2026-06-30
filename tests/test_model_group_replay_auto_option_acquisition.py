@@ -74,6 +74,10 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
                     [
                         "--candidate-model-ref",
                         "storage://fixture/model",
+                        "--candidate-fold-id",
+                        "fold_aapl_2016",
+                        "--candidate-training-target",
+                        "AAPL",
                         "--after-cost-alpha-model-json",
                         str(alpha_model),
                         "--replay-month",
@@ -156,6 +160,10 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
                     [
                         "--candidate-model-ref",
                         "storage://fixture/model",
+                        "--candidate-fold-id",
+                        "fold_aapl_2016",
+                        "--candidate-training-target",
+                        "AAPL",
                         "--after-cost-alpha-model-json",
                         str(alpha_model),
                         "--replay-month",
@@ -178,6 +186,7 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
             self.assertEqual(len(replay_calls), 2)
+            self.assertTrue(all(call.startswith("model_group_replay_fold_aapl_2016_") for call in replay_calls))
             self.assertEqual(len(path_calls), 1)
             self.assertEqual(path_calls[0]["decision_rows_ref"], decision_rows)
             self.assertTrue(path_calls[0]["execute_provider_acquisition"])

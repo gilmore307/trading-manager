@@ -47,6 +47,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--model-repo-root", type=Path, default=DEFAULT_MODEL_REPO_ROOT)
     parser.add_argument("--manager-src-root", type=Path, default=DEFAULT_MANAGER_SRC_ROOT)
     parser.add_argument("--candidate-model-ref", required=True)
+    parser.add_argument("--candidate-fold-id")
+    parser.add_argument("--candidate-training-target")
     parser.add_argument("--after-cost-alpha-model-json", type=Path, default=DEFAULT_ALPHA_MODEL_JSON)
     parser.add_argument("--replay-month", required=True)
     parser.add_argument("--progress-path", type=Path)
@@ -93,7 +95,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit({"event": "stopped", "reason": "time_budget_exhausted", "attempt": attempt}, args=args)
             return 2
 
-        run_id = _run_id(args.run_id_prefix, args.replay_month, attempt)
+        run_id = _run_id(_run_id_prefix(args), args.replay_month, attempt)
         replay_started = time.monotonic()
         replay = _run_replay(args, run_id=run_id, database_url=database_url)
         replay_elapsed = round(time.monotonic() - replay_started, 3)
@@ -389,6 +391,10 @@ def _run_replay(args: argparse.Namespace, *, run_id: str, database_url: str | No
         run_id,
         "--candidate-model-ref",
         args.candidate_model_ref,
+        "--candidate-fold-id",
+        str(args.candidate_fold_id or ""),
+        "--candidate-training-target",
+        str(args.candidate_training_target or ""),
         "--after-cost-alpha-model-json",
         str(args.after_cost_alpha_model_json),
         "--replay-month",
@@ -440,6 +446,17 @@ def _selected_option_path_missing_count(receipt: dict[str, Any]) -> int:
 def _run_id(prefix: str, replay_month: str, attempt: int) -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return f"{prefix}_{timestamp}_{replay_month.replace('-', '_')}_attempt_{attempt:02d}"
+
+
+def _run_id_prefix(args: argparse.Namespace) -> str:
+    fold_token = _safe_token(str(args.candidate_fold_id or ""))
+    if fold_token and args.run_id_prefix == "model_group_replay_auto_option":
+        return f"model_group_replay_{fold_token}"
+    return args.run_id_prefix
+
+
+def _safe_token(value: str) -> str:
+    return "_".join(part for part in "".join(ch.lower() if ch.isalnum() else "_" for ch in value).split("_") if part)
 
 
 def _emit(payload: dict[str, Any], *, args: argparse.Namespace) -> None:

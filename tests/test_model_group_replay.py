@@ -468,6 +468,10 @@ class ModelGroupReplayTests(unittest.TestCase):
             self.assertFalse(decision.broker_execution_performed)
             self.assertIn("--candidate-model-ref", decision.command)
             self.assertIn("storage://trading-manager/model_group/aapl/2016-01_2017-06", decision.command)
+            self.assertIn("--candidate-fold-id", decision.command)
+            self.assertEqual(decision.command[decision.command.index("--candidate-fold-id") + 1], "fold_aapl_2016")
+            self.assertIn("--candidate-training-target", decision.command)
+            self.assertEqual(decision.command[decision.command.index("--candidate-training-target") + 1], "AAPL")
             self.assertNotIn("--replay-month", decision.command)
             self.assertIn("--after-cost-alpha-model-json", decision.command)
             alpha_ref = decision.command[decision.command.index("--after-cost-alpha-model-json") + 1]
