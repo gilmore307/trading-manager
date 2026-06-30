@@ -1255,6 +1255,18 @@ def _iso_sort_key(value: Any) -> str:
     return str(value or "")
 
 
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def _frontier_gated_replay_trace_rows(path: Path) -> list[dict[str, Any]]:
     rows = _load_jsonl_objects(path)
     if any(_trace_row_crossed_frontier(row) for row in rows):
@@ -2363,6 +2375,9 @@ def _task_status_progress(stage_id: str, stage_status: str) -> dict[str, Any]:
 def _progress_display_label(progress: Mapping[str, Any] | None) -> str | None:
     if not isinstance(progress, Mapping):
         return None
+    progress_percent = progress.get("progress_percent")
+    if str(progress.get("progress_display_mode") or "") == "percent_only" and isinstance(progress_percent, (int, float)):
+        return f"{float(progress_percent):.1f}%"
     try:
         expected = max(0, int(progress.get("expected_count") or 0))
         ready = max(0, int(progress.get("ready_count") or 0))
@@ -3522,11 +3537,50 @@ def _model_task_progress_from_internal_stages(
     if not internal_stages:
         return None
     terminal_statuses = {"complete", "succeeded", "not_applicable"}
-    expected_count = 0
-    ready_count = 0
+    expected_seconds = 0.0
+    ready_seconds = 0.0
     failed_count = 0
     accepted_failed_count = 0
-    unit_labels: set[str] = set()
+    stage_weight_notes: list[str] = []
+
+    def default_seconds_per_unit(progress: Mapping[str, Any], stage: Mapping[str, Any]) -> float:
+        unit_label = str(progress.get("unit_label") or "")
+        stage_id = str(stage.get("stage_id") or "")
+        if unit_label == "source-month requests":
+            return 5.0
+        if unit_label == "feature months":
+            return 300.0
+        if unit_label == "dataset months" or ".model_generation." in stage_id:
+            return 1200.0
+        return 60.0
+
+    def stage_duration_seconds(stage: Mapping[str, Any]) -> float | None:
+        started = _parse_iso_datetime(stage.get("started_at_utc") or stage.get("started_at"))
+        ended = _parse_iso_datetime(
+            stage.get("ended_at_utc")
+            or stage.get("completed_at_utc")
+            or stage.get("completed_at")
+            or stage.get("ended_at")
+        )
+        if not started or not ended:
+            return None
+        return max((ended - started).total_seconds(), 0.0)
+
+    def active_elapsed_seconds(stage: Mapping[str, Any]) -> float:
+        runtime_activity = stage.get("runtime_activity")
+        if isinstance(runtime_activity, Mapping):
+            elapsed = runtime_activity.get("elapsed_seconds")
+            if isinstance(elapsed, (int, float)) and elapsed > 0:
+                return float(elapsed)
+            updated = _parse_iso_datetime(runtime_activity.get("updated_at_utc"))
+        else:
+            updated = None
+        started = _parse_iso_datetime(stage.get("started_at_utc") or stage.get("started_at"))
+        if not started:
+            return 0.0
+        end = updated or datetime.now(UTC)
+        return max((end - started).total_seconds(), 0.0)
+
     for stage in internal_stages:
         progress = stage.get("progress")
         if not isinstance(progress, Mapping):
@@ -3534,37 +3588,47 @@ def _model_task_progress_from_internal_stages(
         expected = _int_field(progress, "expected_count")
         if expected <= 0:
             continue
-        expected_count += expected
-        ready_count += min(_int_field(progress, "ready_count"), expected)
+        ready_units = min(_int_field(progress, "ready_count") + _int_field(progress, "accepted_failed_count"), expected)
         failed_count += min(_int_field(progress, "failed_count"), expected)
         accepted_failed_count += min(_int_field(progress, "accepted_failed_count"), expected)
-        label = str(progress.get("unit_label") or "").strip()
-        if label:
-            unit_labels.add(label)
-    if expected_count <= 0:
+        duration = stage_duration_seconds(stage)
+        if duration is not None and ready_units >= expected:
+            stage_expected_seconds = max(duration, 1.0)
+            stage_ready_seconds = stage_expected_seconds
+            stage_weight_notes.append(f"{stage.get('stage_id')}: actual {stage_expected_seconds:.0f}s")
+        else:
+            seconds_per_unit = default_seconds_per_unit(progress, stage)
+            stage_expected_seconds = max(expected * seconds_per_unit, 1.0)
+            stage_ready_seconds = min(ready_units * seconds_per_unit, stage_expected_seconds)
+            if str(progress.get("status") or "").lower() == "running":
+                stage_ready_seconds = min(max(stage_ready_seconds, active_elapsed_seconds(stage)), stage_expected_seconds)
+            stage_weight_notes.append(f"{stage.get('stage_id')}: {seconds_per_unit:.0f}s/{progress.get('unit_label') or 'unit'}")
+        expected_seconds += stage_expected_seconds
+        ready_seconds += stage_ready_seconds
+    if expected_seconds <= 0:
         return None
-    effective_ready = min(ready_count + accepted_failed_count, expected_count)
-    pending_count = max(expected_count - effective_ready - max(failed_count - accepted_failed_count, 0), 0)
-    if effective_ready >= expected_count and failed_count == accepted_failed_count:
+    effective_ready_seconds = min(ready_seconds, expected_seconds)
+    progress_percent = round((effective_ready_seconds / expected_seconds) * 100, 1)
+    if effective_ready_seconds >= expected_seconds and failed_count == accepted_failed_count:
         progress_status = "complete"
     elif failed_count > accepted_failed_count:
         progress_status = "failed"
     else:
         progress_status = status
-    unit_basis = ", ".join(sorted(unit_labels)) if unit_labels else "child progress units"
     return {
         "stage_id": layer_key,
         "status": progress_status,
-        "unit_label": "internal units",
-        "expected_count": expected_count,
-        "ready_count": effective_ready,
-        "active_count": effective_ready,
-        "pending_count": pending_count,
+        "unit_label": "estimated runtime",
+        "progress_percent": progress_percent,
+        "progress_display_mode": "percent_only",
+        "estimated_expected_seconds": round(expected_seconds, 3),
+        "estimated_ready_seconds": round(effective_ready_seconds, 3),
         "failed_count": failed_count,
         "accepted_failed_count": accepted_failed_count,
-        "can_unlock_downstream": bool(effective_ready >= expected_count and failed_count == accepted_failed_count),
-        "progress_source": "model_task_internal_stages",
-        "progress_basis": f"sum of layer-internal child progress denominators: {unit_basis}",
+        "can_unlock_downstream": bool(effective_ready_seconds >= expected_seconds and failed_count == accepted_failed_count),
+        "progress_source": "model_task_estimated_runtime",
+        "progress_basis": "estimated runtime weighted from completed child-stage durations and default weights for unfinished stages",
+        "progress_weight_basis": stage_weight_notes,
     }
 
 
