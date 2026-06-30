@@ -18,7 +18,7 @@ from collections.abc import Iterable as IterableABC
 from collections.abc import Mapping as MappingABC
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 from .fold_naming import parse_model_worker_fold_id
@@ -31,7 +31,16 @@ from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler
 NEW_YORK = ZoneInfo("America/New_York")
 REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE = "post_replay_review_receipt"
 REPLAY_REVIEW_ROW_CONTRACT_TYPE = "post_replay_review_row"
+REPLAY_LAYER_REVIEW_ROW_CONTRACT_TYPE = "post_replay_layer_decision_review_row"
 REPLAY_REVIEW_DATA_REQUIREMENT_CONTRACT_TYPE = "post_replay_review_data_requirement"
+REPLAY_LAYER_REVIEW_LAYERS = (
+    ("model_01_background_context", "M01 Background Context"),
+    ("model_02_target_state", "M02 Target State"),
+    ("model_03_event_state", "M03 Event State"),
+    ("model_04_unified_decision", "M04 Unified Decision"),
+    ("model_05_option_expression", "M05 Option Expression"),
+)
+EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS = ("model_06_residual_event_governance",)
 
 
 def run_model_group_replay_review_if_ready(
@@ -193,6 +202,7 @@ def run_model_group_replay_review_if_ready(
         )
     output_root = dataset_root / "post_replay_review_runs" / run_id
     review_rows_path = output_root / "replay_review_rows.jsonl"
+    layer_review_rows_path = output_root / "replay_layer_decision_review_rows.jsonl"
     receipt_path = output_root / "post_replay_review_receipt.json"
     performance_summary_path = output_root / "replay_review_performance_summary.json"
     layer_attribution_root = output_root / "layer_attribution"
@@ -226,6 +236,14 @@ def run_model_group_replay_review_if_ready(
         if model_candidate_selection_trace_path is not None
         else ()
     )
+    layer_review_rows = tuple(
+        _build_layer_review_rows(
+            decision_rows=decision_rows,
+            trace_rows=trace_rows,
+            max_decision_rows=max_review_rows,
+        )
+    )
+    layer_review_summary = _layer_review_diagnostic_summary(layer_review_rows)
     performance_summary = _replay_review_performance_summary(
         decision_rows=decision_rows,
         trace_rows=trace_rows,
@@ -247,6 +265,7 @@ def run_model_group_replay_review_if_ready(
     with acquire_scheduler_lock(lock_ref):
         output_root.mkdir(parents=True, exist_ok=True)
         _write_jsonl(review_rows_path, review_rows)
+        _write_jsonl(layer_review_rows_path, layer_review_rows)
         performance_summary_path.write_text(
             json.dumps(performance_summary, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -282,6 +301,7 @@ def run_model_group_replay_review_if_ready(
             if replay_run_id
             else None,
             "review_rows_ref": str(review_rows_path),
+            "layer_review_rows_ref": str(layer_review_rows_path),
             "replay_review_performance_summary_ref": str(performance_summary_path),
             "replay_review_performance_summary": performance_summary["summary"],
             "layer_attribution_report_ref": str(layer_attribution_root / "layer_attribution_report.json"),
@@ -306,6 +326,11 @@ def run_model_group_replay_review_if_ready(
             "review_sequence": ["eligibility_ledger", "decision_ledger", "outcome_ledger"],
             "review_scope": "post_replay_component_funnel_review",
             "replay_review_diagnostic_summary": review_summary,
+            "layer_review_scope": "model_layers_m01_m05_path_conditioned_replay_review",
+            "layer_review_included_layers": [layer_id for layer_id, _label in REPLAY_LAYER_REVIEW_LAYERS],
+            "layer_review_excluded_layers": list(EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS),
+            "layer_review_row_count": len(layer_review_rows),
+            "layer_review_diagnostic_summary": layer_review_summary,
             "cause_family_contract": ["data_insufficiency", "execution_connection_failure", "model_mechanism_defect"],
             "residual_event_governance_status": "not_performed",
             "event_evidence_consumed": False,
@@ -337,6 +362,9 @@ def run_model_group_replay_review_if_ready(
             "target_symbol": replay_receipt.get("target_symbol") or replay_receipt.get("candidate_training_target"),
             "review_rows_ref": str(review_rows_path),
             "reviewed_failure_count": len(review_rows),
+            "layer_review_rows_ref": str(layer_review_rows_path),
+            "layer_review_row_count": len(layer_review_rows),
+            "layer_review_diagnostic_summary": layer_review_summary,
             "replay_review_performance_summary_ref": str(performance_summary_path),
             "replay_review_performance_summary": performance_summary["summary"],
             "layer_attribution_report_ref": str(layer_attribution_root / "layer_attribution_report.json"),
@@ -804,6 +832,485 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
             if filled
             else "path-conditioned non-taken decision missed a positive next outcome"
         ),
+    }
+
+
+def _build_layer_review_rows(
+    *,
+    decision_rows: Sequence[Mapping[str, Any]],
+    trace_rows: Sequence[Mapping[str, Any]],
+    max_decision_rows: int | None,
+) -> Iterable[dict[str, Any]]:
+    trace_index = _selected_trace_index(trace_rows)
+    for decision_index, row in enumerate(decision_rows, start=1):
+        if max_decision_rows is not None and decision_index > max_decision_rows:
+            break
+        source_id = str(row.get("decision_id") or row.get("replay_decision_id") or f"decision_row_{decision_index}")
+        trace_row = trace_index.get((_decision_time(row) or "", str(row.get("target_ref") or _target_symbol(row) or "")))
+        for layer_order, (layer_id, layer_label) in enumerate(REPLAY_LAYER_REVIEW_LAYERS, start=1):
+            yield _layer_review_row(
+                row,
+                decision_index=decision_index,
+                source_id=source_id,
+                layer_order=layer_order,
+                layer_id=layer_id,
+                layer_label=layer_label,
+                trace_row=trace_row,
+            )
+
+
+def _selected_trace_index(trace_rows: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str], Mapping[str, Any]]:
+    indexed: dict[tuple[str, str], Mapping[str, Any]] = {}
+    for row in trace_rows:
+        if not _truthy(row.get("selected_by_replay")):
+            continue
+        timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+        target = str(row.get("target_ref") or row.get("target_symbol") or "").strip()
+        if timestamp and target:
+            indexed.setdefault((timestamp, target), row)
+    return indexed
+
+
+def _layer_review_row(
+    row: Mapping[str, Any],
+    *,
+    decision_index: int,
+    source_id: str,
+    layer_order: int,
+    layer_id: str,
+    layer_label: str,
+    trace_row: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    decision_time = _decision_time(row)
+    diagnostics = _layer_diagnostics(row, layer_id)
+    classification = _layer_review_classification(row, layer_id=layer_id, diagnostics=diagnostics, trace_row=trace_row)
+    correctness = str(classification["correctness_class"])
+    return {
+        "contract_type": REPLAY_LAYER_REVIEW_ROW_CONTRACT_TYPE,
+        "stage_id": "model_group.replay_review",
+        "review_policy_version": "m01_m05_path_conditioned_layer_review_v1",
+        "review_id": f"replay_layer_review_{decision_index:08d}_{layer_order:02d}",
+        "source_decision_id": source_id,
+        "source_decision_index": decision_index,
+        "decision_time": decision_time,
+        "impact_exposure_time": _impact_profile(row, failure_type="layer_review_outcome_context", decision_time=decision_time)[
+            "impact_exposure_time"
+        ],
+        "future_outcome_window": _future_outcome_window(row, decision_time=decision_time),
+        "replay_month": _replay_month(row),
+        "target_symbol": _target_symbol(row),
+        "target_ref": str(row.get("target_ref") or _target_symbol(row) or ""),
+        "path_conditioning_policy": _path_conditioning_policy(row),
+        "path_scope": _path_scope(row),
+        "candidate_set_scope": classification["candidate_set_scope"],
+        "layer_id": layer_id,
+        "layer_label": layer_label,
+        "layer_order": layer_order,
+        "effective_decision": _effective_layer_decision(row, layer_id=layer_id, diagnostics=diagnostics, trace_row=trace_row),
+        "effective_decision_status": classification["effective_decision_status"],
+        "selected_output_ref": _layer_ref(row, layer_id) or diagnostics.get("model_ref") or classification.get("selected_output_ref"),
+        "chosen_action": classification["chosen_action"],
+        "available_action": classification["available_action"],
+        "best_available_action_by_future_outcome": classification["best_available_action_by_future_outcome"],
+        "chosen_action_return": classification.get("chosen_action_return"),
+        "best_available_action_return": classification.get("best_available_action_return"),
+        "correctness_class": correctness,
+        "acceptability_class": _layer_acceptability_class(correctness),
+        "scoring_status": classification["scoring_status"],
+        "classification_basis": classification["classification_basis"],
+        "regret_to_best_available": classification.get("regret_to_best_available"),
+        "impact_normalized_severity_score": classification.get("impact_normalized_severity_score"),
+        "cause_family": "model_mechanism_defect" if correctness == "incorrect" else "not_attributed",
+        "failure_type": classification["failure_type"],
+        "first_gap_component": layer_id if correctness == "incorrect" else "no_gap",
+        "first_gap_mechanism": classification["first_gap_mechanism"] if correctness == "incorrect" else "no_gap",
+        "outcome_label": _int_field(row, "outcome_label"),
+        "realized_return": _round_metric_nullable(_safe_float(row.get("realized_return"))),
+        "baseline_return": _round_metric_nullable(_safe_float(row.get("baseline_return"))),
+        "directional_underlying_return": _round_metric_nullable(_directional_underlying_return(row)),
+        "model_ref": _layer_ref(row, layer_id) or diagnostics.get("model_ref"),
+        "layer_diagnostics": dict(diagnostics),
+        "trace_evidence": _layer_trace_evidence(layer_id, trace_row),
+        "evidence_refs": _layer_evidence_refs(layer_id, trace_row=trace_row),
+        "hindsight_caution": "Future returns are post-replay labels for review; they are not decision-time model inputs.",
+    }
+
+
+def _layer_review_classification(
+    row: Mapping[str, Any],
+    *,
+    layer_id: str,
+    diagnostics: Mapping[str, Any],
+    trace_row: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if layer_id == "model_01_background_context":
+        return _m01_background_context_classification(diagnostics)
+    if layer_id == "model_02_target_state":
+        return _m02_target_state_classification(row, diagnostics=diagnostics, trace_row=trace_row)
+    if layer_id == "model_03_event_state":
+        return _m03_event_state_classification(diagnostics)
+    if layer_id == "model_04_unified_decision":
+        return _m04_unified_decision_classification(row)
+    if layer_id == "model_05_option_expression":
+        return _m05_option_expression_classification(row, diagnostics=diagnostics)
+    return _indeterminate_layer_classification(
+        candidate_set_scope="unsupported_layer",
+        chosen_action="not_reported",
+        basis="layer is outside the M01-M05 replay decision review contract",
+    )
+
+
+def _m01_background_context_classification(diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+    state_quality = _safe_float(diagnostics.get("state_quality_score"))
+    stress = _safe_float(diagnostics.get("market_risk_stress_score"))
+    transition = _safe_float(diagnostics.get("transition_risk_score"))
+    if state_quality is None and stress is None and transition is None:
+        return _indeterminate_layer_classification(
+            candidate_set_scope="background_context_state",
+            chosen_action="background_context_not_reported",
+            basis="M01 diagnostics are missing from the replay decision row",
+        )
+    acceptable = (state_quality is None or state_quality >= 0.5) and (stress is None or stress <= 0.8) and (
+        transition is None or transition <= 0.8
+    )
+    return _simple_layer_classification(
+        correct=acceptable,
+        candidate_set_scope="background_context_state",
+        chosen_action="accept_background_context_state",
+        fallback_action="withhold_or_downweight_poor_background_context",
+        basis="point_in_time_background_state_quality_and_risk_thresholds",
+        failure_type="poor_background_context_accepted",
+        first_gap_mechanism="background_context_risk_gate",
+    )
+
+
+def _m02_target_state_classification(
+    row: Mapping[str, Any],
+    *,
+    diagnostics: Mapping[str, Any],
+    trace_row: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    rank = _safe_float((trace_row or {}).get("model_rank_within_timestamp"))
+    score_available = _truthy((trace_row or {}).get("model_score_available"))
+    selected = _truthy((trace_row or {}).get("selected_by_replay")) if trace_row is not None else False
+    direction = _safe_float(diagnostics.get("target_direction_score_1D"))
+    tradability = _safe_float(diagnostics.get("tradability_score_1D"))
+    target_quality = _safe_float(diagnostics.get("target_trend_quality_score_1D"))
+    if trace_row is None and direction is None and tradability is None and target_quality is None:
+        return _indeterminate_layer_classification(
+            candidate_set_scope="selected_target_candidate_handoff",
+            chosen_action=f"select_target:{_target_symbol(row) or 'not_reported'}",
+            basis="M02 candidate trace and target-state diagnostics are missing",
+        )
+    acceptable_rank = rank is None or rank <= 25
+    acceptable_state = (direction is None or direction >= 0.5) and (tradability is None or tradability >= 0.5) and (
+        target_quality is None or target_quality >= 0.5
+    )
+    acceptable_selection = trace_row is None or selected or not score_available
+    correct = acceptable_rank and acceptable_state and acceptable_selection
+    return _simple_layer_classification(
+        correct=correct,
+        candidate_set_scope="selected_target_candidate_handoff",
+        chosen_action=f"select_target:{diagnostics.get('target_ref') or _target_symbol(row) or 'not_reported'}",
+        fallback_action="choose_better_ranked_or_more_tradable_target",
+        basis="point_in_time_target_state_scores_and_same_timestamp_candidate_rank",
+        failure_type="weak_or_low_ranked_target_selected",
+        first_gap_mechanism="target_selection_rank_or_quality",
+        selected_output_ref=(trace_row or {}).get("model_candidate_trace_status"),
+    )
+
+
+def _m03_event_state_classification(diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+    uncertainty = _safe_float(diagnostics.get("event_uncertainty_score_1D"))
+    block = _safe_float(diagnostics.get("event_entry_block_pressure_score_1D"))
+    disable = _safe_float(diagnostics.get("event_strategy_disable_pressure_score_1D"))
+    path_risk = _safe_float(diagnostics.get("event_path_risk_score_1D"))
+    if uncertainty is None and block is None and disable is None and path_risk is None:
+        return _indeterminate_layer_classification(
+            candidate_set_scope="selected_path_event_state",
+            chosen_action="event_state_not_reported",
+            basis="M03 event-state diagnostics are missing from the replay decision row",
+        )
+    correct = (block is None or block <= 0.5) and (disable is None or disable <= 0.5) and (
+        uncertainty is None or uncertainty <= 0.8
+    ) and (path_risk is None or path_risk <= 0.8)
+    return _simple_layer_classification(
+        correct=correct,
+        candidate_set_scope="selected_path_event_state",
+        chosen_action="allow_path_event_state",
+        fallback_action="block_or_downweight_event_risk_path",
+        basis="point_in_time_event_pressure_and_uncertainty_thresholds",
+        failure_type="event_risk_state_allowed",
+        first_gap_mechanism="event_risk_gate",
+    )
+
+
+def _m04_unified_decision_classification(row: Mapping[str, Any]) -> dict[str, Any]:
+    chosen = _decision_intended_action(row) or "underlying_action_not_reported"
+    directional_return = _directional_underlying_return(row)
+    if directional_return is None:
+        return _indeterminate_layer_classification(
+            candidate_set_scope="selected_target_underlying_decision",
+            chosen_action=chosen,
+            basis="directional underlying outcome label is missing",
+        )
+    baseline = _safe_float(row.get("baseline_return")) or 0.0
+    correct = directional_return >= baseline
+    return _return_labeled_layer_classification(
+        correct=correct,
+        candidate_set_scope="selected_target_underlying_decision",
+        chosen_action=chosen,
+        fallback_action="baseline_action",
+        chosen_return=directional_return,
+        baseline_return=baseline,
+        basis="post_replay_directional_underlying_return_label",
+        failure_type="underlying_action_underperformed_baseline",
+        first_gap_mechanism="underlying_direction_or_entry_timing",
+    )
+
+
+def _m05_option_expression_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+    expression = str(
+        diagnostics.get("selected_expression_type")
+        or row.get("selected_option_expression_type")
+        or row.get("decision_expression_type")
+        or "option_expression_not_reported"
+    )
+    contract = str(
+        diagnostics.get("selected_contract_ref")
+        or row.get("selected_option_contract_ref")
+        or row.get("selected_contract_ref")
+        or ""
+    )
+    chosen = f"{expression} {contract}".strip()
+    selected_return = _safe_float(row.get("realized_return"))
+    if selected_return is None:
+        selected_return = _opportunity_return(row)
+    if selected_return is None:
+        return _indeterminate_layer_classification(
+            candidate_set_scope=_candidate_set_scope(row),
+            chosen_action=chosen,
+            basis="selected option expression outcome label is missing",
+        )
+    baseline = _safe_float(row.get("baseline_return")) or 0.0
+    direction_ok = _option_direction_consistency_status(row) != "mismatch"
+    correct = selected_return >= baseline and direction_ok
+    return _return_labeled_layer_classification(
+        correct=correct,
+        candidate_set_scope=_candidate_set_scope(row),
+        chosen_action=chosen,
+        fallback_action="baseline_action",
+        chosen_return=selected_return,
+        baseline_return=baseline,
+        basis="post_replay_selected_option_expression_return_label_and_direction_consistency",
+        failure_type="option_expression_underperformed_or_mismatched_direction",
+        first_gap_mechanism="option_expression_selection",
+    )
+
+
+def _simple_layer_classification(
+    *,
+    correct: bool,
+    candidate_set_scope: str,
+    chosen_action: str,
+    fallback_action: str,
+    basis: str,
+    failure_type: str,
+    first_gap_mechanism: str,
+    selected_output_ref: Any = None,
+) -> dict[str, Any]:
+    return {
+        "candidate_set_scope": candidate_set_scope,
+        "effective_decision_status": "measured",
+        "chosen_action": chosen_action,
+        "available_action": [chosen_action, fallback_action],
+        "best_available_action_by_future_outcome": chosen_action if correct else fallback_action,
+        "chosen_action_return": None,
+        "best_available_action_return": None,
+        "correctness_class": "correct" if correct else "incorrect",
+        "scoring_status": "scored_point_in_time_diagnostic",
+        "classification_basis": basis,
+        "regret_to_best_available": 0.0 if correct else None,
+        "impact_normalized_severity_score": None,
+        "failure_type": "none" if correct else failure_type,
+        "first_gap_mechanism": first_gap_mechanism,
+        "selected_output_ref": selected_output_ref,
+    }
+
+
+def _return_labeled_layer_classification(
+    *,
+    correct: bool,
+    candidate_set_scope: str,
+    chosen_action: str,
+    fallback_action: str,
+    chosen_return: float,
+    baseline_return: float,
+    basis: str,
+    failure_type: str,
+    first_gap_mechanism: str,
+) -> dict[str, Any]:
+    regret = max(0.0, baseline_return - chosen_return)
+    return {
+        "candidate_set_scope": candidate_set_scope,
+        "effective_decision_status": "measured",
+        "chosen_action": chosen_action,
+        "available_action": [chosen_action, fallback_action],
+        "best_available_action_by_future_outcome": chosen_action if correct else fallback_action,
+        "chosen_action_return": _round_metric(chosen_return),
+        "best_available_action_return": _round_metric(chosen_return if correct else baseline_return),
+        "correctness_class": "correct" if correct else "incorrect",
+        "scoring_status": "scored_post_replay_outcome_label",
+        "classification_basis": basis,
+        "regret_to_best_available": _round_metric(regret),
+        "impact_normalized_severity_score": _round_metric(regret) if regret > 0 else 0.0,
+        "failure_type": "none" if correct else failure_type,
+        "first_gap_mechanism": first_gap_mechanism,
+    }
+
+
+def _indeterminate_layer_classification(*, candidate_set_scope: str, chosen_action: str, basis: str) -> dict[str, Any]:
+    return {
+        "candidate_set_scope": candidate_set_scope,
+        "effective_decision_status": "missing_evidence",
+        "chosen_action": chosen_action,
+        "available_action": [chosen_action],
+        "best_available_action_by_future_outcome": "not_determinable",
+        "chosen_action_return": None,
+        "best_available_action_return": None,
+        "correctness_class": "indeterminate",
+        "scoring_status": "missing_layer_review_evidence",
+        "classification_basis": basis,
+        "regret_to_best_available": None,
+        "impact_normalized_severity_score": None,
+        "failure_type": "missing_layer_review_evidence",
+        "first_gap_mechanism": "missing_evidence",
+    }
+
+
+def _layer_acceptability_class(correctness: str) -> str:
+    if correctness == "correct":
+        return "acceptable"
+    if correctness == "incorrect":
+        return "unacceptable"
+    return "indeterminate"
+
+
+def _layer_diagnostics(row: Mapping[str, Any], layer_id: str) -> Mapping[str, Any]:
+    diagnostics = row.get("model_layer_diagnostics")
+    if not isinstance(diagnostics, MappingABC):
+        return {}
+    value = diagnostics.get(layer_id)
+    return value if isinstance(value, MappingABC) else {}
+
+
+def _layer_ref(row: Mapping[str, Any], layer_id: str) -> Any:
+    refs = row.get("model_layer_refs")
+    if isinstance(refs, MappingABC):
+        return refs.get(layer_id)
+    return None
+
+
+def _effective_layer_decision(
+    row: Mapping[str, Any],
+    *,
+    layer_id: str,
+    diagnostics: Mapping[str, Any],
+    trace_row: Mapping[str, Any] | None,
+) -> str:
+    if layer_id == "model_01_background_context":
+        return (
+            "background_context_state "
+            f"quality={diagnostics.get('state_quality_score')} "
+            f"risk={diagnostics.get('market_risk_stress_score')} "
+            f"transition={diagnostics.get('transition_risk_score')}"
+        )
+    if layer_id == "model_02_target_state":
+        rank = (trace_row or {}).get("model_rank_within_timestamp")
+        return (
+            f"selected_target {diagnostics.get('target_ref') or _target_symbol(row) or 'not_reported'} "
+            f"direction_1d={diagnostics.get('target_direction_score_1D')} "
+            f"tradability_1d={diagnostics.get('tradability_score_1D')} "
+            f"same_timestamp_rank={rank}"
+        )
+    if layer_id == "model_03_event_state":
+        return (
+            "event_state "
+            f"uncertainty_1d={diagnostics.get('event_uncertainty_score_1D')} "
+            f"block_pressure_1d={diagnostics.get('event_entry_block_pressure_score_1D')} "
+            f"path_risk_1d={diagnostics.get('event_path_risk_score_1D')}"
+        )
+    if layer_id == "model_04_unified_decision":
+        return str(
+            diagnostics.get("resolved_underlying_action_type")
+            or diagnostics.get("resolved_action_side")
+            or row.get("decision_action")
+            or row.get("action")
+            or "not_reported"
+        )
+    if layer_id == "model_05_option_expression":
+        expression = diagnostics.get("selected_expression_type") or row.get("selected_option_expression_type")
+        contract = diagnostics.get("selected_contract_ref") or row.get("selected_option_contract_ref") or row.get("instrument_ref")
+        return f"{expression or 'not_reported'} {contract or ''}".strip()
+    return "not_reported"
+
+
+def _layer_trace_evidence(layer_id: str, trace_row: Mapping[str, Any] | None) -> dict[str, Any]:
+    if layer_id != "model_02_target_state" or trace_row is None:
+        return {}
+    fields = (
+        "model_candidate_trace_status",
+        "selected_by_replay",
+        "model_rank_within_timestamp",
+        "diagnostic_rank_score",
+        "alpha_score",
+        "expected_return_score",
+        "action_direction_score",
+        "trade_intensity_score",
+    )
+    return {field: trace_row.get(field) for field in fields if field in trace_row}
+
+
+def _layer_evidence_refs(layer_id: str, *, trace_row: Mapping[str, Any] | None) -> list[str]:
+    refs = ["decision_rows.jsonl"]
+    if layer_id == "model_02_target_state" and trace_row is not None:
+        refs.append("model_candidate_selection_trace.jsonl")
+    return refs
+
+
+def _layer_review_diagnostic_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    material = list(rows)
+    by_layer: dict[str, list[Mapping[str, Any]]] = {
+        layer_id: [row for row in material if row.get("layer_id") == layer_id]
+        for layer_id, _label in REPLAY_LAYER_REVIEW_LAYERS
+    }
+    return {
+        "contract_type": "post_replay_layer_decision_review_summary",
+        "row_count": len(material),
+        "included_layers": [layer_id for layer_id, _label in REPLAY_LAYER_REVIEW_LAYERS],
+        "excluded_layers": list(EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS),
+        "layer_summaries": {
+            layer_id: {
+                "row_count": len(layer_rows),
+                "correct_count": sum(1 for row in layer_rows if row.get("correctness_class") == "correct"),
+                "incorrect_count": sum(1 for row in layer_rows if row.get("correctness_class") == "incorrect"),
+                "indeterminate_count": sum(1 for row in layer_rows if row.get("correctness_class") == "indeterminate"),
+                "scoring_status_counts": _count_text(row.get("scoring_status") for row in layer_rows),
+                "mean_regret_to_best_available": _round_metric_nullable(
+                    _mean_float(
+                        _safe_float(row.get("regret_to_best_available"))
+                        for row in layer_rows
+                        if _safe_float(row.get("regret_to_best_available")) is not None
+                    )
+                ),
+            }
+            for layer_id, layer_rows in by_layer.items()
+        },
+        "classification_policy": {
+            "m01_m03": "point-in-time diagnostics and selected-path trace thresholds; no future labels are used as decision-time inputs",
+            "m04": "post-replay directional underlying return label",
+            "m05": "post-replay selected option expression return label plus direction consistency",
+        },
     }
 
 

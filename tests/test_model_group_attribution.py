@@ -251,6 +251,25 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(receipt["residual_event_governance_status"], "not_performed")
             self.assertIs(receipt["event_evidence_consumed"], False)
             self.assertEqual(receipt["replay_review_diagnostic_summary"]["reviewed_row_count"], 3)
+            self.assertIn("layer_review_rows_ref", receipt)
+            layer_review_rows = [
+                json.loads(line)
+                for line in Path(receipt["layer_review_rows_ref"]).read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(len(layer_review_rows), 25)
+            self.assertEqual(
+                {row["layer_id"] for row in layer_review_rows},
+                {
+                    "model_01_background_context",
+                    "model_02_target_state",
+                    "model_03_event_state",
+                    "model_04_unified_decision",
+                    "model_05_option_expression",
+                },
+            )
+            self.assertEqual(receipt["layer_review_diagnostic_summary"]["row_count"], 25)
+            self.assertNotIn("model_06_residual_event_governance", {row["layer_id"] for row in layer_review_rows})
             self.assertIn("replay_review_performance_summary_ref", receipt)
             self.assertIn("layer_attribution_report_ref", receipt)
             performance_summary = json.loads(
