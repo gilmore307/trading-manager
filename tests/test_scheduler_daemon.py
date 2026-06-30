@@ -2775,6 +2775,61 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(kwargs["selected_target_symbol"], "AAPL")
         self.assertTrue(kwargs["write"])
 
+    def test_daemon_skips_month_source_bootstrap_for_model_worker_fold_scope(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "manager-storage"
+            queue_path = self._write_target_queue(storage_root)
+            state_path = model_worker_fold_state_path(
+                "2016-01",
+                "2017-06",
+                root=storage_root / "runtime",
+                selected_target_symbol="AAPL",
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2017-06",
+                        "target_symbol": "AAPL",
+                        "stages": [
+                            {
+                                "stage_id": "model_06_residual_event_governance.model_generation.train",
+                                "stage_type": "model_generation",
+                                "layer": 6,
+                                "layer_key": "model_06_residual_event_governance",
+                                "status": "ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with patch("trading_manager_tasks.scheduler_daemon.run_source_existing_bootstrap") as bootstrap:
+                state = run_daemon_loop(
+                    start_month="2016-01",
+                    end_month="2017-06",
+                    storage_root=storage_root,
+                    component_src_root=self._fake_data_src(tmp),
+                    state_path=tmp / "runtime" / "state.json",
+                    lock_path=tmp / "runtime" / "scheduler.lock",
+                    decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                    interval_seconds=0,
+                    max_iterations=0,
+                    execute_safe_preparation=True,
+                    auto_select_next_work=True,
+                    target_queue_path=queue_path,
+                    config=SchedulerConfig(min_free_disk_gb=0, protected_start_et="00:00", protected_end_et="00:00"),
+                )
+
+        bootstrap.assert_not_called()
+        self.assertEqual((state.start_month, state.end_month), ("2016-01", "2017-06"))
+        self.assertEqual(state.last_work_selection_reason, "resume_open_model_worker_fold")
+
     def test_daemon_loop_persists_state_and_decision_log(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

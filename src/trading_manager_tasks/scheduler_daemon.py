@@ -2744,7 +2744,7 @@ def run_daemon_loop(
             target_queue_path=target_queue_path,
             decision_log_path=decision_log_path,
         )
-    if source_existing_bootstrap:
+    if source_existing_bootstrap and state.start_month == state.end_month:
         run_source_existing_bootstrap(
             start_month=state.start_month,
             end_month=state.end_month,
