@@ -1698,7 +1698,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
-            earlier_replay_run = replay_root / "replay_execution_runs" / "model_group_replay_20260624T150000Z"
+            earlier_replay_run = replay_root / "replay_execution_runs" / "model_group_replay_fold_aapl_2016_20260624T150000Z"
             earlier_replay_run.mkdir(parents=True, exist_ok=True)
             (earlier_replay_run / "option_feature_requirements.jsonl").write_text(
                 json.dumps(
@@ -1712,7 +1712,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            replay_run = replay_root / "replay_execution_runs" / "model_group_replay_fixture"
+            replay_run = replay_root / "replay_execution_runs" / "model_group_replay_fold_aapl_2016_20260625T150000Z"
             replay_run.mkdir(parents=True, exist_ok=True)
             (replay_run / "option_feature_requirements.jsonl").write_text(
                 json.dumps(
@@ -1904,7 +1904,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertNotIn("sample AAPL", runtime_activity["activity_summary"])
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["status"], "running")
-        self.assertEqual(replay_task["started_at_utc"], "2026-06-24T15:00:00Z")
+        self.assertEqual(replay_task["started_at_utc"], "2026-06-25T15:00:00Z")
         self.assertEqual(replay_task["updated_at_utc"], "2026-06-25T15:41:00Z")
         self.assertEqual(replay_task["detail"]["runtime_activity"]["source_missing_count"], 42)
         self.assertEqual(replay_task["detail"]["progress"]["expected_count"], 2)
@@ -1959,6 +1959,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "batch_index": 2,
                         "batch_size": 12,
                         "batch_count": 0,
+                        "drain_started_at_utc": "2026-06-20T00:00:00Z",
+                        "elapsed_seconds": 0.4,
+                        "emitted_at_utc": "2026-06-25T15:41:00Z",
                     }
                 )
                 + "\n",
@@ -2000,6 +2003,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIsNone(runtime_activity["requirements_artifact_ref"])
         self.assertIsNone(runtime_activity["requirement_count"])
         self.assertEqual(runtime_activity["sample_targets"], [])
+        self.assertEqual(runtime_activity["started_at_utc"], "2026-06-25T15:40:59Z")
         self.assertIn("0 source-gap candidates in current repair slice", runtime_activity["activity_summary"])
         self.assertNotIn("AAPL", runtime_activity["activity_summary"])
 
@@ -2031,6 +2035,23 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             (replay_root / "feed_acquisition_plan.csv").write_text("month\n2021-01\n2021-02\n", encoding="utf-8")
             replay_run = replay_root / "replay_execution_runs" / "model_group_replay_20260625T150000Z"
             replay_run.mkdir(parents=True, exist_ok=True)
+            old_run = replay_root / "replay_execution_runs" / "model_group_replay_20260624T120000Z"
+            old_run.mkdir(parents=True, exist_ok=True)
+            (old_run / "replay_runtime_trace.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_runtime_trace_row",
+                        "trace_event_type": "replay_clock_processed",
+                        "replay_execution_run_id": old_run.name,
+                        "replay_month": "2021-01",
+                        "replay_time_pointer": "2021-01-04T16:00:00-05:00",
+                        "generated_at_utc": "2026-06-24T12:00:01Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            os.utime(old_run / "replay_runtime_trace.jsonl", (1000, 1000))
             trace_path = replay_run / "replay_runtime_trace.jsonl"
             trace_path.write_text(
                 "\n".join(
@@ -2119,6 +2140,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["active_month"], "2021-02")
         self.assertEqual(progress["active_time_pointer"], "2021-02-03T16:00:00-05:00")
         self.assertEqual(progress["current_count"], 2)
+        self.assertEqual(replay_task["started_at_utc"], "2026-06-25T15:00:00Z")
 
     def test_replay_progress_uses_high_water_when_drain_status_has_no_cursor(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2243,7 +2265,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(progress["active_time_pointer"], "2021-02-03T16:00:00-05:00")
         self.assertEqual(progress["current_count"], 2)
         self.assertIn("has reached 2/3 replay months", replay_task["reason"])
-        self.assertIn("0/3 months have closed with terminal replay receipts", replay_task["reason"])
+        self.assertIn("0/3 months are backed by accepted replay receipt progress", replay_task["reason"])
 
     def test_running_replay_retry_keeps_frontier_high_water_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -2277,9 +2299,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             )
             runs_root = replay_root / "replay_execution_runs"
             bad_run = runs_root / "model_group_replay_bad_future_gap"
-            good_run = runs_root / "model_group_replay_frontier_high_water"
-            retry_run = runs_root / "model_group_replay_retry_from_start"
-            for run in (bad_run, good_run, retry_run):
+            foreign_run = runs_root / "model_group_replay_fold_aapl_2017_20260625T155900Z"
+            good_run = runs_root / "model_group_replay_fold_aapl_2020_20260625T155000Z"
+            retry_run = runs_root / "model_group_replay_fold_aapl_2020_20260625T155500Z"
+            for run in (bad_run, foreign_run, good_run, retry_run):
                 run.mkdir(parents=True, exist_ok=True)
             (bad_run / "replay_runtime_trace.jsonl").write_text(
                 json.dumps(
@@ -2293,6 +2316,25 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "cumulative_summary": {
                             "timestamp_count": 244,
                             "missing_option_feature_requirement_count": 174236,
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (foreign_run / "replay_runtime_trace.jsonl").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "evaluation_replay_runtime_trace_row",
+                        "trace_event_type": "replay_option_feature_requirements_blocked",
+                        "replay_execution_run_id": foreign_run.name,
+                        "replay_month": "2025-12",
+                        "replay_time_pointer": "2025-12-30T16:00:00-05:00",
+                        "missing_option_feature_requirement_count": 1,
+                        "generated_at_utc": "2026-06-25T15:59:00Z",
+                        "cumulative_summary": {
+                            "timestamp_count": 800,
+                            "missing_option_feature_requirement_count": 1,
                         },
                     }
                 )
@@ -2336,6 +2378,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             os.utime(bad_run / "replay_runtime_trace.jsonl", (1000, 1000))
             os.utime(good_run / "replay_runtime_trace.jsonl", (2000, 2000))
             os.utime(retry_run / "replay_runtime_trace.jsonl", (3000, 3000))
+            os.utime(foreign_run / "replay_runtime_trace.jsonl", (4000, 4000))
             drain_status_path = runtime / "replay_option_feature_drain_latest.json"
             drain_status_path.write_text(
                 json.dumps(
@@ -2362,6 +2405,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "selected_work": "model_group.replay_option_features",
                         "next_internal_stage": "model_group.replay_option_features",
                         "reason_code": "model_group_replay_option_features_already_ready",
+                        "execution_summary": {
+                            "training_fold": {
+                                "fold_id": "fold_aapl_2020",
+                                "start_month": "2020-01",
+                                "end_month": "2021-06",
+                                "target_symbol": "AAPL",
+                            }
+                        },
                     }
                 )
                 + "\n",
@@ -2391,6 +2442,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertIn("current run 2021-02-17T16:00:00-05:00", runtime_activity["activity_summary"])
         self.assertIn("furthest reached 2022-04-25T16:00:00-04:00", runtime_activity["activity_summary"])
         self.assertNotIn("2025-12", runtime_activity["activity_summary"])
+        self.assertNotEqual(runtime_activity["furthest_replay_execution_run_id"], foreign_run.name)
         replay_task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_group.replay")
         progress = replay_task["detail"]["progress"]
         self.assertEqual(progress["active_month"], "2022-04")

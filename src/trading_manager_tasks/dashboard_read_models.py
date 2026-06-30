@@ -1137,10 +1137,26 @@ def _mtime_utc(path: Path) -> str | None:
     return datetime.fromtimestamp(timestamp, tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _replay_execution_started_at(dataset_root: Path) -> str | None:
+def _replay_execution_run_prefix(candidate_fold_id: object) -> str | None:
+    token = re.sub(r"[^A-Za-z0-9]+", "_", str(candidate_fold_id or "").strip().lower()).strip("_")
+    return f"model_group_replay_{token}_" if token else None
+
+
+def _replay_execution_run_prefixes(candidate_fold_id: object) -> tuple[str, ...]:
+    values = candidate_fold_id if isinstance(candidate_fold_id, (list, tuple, set, frozenset)) else [candidate_fold_id]
+    prefixes = [_replay_execution_run_prefix(value) for value in values]
+    return tuple(prefix for prefix in prefixes if prefix)
+
+
+def _replay_execution_run_matches(run_dir: Path, prefixes: tuple[str, ...]) -> bool:
+    return not prefixes or any(run_dir.name.startswith(prefix) for prefix in prefixes)
+
+
+def _replay_execution_started_at(dataset_root: Path, *, candidate_fold_id: object = None) -> str | None:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
         return None
+    run_prefixes = _replay_execution_run_prefixes(candidate_fold_id)
     start_artifacts = {
         "decision_rows.jsonl",
         "entry_threshold_calibration.json",
@@ -1151,6 +1167,8 @@ def _replay_execution_started_at(dataset_root: Path) -> str | None:
     candidates: list[str] = []
     for run_dir in replay_root.iterdir():
         if not run_dir.is_dir():
+            continue
+        if not _replay_execution_run_matches(run_dir, run_prefixes):
             continue
         artifact_paths = [run_dir / artifact for artifact in start_artifacts if (run_dir / artifact).exists()]
         if not artifact_paths:
@@ -1196,6 +1214,19 @@ def _replay_option_feature_requirement_sample(path: Path | None, *, limit: int =
 
 
 def _replay_activity_started_at(requirements_artifact: Path | None, latest_status: Mapping[str, Any]) -> str | None:
+    emitted_at = latest_status.get("emitted_at_utc")
+    elapsed_seconds = latest_status.get("elapsed_seconds")
+    if (
+        latest_status.get("reason_code") == "model_group_replay_option_features_already_ready"
+        and isinstance(emitted_at, str)
+        and isinstance(elapsed_seconds, (int, float))
+    ):
+        try:
+            emitted = datetime.fromisoformat(emitted_at.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        started = emitted.timestamp() - float(elapsed_seconds)
+        return datetime.fromtimestamp(started, tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     drain_started_at = latest_status.get("drain_started_at_utc")
     if isinstance(drain_started_at, str) and drain_started_at:
         return drain_started_at
@@ -1203,8 +1234,6 @@ def _replay_activity_started_at(requirements_artifact: Path | None, latest_statu
         parsed_dir_time = _timestamp_from_replay_run_dir(requirements_artifact.parent)
         if parsed_dir_time:
             return parsed_dir_time
-    emitted_at = latest_status.get("emitted_at_utc")
-    elapsed_seconds = latest_status.get("elapsed_seconds")
     if isinstance(emitted_at, str) and isinstance(elapsed_seconds, (int, float)):
         try:
             emitted = datetime.fromisoformat(emitted_at.replace("Z", "+00:00"))
@@ -1215,21 +1244,24 @@ def _replay_activity_started_at(requirements_artifact: Path | None, latest_statu
     return None
 
 
-def _latest_replay_runtime_trace_artifact(dataset_root: Path) -> Path | None:
-    candidates = _replay_runtime_trace_artifacts(dataset_root)
+def _latest_replay_runtime_trace_artifact(dataset_root: Path, *, candidate_fold_id: object = None) -> Path | None:
+    candidates = _replay_runtime_trace_artifacts(dataset_root, candidate_fold_id=candidate_fold_id)
     if not candidates:
         return None
     return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
-def _replay_runtime_trace_artifacts(dataset_root: Path) -> list[Path]:
+def _replay_runtime_trace_artifacts(dataset_root: Path, *, candidate_fold_id: object = None) -> list[Path]:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
         return []
+    run_prefixes = _replay_execution_run_prefixes(candidate_fold_id)
     return [
         path / "replay_runtime_trace.jsonl"
         for path in replay_root.iterdir()
-        if path.is_dir() and (path / "replay_runtime_trace.jsonl").exists()
+        if path.is_dir()
+        and _replay_execution_run_matches(path, run_prefixes)
+        and (path / "replay_runtime_trace.jsonl").exists()
     ]
 
 
@@ -1287,18 +1319,22 @@ def _trace_row_crossed_frontier(row: Mapping[str, Any]) -> bool:
     return cumulative_missing > row_missing
 
 
-def _furthest_frontier_gated_replay_trace_row(dataset_root: Path) -> tuple[Path, dict[str, Any]] | None:
+def _furthest_frontier_gated_replay_trace_row(
+    dataset_root: Path,
+    *,
+    candidate_fold_id: object = None,
+) -> tuple[Path, dict[str, Any]] | None:
     furthest: tuple[Path, dict[str, Any]] | None = None
-    for trace_path in _replay_runtime_trace_artifacts(dataset_root):
+    for trace_path in _replay_runtime_trace_artifacts(dataset_root, candidate_fold_id=candidate_fold_id):
         for row in _frontier_gated_replay_trace_rows(trace_path):
             if furthest is None or _iso_sort_key(row.get("replay_time_pointer")) > _iso_sort_key(furthest[1].get("replay_time_pointer")):
                 furthest = (trace_path, row)
     return furthest
 
 
-def _replay_execution_runtime_activity(storage_root: Path) -> dict[str, Any] | None:
+def _replay_execution_runtime_activity(storage_root: Path, *, candidate_fold_id: object = None) -> dict[str, Any] | None:
     dataset_root = _replay_dataset_root(storage_root, "promotion_replay_candidate_policy")
-    trace_path = _latest_replay_runtime_trace_artifact(dataset_root)
+    trace_path = _latest_replay_runtime_trace_artifact(dataset_root, candidate_fold_id=candidate_fold_id)
     if trace_path is None:
         return None
     latest_row = _last_jsonl_object(trace_path)
@@ -1309,7 +1345,7 @@ def _replay_execution_runtime_activity(storage_root: Path) -> dict[str, Any] | N
     cumulative_summary = latest_row.get("cumulative_summary") if isinstance(latest_row.get("cumulative_summary"), Mapping) else {}
     timestamp_count = cumulative_summary.get("timestamp_count") if isinstance(cumulative_summary, Mapping) else None
     selected_targets = [str(target) for target in latest_row.get("selected_targets") or [] if str(target)]
-    furthest = _furthest_frontier_gated_replay_trace_row(dataset_root)
+    furthest = _furthest_frontier_gated_replay_trace_row(dataset_root, candidate_fold_id=candidate_fold_id)
     furthest_path = furthest[0] if furthest else None
     furthest_row = furthest[1] if furthest else None
     furthest_time_pointer = furthest_row.get("replay_time_pointer") if furthest_row else None
@@ -1457,15 +1493,22 @@ def _replay_dataset_root_from_artifact_ref(value: object) -> Path | None:
 
 
 def _runtime_replay_task_started_at(runtime_activity: Mapping[str, Any]) -> str | None:
-    dataset_root = _replay_dataset_root_from_artifact_ref(runtime_activity.get("requirements_artifact_ref"))
-    if dataset_root is None:
-        dataset_root = _replay_dataset_root_from_artifact_ref(runtime_activity.get("replay_runtime_trace_ref"))
-    if dataset_root is not None:
-        started_at = _replay_execution_started_at(dataset_root)
-        if started_at:
-            return started_at
     started_at = runtime_activity.get("started_at_utc")
-    return str(started_at) if started_at else None
+    if started_at:
+        return str(started_at)
+    for key in ("replay_runtime_trace_ref", "requirements_artifact_ref"):
+        raw_ref = runtime_activity.get(key)
+        if not raw_ref:
+            continue
+        artifact_path = Path(str(raw_ref))
+        parsed_dir_time = _timestamp_from_replay_run_dir(artifact_path.parent)
+        if parsed_dir_time:
+            return parsed_dir_time
+        if artifact_path.exists():
+            artifact_mtime = _mtime_utc(artifact_path)
+            if artifact_mtime:
+                return artifact_mtime
+    return None
 
 
 def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Path | None = None) -> dict[str, Any]:
@@ -1499,7 +1542,10 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
         or "replay_option_source" in runtime_reason
     ):
         runtime_activity = _replay_option_feature_drain_activity(resolved_storage_root)
-    replay_activity = _replay_execution_runtime_activity(resolved_storage_root)
+    replay_activity = _replay_execution_runtime_activity(
+        resolved_storage_root,
+        candidate_fold_id=_runtime_candidate_fold_id(latest_decision, status),
+    )
     replay_progress_activity = replay_activity if isinstance(replay_activity, Mapping) else None
     if isinstance(replay_activity, Mapping) and status.lock.status == "active" and is_replay_work:
         if runtime_activity is None or (
@@ -1542,6 +1588,48 @@ def _runtime_active_work(status: HistoricalSchedulerStatus, *, storage_root: Pat
         "runtime_activity": runtime_activity,
         "replay_progress_activity": replay_progress_activity,
     }
+
+
+def _runtime_candidate_fold_id(latest_decision: Mapping[str, Any], status: HistoricalSchedulerStatus) -> str | None:
+    candidates: list[Any] = []
+    execution_summary = latest_decision.get("execution_summary")
+    if isinstance(execution_summary, Mapping):
+        training_fold = execution_summary.get("training_fold")
+        if isinstance(training_fold, Mapping):
+            candidates.extend(
+                [
+                    training_fold.get("fold_id"),
+                    training_fold.get("candidate_fold_id"),
+                    training_fold.get("legacy_fold_id"),
+                ]
+            )
+        candidates.extend([execution_summary.get("candidate_fold_id"), execution_summary.get("fold_id")])
+    candidates.extend([latest_decision.get("candidate_fold_id"), latest_decision.get("fold_id")])
+    latest_transition = getattr(status, "latest_workflow_transition", None)
+    if isinstance(latest_transition, Mapping):
+        candidates.extend([latest_transition.get("candidate_fold_id"), latest_transition.get("fold_id")])
+    for candidate in candidates:
+        text = str(candidate or "").strip()
+        if text:
+            return text
+    return None
+
+
+def _candidate_fold_ids_for_replay_scope(
+    *,
+    start_month: str | None,
+    end_month: str | None,
+    selected_target_symbol: str | None,
+) -> tuple[str, ...]:
+    ids: list[str] = []
+    start = str(start_month or "").strip()
+    end = str(end_month or "").strip()
+    target = str(selected_target_symbol or "").strip().lower()
+    if target and _is_month_key(start):
+        ids.append(f"fold_{target}_{start[:4]}")
+    if _is_month_key(start) and _is_month_key(end):
+        ids.append(f"fold_{start}_{end}")
+    return tuple(ids)
 
 
 def _runtime_work_period(latest_decision: Mapping[str, Any], status: HistoricalSchedulerStatus) -> str | None:
@@ -1843,8 +1931,8 @@ def _replay_running_reason_with_cursor(reason: object, progress: Mapping[str, An
     cursor = current_pointer or current_month
     cursor_text = f" through {cursor}" if cursor else ""
     return (
-        f"Model-group replay has reached {current}/{expected} replay months{cursor_text}; "
-        f"{ready}/{expected} months have closed with terminal replay receipts."
+        f"Model-group replay clock has reached {current}/{expected} replay months{cursor_text}; "
+        f"{ready}/{expected} months are backed by accepted replay receipt progress."
     )
 
 
@@ -1921,7 +2009,7 @@ def _mark_active_task_running(
                 and isinstance(progress, Mapping)
             ):
                 updated["reason"] = _replay_running_reason_with_cursor(updated.get("reason"), progress)
-            if not updated.get("started_at_utc"):
+            if str(updated.get("task_id") or "") == "model_group.replay" or not updated.get("started_at_utc"):
                 started_at = _runtime_replay_task_started_at(runtime_activity)
                 if started_at:
                     updated["started_at_utc"] = started_at
@@ -4938,10 +5026,11 @@ def _compatible_replay_run_ids(
     return run_ids
 
 
-def _replay_execution_has_started(dataset_root: Path) -> bool:
+def _replay_execution_has_started(dataset_root: Path, *, candidate_fold_id: object = None) -> bool:
     replay_root = dataset_root / "replay_execution_runs"
     if not replay_root.exists():
         return False
+    run_prefixes = _replay_execution_run_prefixes(candidate_fold_id)
     start_artifacts = {
         "decision_rows.jsonl",
         "entry_threshold_calibration.json",
@@ -4950,6 +5039,8 @@ def _replay_execution_has_started(dataset_root: Path) -> bool:
     }
     for run_dir in replay_root.iterdir():
         if not run_dir.is_dir():
+            continue
+        if not _replay_execution_run_matches(run_dir, run_prefixes):
             continue
         if any((run_dir / artifact).exists() for artifact in start_artifacts):
             return True
@@ -5987,9 +6078,18 @@ def _model_group_replay_timeline_tasks(
         ),
         ready_months=replay_ready_months,
     )
-    replay_started_at = _replay_execution_started_at(dataset_root) if lifecycle_artifacts_allowed else None
+    replay_fold_ids = _candidate_fold_ids_for_replay_scope(
+        start_month=training_start_month,
+        end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol or (completed_training_fold[2] if completed_training_fold else None),
+    )
+    replay_started_at = (
+        _replay_execution_started_at(dataset_root, candidate_fold_id=replay_fold_ids)
+        if lifecycle_artifacts_allowed
+        else None
+    )
     replay_started = bool(replay_ready_months) or bool(replay_started_at) or (
-        lifecycle_artifacts_allowed and _replay_execution_has_started(dataset_root)
+        lifecycle_artifacts_allowed and _replay_execution_has_started(dataset_root, candidate_fold_id=replay_fold_ids)
     )
     replay_complete = bool(replay_progress["can_unlock_downstream"])
     review_artifacts = (
