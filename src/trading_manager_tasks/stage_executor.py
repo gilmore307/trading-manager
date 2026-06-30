@@ -45,6 +45,7 @@ LONG_DATABASE_STAGE_IDS = {
     "model_02_target_state.feature_generation",
     "model_05_option_expression.feature_generation",
 }
+DATABASE_BACKED_MODEL_GENERATION_STAGE_TYPES = {"model_generation"}
 SAFE_OFFLINE_STAGE_TYPES = {
     "data_acquisition",
     "feature_generation",
@@ -311,13 +312,19 @@ def _env_int(name: str, default: int) -> int:
 
 
 def _stage_timeout_seconds(stage: StageProgress) -> int:
-    if stage.stage_id in LONG_DATABASE_STAGE_IDS:
+    if _uses_long_database_stage_timeout(stage):
         long_default = max(
             _env_int("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS", DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS),
             DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS,
         )
         return _env_int("TRADING_MANAGER_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS", long_default)
     return _env_int("TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS", DEFAULT_STAGE_EXECUTION_TIMEOUT_SECONDS)
+
+
+def _uses_long_database_stage_timeout(stage: StageProgress) -> bool:
+    if stage.stage_id in LONG_DATABASE_STAGE_IDS:
+        return True
+    return stage.stage_type in DATABASE_BACKED_MODEL_GENERATION_STAGE_TYPES and "--from-database" in stage.command
 
 
 def _progress_marker(path: Path) -> tuple[int, int] | None:
@@ -479,7 +486,7 @@ def _run_stage_subprocess_with_progress_guard(
 
 
 def _stage_progress_stall_seconds(stage: StageProgress) -> float:
-    if stage.stage_id in LONG_DATABASE_STAGE_IDS:
+    if _uses_long_database_stage_timeout(stage):
         return 0.0
     return _env_float("TRADING_MANAGER_STAGE_PROGRESS_STALL_SECONDS", DEFAULT_STAGE_PROGRESS_STALL_SECONDS)
 

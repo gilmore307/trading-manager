@@ -13,6 +13,7 @@ from trading_manager_tasks.stage_executor import (
     DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS,
     _cwd_for_stage,
     _resolve_command_placeholders,
+    _stage_progress_stall_seconds,
     _stage_progress_worker_id,
     _stage_timeout_seconds,
     execute_stage_process,
@@ -333,6 +334,30 @@ class StageExecutorTests(unittest.TestCase):
 
     def test_long_database_feature_generation_default_timeout_covers_fold_scope(self):
         self.assertEqual(DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS, 60 * 60 * 4)
+
+    def test_database_backed_model_generation_uses_dedicated_timeout(self):
+        stage = StageProgress(
+            stage_id="model_04_unified_decision.model_generation.validation",
+            layer=4,
+            layer_key="model_04_unified_decision",
+            stage_type="model_generation",
+            status="ready",
+            command=[
+                "PYTHONPATH=/root/projects/trading-model/src",
+                "python3",
+                "/root/projects/trading-model/scripts/models/model_04_unified_decision/generate_model_04_unified_decision.py",
+                "--from-database",
+                "--source-start",
+                "2020-01-01T00:00:00-05:00",
+                "--source-end",
+                "2020-04-01T00:00:00-05:00",
+            ],
+            blockers=(),
+        )
+
+        with patch.dict("os.environ", {"TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "1800"}, clear=True):
+            self.assertEqual(_stage_timeout_seconds(stage), DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS)
+            self.assertEqual(_stage_progress_stall_seconds(stage), 0.0)
 
     def test_stage_process_retries_once_after_completed_agent_repair(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
