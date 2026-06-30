@@ -973,6 +973,11 @@ def _m01_background_context_classification(diagnostics: Mapping[str, Any]) -> di
     acceptable = (state_quality is None or state_quality >= 0.5) and (stress is None or stress <= 0.8) and (
         transition is None or transition <= 0.8
     )
+    severity = _diagnostic_threshold_severity(
+        0.5 - state_quality if state_quality is not None else None,
+        stress - 0.8 if stress is not None else None,
+        transition - 0.8 if transition is not None else None,
+    )
     return _simple_layer_classification(
         correct=acceptable,
         candidate_set_scope="background_context_state",
@@ -981,6 +986,7 @@ def _m01_background_context_classification(diagnostics: Mapping[str, Any]) -> di
         basis="point_in_time_background_state_quality_and_risk_thresholds",
         failure_type="poor_background_context_accepted",
         first_gap_mechanism="background_context_risk_gate",
+        diagnostic_severity_score=severity,
     )
 
 
@@ -1008,6 +1014,14 @@ def _m02_target_state_classification(
     )
     acceptable_selection = trace_row is None or selected or not score_available
     correct = acceptable_rank and acceptable_state and acceptable_selection
+    rank_severity = (rank - 25.0) / 25.0 if rank is not None else None
+    severity = _diagnostic_threshold_severity(
+        rank_severity,
+        0.5 - direction if direction is not None else None,
+        0.5 - tradability if tradability is not None else None,
+        0.5 - target_quality if target_quality is not None else None,
+        1.0 if not acceptable_selection else 0.0,
+    )
     return _simple_layer_classification(
         correct=correct,
         candidate_set_scope="selected_target_candidate_handoff",
@@ -1017,6 +1031,7 @@ def _m02_target_state_classification(
         failure_type="weak_or_low_ranked_target_selected",
         first_gap_mechanism="target_selection_rank_or_quality",
         selected_output_ref=(trace_row or {}).get("model_candidate_trace_status"),
+        diagnostic_severity_score=severity,
     )
 
 
@@ -1034,6 +1049,12 @@ def _m03_event_state_classification(diagnostics: Mapping[str, Any]) -> dict[str,
     correct = (block is None or block <= 0.5) and (disable is None or disable <= 0.5) and (
         uncertainty is None or uncertainty <= 0.8
     ) and (path_risk is None or path_risk <= 0.8)
+    severity = _diagnostic_threshold_severity(
+        block - 0.5 if block is not None else None,
+        disable - 0.5 if disable is not None else None,
+        uncertainty - 0.8 if uncertainty is not None else None,
+        path_risk - 0.8 if path_risk is not None else None,
+    )
     return _simple_layer_classification(
         correct=correct,
         candidate_set_scope="selected_path_event_state",
@@ -1042,6 +1063,7 @@ def _m03_event_state_classification(diagnostics: Mapping[str, Any]) -> dict[str,
         basis="point_in_time_event_pressure_and_uncertainty_thresholds",
         failure_type="event_risk_state_allowed",
         first_gap_mechanism="event_risk_gate",
+        diagnostic_severity_score=severity,
     )
 
 
@@ -1118,7 +1140,9 @@ def _simple_layer_classification(
     failure_type: str,
     first_gap_mechanism: str,
     selected_output_ref: Any = None,
+    diagnostic_severity_score: float | None = None,
 ) -> dict[str, Any]:
+    severity = 0.0 if correct else diagnostic_severity_score
     return {
         "candidate_set_scope": candidate_set_scope,
         "effective_decision_status": "measured",
@@ -1131,7 +1155,7 @@ def _simple_layer_classification(
         "scoring_status": "scored_point_in_time_diagnostic",
         "classification_basis": basis,
         "regret_to_best_available": 0.0 if correct else None,
-        "impact_normalized_severity_score": None,
+        "impact_normalized_severity_score": _round_metric_nullable(severity),
         "failure_type": "none" if correct else failure_type,
         "first_gap_mechanism": first_gap_mechanism,
         "selected_output_ref": selected_output_ref,
@@ -2191,6 +2215,11 @@ def _round_metric(value: float) -> float:
     return round(value, 10)
 
 
+def _diagnostic_threshold_severity(*breaches: float | None) -> float:
+    material = [value for value in breaches if value is not None and value > 0]
+    return _round_metric(min(1.0, max(material))) if material else 0.0
+
+
 def _impact_profile(row: Mapping[str, Any], *, failure_type: str, decision_time: str | None) -> dict[str, Any]:
     explicit_onset = _first_text(
         row,
@@ -2209,7 +2238,7 @@ def _impact_profile(row: Mapping[str, Any], *, failure_type: str, decision_time:
     raw_delta = realized_return - baseline_return
     magnitude = abs(raw_delta)
     denominator = _impact_normalization_denominator(row)
-    normalized = magnitude / denominator if denominator and denominator > 0 else None
+    normalized = magnitude / denominator if denominator and denominator > 0 else magnitude
     if denominator and denominator > 0:
         severity_basis = "target_normalized_return_move"
     else:
