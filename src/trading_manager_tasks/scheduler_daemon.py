@@ -309,21 +309,6 @@ def select_next_historical_work(
 
     completed_tuple = tuple(sorted(set(completed)))
     open_tuple = tuple(sorted(set(open_months)))
-    known_tuple = tuple(sorted(set(completed_tuple + open_tuple)))
-    if known_tuple:
-        gap_cursor = default_start_month
-        gap_limit = min(known_tuple[-1], max_month)
-        known_set = set(known_tuple)
-        while gap_cursor <= gap_limit:
-            if gap_cursor not in known_set:
-                return HistoricalWorkSelection(
-                    start_month=gap_cursor,
-                    end_month=gap_cursor,
-                    reason_code="fill_missing_workflow_state_gap",
-                    completed_months=completed_tuple,
-                    open_months=open_tuple,
-                )
-            gap_cursor = next_month(gap_cursor)
     active_target_symbol = active_model_worker_target_symbol(
         requested_target_symbol=selected_target_symbol,
         target_queue_path=target_queue_path,
@@ -337,6 +322,24 @@ def select_next_historical_work(
         else None
     )
     if open_target_fold is not None:
+        if _selection_payload_has_target_chain_stage(open_target_fold):
+            return HistoricalWorkSelection(
+                start_month=open_target_fold.start_month,
+                end_month=open_target_fold.end_month,
+                reason_code=open_target_fold.reason_code,
+                completed_months=completed_tuple,
+                open_months=open_tuple,
+                blocked_fold_start_month=(
+                    open_target_fold.start_month if open_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None
+                ),
+                blocked_fold_end_month=(
+                    open_target_fold.end_month if open_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None
+                ),
+                blocked_fold_state_path=(
+                    open_target_fold.state_path if open_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None
+                ),
+                blocked_target_symbol=active_target_symbol if open_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None,
+            )
         fold_ready, _ = _model_worker_fold_is_ready(storage_root, open_target_fold.start_month)
         if fold_ready:
             return HistoricalWorkSelection(
@@ -356,6 +359,41 @@ def select_next_historical_work(
                 ),
                 blocked_target_symbol=active_target_symbol if open_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None,
             )
+    lifecycle_block = (
+        _first_incomplete_model_group_lifecycle_fold(
+            storage_root=storage_root,
+            selected_target_symbol=active_target_symbol,
+        )
+        if active_target_symbol
+        else None
+    )
+    if lifecycle_block is not None:
+        return HistoricalWorkSelection(
+            start_month=lifecycle_block["start_month"],
+            end_month=lifecycle_block["end_month"],
+            reason_code="model_group_lifecycle_holds_fold_lane",
+            completed_months=completed_tuple,
+            open_months=open_tuple,
+            blocked_fold_start_month=lifecycle_block["start_month"],
+            blocked_fold_end_month=lifecycle_block["end_month"],
+            blocked_fold_state_path=lifecycle_block["state_path"],
+            blocked_target_symbol=lifecycle_block.get("target_symbol"),
+        )
+    known_tuple = tuple(sorted(set(completed_tuple + open_tuple)))
+    if known_tuple:
+        gap_cursor = default_start_month
+        gap_limit = min(known_tuple[-1], max_month)
+        known_set = set(known_tuple)
+        while gap_cursor <= gap_limit:
+            if gap_cursor not in known_set:
+                return HistoricalWorkSelection(
+                    start_month=gap_cursor,
+                    end_month=gap_cursor,
+                    reason_code="fill_missing_workflow_state_gap",
+                    completed_months=completed_tuple,
+                    open_months=open_tuple,
+                )
+            gap_cursor = next_month(gap_cursor)
     ready_target_fold = (
         select_model_worker_fold(
             storage_root=storage_root,
@@ -384,27 +422,6 @@ def select_next_historical_work(
             ),
             blocked_target_symbol=active_target_symbol if ready_target_fold.reason_code == "blocked_model_worker_fold_holds_target_lane" else None,
         )
-    lifecycle_block = (
-        _first_incomplete_model_group_lifecycle_fold(
-            storage_root=storage_root,
-            selected_target_symbol=active_target_symbol,
-        )
-        if active_target_symbol
-        else None
-    )
-    if lifecycle_block is not None:
-        return HistoricalWorkSelection(
-            start_month=lifecycle_block["start_month"],
-            end_month=lifecycle_block["end_month"],
-            reason_code="model_group_lifecycle_holds_fold_lane",
-            completed_months=completed_tuple,
-            open_months=open_tuple,
-            blocked_fold_start_month=lifecycle_block["start_month"],
-            blocked_fold_end_month=lifecycle_block["end_month"],
-            blocked_fold_state_path=lifecycle_block["state_path"],
-            blocked_target_symbol=lifecycle_block.get("target_symbol"),
-        )
-
     eligible_open_tuple = tuple(month for month in open_tuple if month <= max_month)
     if eligible_open_tuple:
         selected = eligible_open_tuple[0]
@@ -960,6 +977,37 @@ def _fold_payload_has_ready_model_worker_stage(payload: dict[str, Any]) -> bool:
     return False
 
 
+def _fold_payload_has_target_chain_stage(payload: dict[str, Any]) -> bool:
+    """Return whether an open fold has moved beyond monthly foundation repair."""
+
+    stages = payload.get("stages")
+    if not isinstance(stages, list):
+        return False
+    for stage in stages:
+        if not isinstance(stage, dict) or not _is_model_worker_routable_stage(stage):
+            continue
+        stage_type = str(stage.get("stage_type") or "")
+        if stage_type in MODEL_WORKER_STAGE_TYPES:
+            return True
+        try:
+            layer = int(stage.get("layer"))
+        except (TypeError, ValueError):
+            return True
+        if stage_type in MODEL_WORKER_PREP_STAGE_TYPES and layer >= 3:
+            return True
+    return False
+
+
+def _selection_payload_has_target_chain_stage(selection: ModelWorkerFoldSelection | None) -> bool:
+    if selection is None or not selection.state_path:
+        return False
+    try:
+        payload = json.loads(Path(selection.state_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return _fold_payload_has_target_chain_stage(payload)
+
+
 def _open_model_worker_fold_for_target(
     *,
     storage_root: Path,
@@ -1091,6 +1139,8 @@ def target_has_open_model_worker_fold(
             return False
         if selection.end_month > max_month:
             return False
+        if _selection_payload_has_target_chain_stage(selection):
+            return True
         if _first_missing_workflow_month(
             storage_root=storage_root,
             default_start_month="2016-01",
@@ -1105,6 +1155,8 @@ def target_has_open_model_worker_fold(
             continue
         if selection.end_month > max_month:
             continue
+        if _selection_payload_has_target_chain_stage(selection):
+            return True
         if (
             _first_missing_workflow_month(
                 storage_root=storage_root,
@@ -1152,6 +1204,8 @@ def select_model_worker_fold(
     if open_selection is not None:
         if open_selection.end_month > max_month:
             return None
+        if _selection_payload_has_target_chain_stage(open_selection):
+            return open_selection
         if _first_missing_workflow_month(
             storage_root=storage_root,
             default_start_month=default_start_month,

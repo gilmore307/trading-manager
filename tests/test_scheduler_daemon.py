@@ -2000,6 +2000,70 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(selection.fold_id, "fold_aapl_2016")
         self.assertEqual(selection.reason_code, "blocked_model_worker_fold_holds_target_lane")
 
+    def test_open_target_chain_fold_holds_lane_even_when_month_state_is_missing(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            storage_root = Path(raw_tmp) / "manager-storage"
+            queue_path = self._write_target_queue(storage_root)
+            for month in rolling_fold_months("2016-01")[:12]:
+                self._complete_monthly_substrate(storage_root=storage_root, month=month)
+            self._complete_monthly_substrate(storage_root=storage_root, month="2017-02")
+            state_path = model_worker_fold_state_path(
+                "2016-01",
+                "2017-06",
+                root=storage_root / "runtime",
+                selected_target_symbol="AAPL",
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2017-06",
+                        "target_symbol": "AAPL",
+                        "stages": [
+                            {
+                                "stage_id": "model_06_residual_event_governance.model_generation.train",
+                                "stage_type": "model_generation",
+                                "layer": 6,
+                                "layer_key": "model_06_residual_event_governance",
+                                "status": "ready",
+                            }
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            next_work = select_next_historical_work(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                default_end_month="2016-01",
+                max_month="2018-06",
+                target_queue_path=queue_path,
+            )
+            fold_selection = select_model_worker_fold(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                max_month="2017-06",
+                selected_target_symbol="AAPL",
+            )
+            ingest_months = select_month_ingest_worker_months(
+                storage_root=storage_root,
+                default_start_month="2016-01",
+                worker_count=3,
+                max_month="2018-06",
+                selected_target_symbol="AAPL",
+            )
+
+        self.assertEqual(next_work.reason_code, "resume_open_model_worker_fold")
+        self.assertEqual((next_work.start_month, next_work.end_month), ("2016-01", "2017-06"))
+        self.assertIsNotNone(fold_selection)
+        assert fold_selection is not None
+        self.assertEqual(fold_selection.fold_id, "fold_aapl_2016")
+        self.assertEqual(ingest_months, ())
+
     def test_completed_pre_replay_fold_holds_next_fold_until_model_group_lifecycle_completes(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             storage_root = Path(raw_tmp) / "manager-storage"
