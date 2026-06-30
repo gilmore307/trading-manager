@@ -898,9 +898,9 @@ def model_group_lifecycle_blocks_next_fold(
     """Return whether any completed pre-replay fold still owns the lane.
 
     M06 may update the event-observation pool consumed by later M03 event-state
-    folds. The scheduler therefore cannot start the next fold after M01-M05
-    alone; the current fold must complete replay, M06, evaluation,
-    promotion, and maintenance readiness first.
+    folds. The scheduler therefore cannot start the next fold after M01-M06
+    model generation alone; the current fold must complete replay, post-replay
+    M06 attribution, evaluation, promotion, and maintenance readiness first.
     """
 
     return _first_incomplete_model_group_lifecycle_fold(

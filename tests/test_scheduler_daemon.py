@@ -1238,7 +1238,7 @@ class SchedulerDaemonTests(unittest.TestCase):
             statuses = {stage["stage_id"]: stage["status"] for stage in payload["stages"]}
 
         self.assertEqual(seeded_path, state_path)
-        self.assertEqual(statuses["model_03_event_state.data_acquisition"], "succeeded")
+        self.assertEqual(statuses["model_03_event_state.data_acquisition"], "blocked")
         self.assertEqual(statuses["model_01_background_context.feature_generation"], "succeeded")
         self.assertEqual(payload["next_stage"]["stage_id"], "model_01_background_context.model_generation.train")
 

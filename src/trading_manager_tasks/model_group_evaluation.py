@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
+from .fold_naming import model_worker_fold_id
 from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
 from .model_training_workflow import base_stack_model_generation_splits_complete
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -2689,7 +2690,7 @@ def _completed_training_fold(
                     "start_month": start_month,
                     "end_month": end_month,
                     "state_path": str(path),
-                    "fold_id": f"fold_{start_month}_{end_month}",
+                    "fold_id": model_worker_fold_id(target_symbol=target_symbol, start_month=start_month),
                     "target_symbol": target_symbol,
                     "candidate_model_ref": f"storage://trading-manager/model_group/{target_ref_part}/{start_month}_{end_month}",
                 },

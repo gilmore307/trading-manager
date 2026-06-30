@@ -460,7 +460,7 @@ def _write_no_decision_promotion_rejection(
         "agent_review_recommendation": "failed",
         "replay_freeze_status": "frozen",
         "guardrail_status": "failed",
-        "fold_stack_status": "complete_m01_m05_replay_no_decisions",
+        "fold_stack_status": "complete_m01_m06_replay_no_decisions",
         "metric_refs": [],
         "guardrail_refs": [str(replay_receipt_path)],
         "first_model_bootstrap": False,

@@ -82,7 +82,7 @@ watch.
 | Market structure calendar | Market session, holiday, early close, option expiry, triple-witching, and rebalance calendar rows | Frozen market-session/special-calendar rows for the replay window | `realtime_calendar_context` market-session/special-calendar refs | Calendar state/tradeability context; not a broker action by itself |
 | Option activity context | PIT option-chain/quote/trade/IV/OI evidence where available | Replay-triggered option snapshots when components request option expression | ThetaData/Alpaca option refs where approved | Trained option-expression/event-risk input only when option coverage and clocks are accepted |
 
-M01-M05 parity audits should use the same columns instead of inventing separate
+M01-M06 parity audits should use the same columns instead of inventing separate
 phase-specific vocabulary.
 
 ## Acceptance

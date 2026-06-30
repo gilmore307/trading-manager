@@ -41,6 +41,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_model_group_replay_auto_option_acquisition.py`
 - `test_model_group_replay_contract_paths.py`
 - `test_model_group_replay_dataset.py`
+- `test_model_group_replay_naming.py`
 - `test_model_group_replay_option_features.py`
 - `test_model_group_rerun.py`
 - `test_model_promotion.py`

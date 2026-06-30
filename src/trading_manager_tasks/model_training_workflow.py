@@ -25,7 +25,7 @@ from .storage_paths import data_storage_root, model_runtime_root
 StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
 BASE_STACK_LAYER_COUNT = 6
-PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT = 5
+PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT = BASE_STACK_LAYER_COUNT
 BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 5)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 12
@@ -48,7 +48,7 @@ ROLLING_FOLD_SPLIT_MONTHS = (
 )
 REQUIRED_MODEL_GENERATION_SPLIT_NAMES = tuple(split_name for split_name, _months in ROLLING_FOLD_SPLIT_MONTHS)
 PROMOTION_STAGE_TYPE = "promotion_review"
-FOLD_STACK_PROMOTION_BLOCKER = "fold_models_01_05_model_generation_complete"
+FOLD_STACK_PROMOTION_BLOCKER = "fold_models_01_06_model_generation_complete"
 MODEL_GROUP_REPLAY_COMPLETE_BLOCKER = "model_group_replay_complete"
 MULTI_TARGET_SYMBOL_BLOCKER = "multiple_target_symbols_require_separate_workflows"
 MODEL_RUNTIME_ROOT = model_runtime_root()
@@ -222,7 +222,7 @@ def model_generation_splits_complete(stages: Any, *, layer_number: int) -> bool:
 
 
 def base_stack_model_generation_splits_complete(stages: Any, *, layer_count: int = PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT) -> bool:
-    """Return whether the pre-replay M01-M05 stack has completed train/validation/test generation."""
+    """Return whether the pre-replay M01-M06 stack has completed train/validation/test generation."""
 
     return all(model_generation_splits_complete(stages, layer_number=layer_number) for layer_number in range(1, layer_count + 1))
 
@@ -235,7 +235,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (),
         "progression_mode": "background_panel_continuous",
         "candidate_axis": "walk_forward_12_3_3_window",
-        "candidate_progression_policy": "complete fixed M01 market and sector background substrate for each eighteen-month chronological evaluation window; promotion waits for M01-M05 model generation, model-group replay, and residual-event attribution",
+        "candidate_progression_policy": "complete fixed M01 market and sector background substrate for each eighteen-month chronological evaluation window; promotion waits for M01-M06 model generation, model-group replay, and residual-event attribution",
         "data_surface": "autonomous Alpaca market/background ETF bars acquisition plus migration-source m01/m02 context features",
         "feature_cli": "trading-data-m01-market-regime-feature-generation",
     },

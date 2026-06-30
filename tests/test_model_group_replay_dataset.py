@@ -253,7 +253,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             )
             self.assertIsNone(second)
 
-    def test_pre_replay_fold_admits_dataset_before_m06_generation(self):
+    def test_pre_replay_fold_blocks_dataset_before_m06_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
@@ -275,10 +275,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                 execute=False,
             )
 
-        self.assertIsNotNone(decision)
-        assert decision is not None
-        self.assertEqual(decision.decision_status, "ready")
-        self.assertEqual(decision.reason_code, "model_group_replay_dataset_base_context_ready")
+        self.assertIsNone(decision)
 
     def test_frozen_manifest_is_fold_agnostic_after_latest_completed_fold_changes(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

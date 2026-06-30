@@ -3380,8 +3380,6 @@ def _presentable_fold_stages(raw_stages: list[Any]) -> list[Any]:
             layer = int(raw_stage.get("layer"))
         except (TypeError, ValueError):
             layer = 0
-        if layer == 6 and str(raw_stage.get("stage_type") or "") == "model_generation":
-            continue
         if _is_fold_dashboard_stage(raw_stage):
             visible.append(raw_stage)
     return visible
@@ -6132,7 +6130,7 @@ def _model_group_replay_timeline_tasks(
 
     replay_blockers: list[str] = []
     if not pre_replay_complete:
-        replay_blockers.append("fold_models_01_05_model_generation_complete")
+        replay_blockers.append("fold_models_01_06_model_generation_complete")
     elif manifest is None:
         replay_blockers.append("replay_dataset_preparation_manifest")
     elif not replay_scope_status["compatible"]:
@@ -6172,7 +6170,7 @@ def _model_group_replay_timeline_tasks(
         if replay_month_reason is not None
         else f"Model-group replay has started and completed {len(replay_ready_months)}/{_replay_window_month_count(dataset_root)} replay months."
         if replay_started
-        else "Pre-replay M01-M05 fold is complete; replay is waiting for its fixed replay dataset preparation manifest."
+        else "Pre-replay M01-M06 fold is complete; replay is waiting for its fixed replay dataset preparation manifest."
         if pre_replay_complete and manifest is None
         else str(replay_scope_status["reason"])
         if pre_replay_complete and manifest is not None and not replay_scope_status["compatible"]
@@ -6182,7 +6180,7 @@ def _model_group_replay_timeline_tasks(
         if pre_replay_complete and manifest is not None and coverage_complete and not freeze_ready
         else "Replay dataset is frozen and ready for fold-bound execution-component-graph replay."
         if pre_replay_complete and manifest is not None and freeze_ready and not replay_complete
-        else "Waiting for pre-replay M01-M05 model generation to complete before replay can run."
+        else "Waiting for pre-replay M01-M06 model generation to complete before replay can run."
     )
     if manifest is not None and replay_scope_status["compatible"] and not coverage_complete:
         replay_progress = _replay_dataset_month_operation_progress(

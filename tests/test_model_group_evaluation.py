@@ -110,7 +110,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _write_pre_replay_complete_fold_with_pending_m06_generation(self, storage_root: Path) -> None:
+    def _write_fold_with_pending_m06_generation(self, storage_root: Path) -> None:
         state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
         state_path.parent.mkdir(parents=True)
         stages = []
@@ -574,13 +574,13 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(refreshed.reason_code, "model_group_evaluation_executed")
             self.assertEqual(len(list((dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json"))), 3)
 
-    def test_evaluates_pre_replay_complete_fold_with_pending_m06_generation_stages(self):
+    def test_blocks_evaluation_when_m06_generation_stages_are_pending(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             self._write_ready_replay_and_attribution(storage_root)
-            self._write_pre_replay_complete_fold_with_pending_m06_generation(storage_root)
+            self._write_fold_with_pending_m06_generation(storage_root)
 
             decision = run_model_group_evaluation_if_ready(
                 storage_root=storage_root,
@@ -588,9 +588,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 call_agent_review=False,
             )
 
-            self.assertIsNotNone(decision)
-            assert decision is not None
-            self.assertEqual(decision.reason_code, "model_group_evaluation_executed")
+            self.assertIsNone(decision)
 
     def test_local_fallback_review_writes_terminal_deferred_decision(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
