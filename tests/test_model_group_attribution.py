@@ -330,6 +330,14 @@ class ModelGroupAttributionTests(unittest.TestCase):
             )
             self.assertEqual(performance_summary["contract_type"], "model_group_replay_review_performance_summary")
             self.assertEqual(performance_summary["summary"]["decision_scope"]["decision_row_count"], 5)
+            self.assertEqual(
+                performance_summary["layer_differentiation"]["model_01_background_context"]["continuous_trigger_count"],
+                3,
+            )
+            self.assertEqual(
+                performance_summary["layer_differentiation"]["model_03_event_state"]["coverage_basis"],
+                "unique_replay_time_pointer_from_model_candidate_selection_trace",
+            )
             target_performance = performance_summary["summary"]["target_performance"]
             self.assertEqual(target_performance["turnover_gross_pnl_total"], 150.0)
             self.assertAlmostEqual(target_performance["gross_pnl_total"], 149.6)

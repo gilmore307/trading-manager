@@ -1659,7 +1659,7 @@ def _replay_review_performance_summary(
         "replacement_review": replacement_review,
         "option_expression": option_expression,
         "direction_expression": direction_expression,
-        "layer_differentiation": _layer_differentiation_summary(decisions),
+        "layer_differentiation": _layer_differentiation_summary(decisions, trace_rows=traces),
         "source_refs": {
             "decision_rows_ref": str(replay_receipt.get("decision_rows_ref") or ""),
             "model_candidate_selection_trace_ref": str(replay_receipt.get("model_candidate_selection_trace_ref") or ""),
@@ -1938,8 +1938,13 @@ def _replacement_review_rows(rows: Iterable[Mapping[str, Any]], *, limit: int) -
     ]
 
 
-def _layer_differentiation_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+def _layer_differentiation_summary(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    trace_rows: Iterable[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
     decisions = list(rows)
+    traces = list(trace_rows)
     diagnostics_by_layer: dict[str, list[Mapping[str, Any]]] = {
         "model_01_background_context": [],
         "model_02_target_state": [],
@@ -1956,10 +1961,25 @@ def _layer_differentiation_summary(rows: Iterable[Mapping[str, Any]]) -> dict[st
             value = diagnostics.get(layer)
             if isinstance(value, MappingABC):
                 diagnostics_by_layer[layer].append(value)
-    return {
+    summaries = {
         layer: _diagnostic_variation_summary(items)
         for layer, items in diagnostics_by_layer.items()
     }
+    replay_timestamps = {
+        str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+        for row in traces
+        if str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+    }
+    if replay_timestamps:
+        for layer in ("model_01_background_context", "model_03_event_state"):
+            summaries[layer] = {
+                **summaries[layer],
+                "continuous_trigger_count": len(replay_timestamps),
+                "trace_timestamp_count": len(replay_timestamps),
+                "trace_row_count": len(traces),
+                "coverage_basis": "unique_replay_time_pointer_from_model_candidate_selection_trace",
+            }
+    return summaries
 
 
 def _diagnostic_variation_summary(items: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
