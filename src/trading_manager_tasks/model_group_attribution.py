@@ -41,6 +41,61 @@ REPLAY_LAYER_REVIEW_LAYERS = (
     ("model_05_option_expression", "M05 Option Expression"),
 )
 EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS = ("model_06_residual_event_governance",)
+REPLAY_LAYER_REVIEW_METHODS = {
+    "model_01_background_context": {
+        "metric_family": "background_context_state_quality",
+        "analysis_method": "point_in_time_context_quality_threshold_review",
+        "decision_time_input_fields": [
+            "state_quality_score",
+            "market_risk_stress_score",
+            "transition_risk_score",
+        ],
+        "post_replay_label_fields": [],
+    },
+    "model_02_target_state": {
+        "metric_family": "target_candidate_selection_quality",
+        "analysis_method": "same_timestamp_candidate_rank_and_tradability_review",
+        "decision_time_input_fields": [
+            "model_rank_within_timestamp",
+            "target_direction_score_1D",
+            "tradability_score_1D",
+            "target_trend_quality_score_1D",
+        ],
+        "post_replay_label_fields": [],
+    },
+    "model_03_event_state": {
+        "metric_family": "event_state_risk_pressure_quality",
+        "analysis_method": "point_in_time_event_pressure_threshold_review",
+        "decision_time_input_fields": [
+            "event_uncertainty_score_1D",
+            "event_entry_block_pressure_score_1D",
+            "event_strategy_disable_pressure_score_1D",
+            "event_path_risk_score_1D",
+        ],
+        "post_replay_label_fields": [],
+    },
+    "model_04_unified_decision": {
+        "metric_family": "underlying_action_quality",
+        "analysis_method": "post_replay_directional_underlying_label_review",
+        "decision_time_input_fields": [
+            "resolved_underlying_action_type",
+            "resolved_action_side",
+            "prediction_score",
+        ],
+        "post_replay_label_fields": ["directional_underlying_return", "realized_return", "baseline_return"],
+    },
+    "model_05_option_expression": {
+        "metric_family": "option_expression_quality",
+        "analysis_method": "selected_option_expression_return_and_direction_consistency_review",
+        "decision_time_input_fields": [
+            "selected_expression_type",
+            "selected_contract_ref",
+            "eligible_candidate_count",
+            "top_contract_fit_score",
+        ],
+        "post_replay_label_fields": ["realized_return", "baseline_return", "fill_status"],
+    },
+}
 
 
 def run_model_group_replay_review_if_ready(
@@ -883,6 +938,7 @@ def _layer_review_row(
 ) -> dict[str, Any]:
     decision_time = _decision_time(row)
     diagnostics = _layer_diagnostics(row, layer_id)
+    method = REPLAY_LAYER_REVIEW_METHODS.get(layer_id, {})
     classification = _layer_review_classification(row, layer_id=layer_id, diagnostics=diagnostics, trace_row=trace_row)
     correctness = str(classification["correctness_class"])
     return {
@@ -906,6 +962,13 @@ def _layer_review_row(
         "layer_id": layer_id,
         "layer_label": layer_label,
         "layer_order": layer_order,
+        "metric_family": method.get("metric_family", "unsupported_layer_review"),
+        "analysis_method": method.get("analysis_method", "unsupported_layer_review"),
+        "decision_time_input_fields": list(method.get("decision_time_input_fields", [])),
+        "post_replay_label_fields": list(method.get("post_replay_label_fields", [])),
+        "label_role": "post_replay_review_label_not_decision_time_input"
+        if method.get("post_replay_label_fields")
+        else "point_in_time_diagnostic_only",
         "effective_decision": _effective_layer_decision(row, layer_id=layer_id, diagnostics=diagnostics, trace_row=trace_row),
         "effective_decision_status": classification["effective_decision_status"],
         "selected_output_ref": _layer_ref(row, layer_id) or diagnostics.get("model_ref") or classification.get("selected_output_ref"),
@@ -1331,10 +1394,15 @@ def _layer_review_diagnostic_summary(rows: Iterable[Mapping[str, Any]]) -> dict[
             for layer_id, layer_rows in by_layer.items()
         },
         "classification_policy": {
-            "m01_m03": "point-in-time diagnostics and selected-path trace thresholds; no future labels are used as decision-time inputs",
-            "m04": "post-replay directional underlying return label",
-            "m05": "post-replay selected option expression return label plus direction consistency",
+            "shared_envelope": "M01-M05 rows share identity, evidence refs, scoring status, and label provenance fields; metric families and analysis methods are layer-specific.",
+            "m01": REPLAY_LAYER_REVIEW_METHODS["model_01_background_context"]["analysis_method"],
+            "m02": REPLAY_LAYER_REVIEW_METHODS["model_02_target_state"]["analysis_method"],
+            "m03": REPLAY_LAYER_REVIEW_METHODS["model_03_event_state"]["analysis_method"],
+            "m04": REPLAY_LAYER_REVIEW_METHODS["model_04_unified_decision"]["analysis_method"],
+            "m05": REPLAY_LAYER_REVIEW_METHODS["model_05_option_expression"]["analysis_method"],
+            "hindsight_caution": "Post-replay label fields are review labels only and must not be interpreted as decision-time inputs.",
         },
+        "layer_analysis_methods": REPLAY_LAYER_REVIEW_METHODS,
     }
 
 

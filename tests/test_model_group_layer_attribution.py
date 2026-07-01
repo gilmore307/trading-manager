@@ -278,7 +278,11 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 }
             self.assertEqual(
                 operation_flow_rows["C03_lifecycle_operation"]["applicability_status"],
-                "not_applicable_for_candidate_entry_replay",
+                "missing_lifecycle_state_evidence",
+            )
+            self.assertEqual(
+                operation_flow_rows["C03_lifecycle_operation"]["verdict_basis"],
+                "portfolio_lifecycle_summary_missing_from_replay_receipt",
             )
             self.assertEqual(
                 operation_flow_rows["C04_expression_review_operation"]["first_limiting_projections"],
@@ -308,6 +312,12 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             )
             self.assertEqual(
                 metric_rows[("C02_entry_operation", "selected_target_forward_return_rank_within_sector")][
+                    "availability_status"
+                ],
+                "data_gap",
+            )
+            self.assertEqual(
+                metric_rows[("C03_lifecycle_operation", "portfolio_lifecycle_state_evidence_coverage")][
                     "availability_status"
                 ],
                 "data_gap",

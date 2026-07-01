@@ -151,15 +151,16 @@ contract path materialization under C04, fill/execution under C06, and residual
 event or settled prediction quality under C07. The metrics surface gives each
 operation its own diagnostic family: C01 target-universe integrity and
 sector-bucket selection effectiveness, C02 target rank inside the selected
-sector bucket and entry signal/outcome alignment, C04 option-expression candidate
-funnel and selected-path materialization, C05 capacity/sizing counterfactual
-spread, C06 path/fill coverage, and C07 settled score/outcome quality. Future
-returns in these metrics are retrospective labels only and are forbidden as
-decision-time inputs. When the visible universe or forward-return evidence is not
-available, the component metric is a `data_gap`, not neutral performance. C03
-lifecycle is marked
-`not_applicable_for_candidate_entry_replay` for candidate-entry replay rows that
-do not manage an existing position.
+sector bucket and entry signal/outcome alignment, C03 portfolio lifecycle
+continuity and replacement-policy state, C04 option-expression candidate funnel
+and selected-path materialization, C05 capacity/sizing counterfactual spread, C06
+path/fill coverage, and C07 settled score/outcome quality. Future returns in
+these metrics are retrospective labels only and are forbidden as decision-time
+inputs. When the visible universe, forward-return evidence, or lifecycle state
+evidence is not available, the component metric is a `data_gap`, not neutral
+performance. C03 is part of the single replay operation chain; missing portfolio
+lifecycle state must be reported as missing evidence, not as a separate replay
+mode or non-applicable component.
 
 `operation_mechanism_contract_packet.csv/json` is the standing mechanism
 contract layer. It does not create one-off repair tasks. Each row names a

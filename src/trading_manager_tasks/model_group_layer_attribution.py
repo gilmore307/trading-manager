@@ -329,8 +329,8 @@ OPERATION_COMPONENT_SPECS = [
         "operation_component_id": "C03_lifecycle_operation",
         "runtime_component_ref": "component_03_lifecycle",
         "operation_component_label": "C03 Lifecycle",
-        "operation_role": "manage existing positions after entry",
-        "entry_path_participant": False,
+        "operation_role": "manage open-position continuity, held-target continuation, and replacement policy",
+        "entry_path_participant": True,
     },
     {
         "component_index": 4,
@@ -368,6 +368,43 @@ OPERATION_COMPONENT_SPECS = [
 OPERATION_COMPONENT_BY_ID = {
     str(spec["operation_component_id"]): spec
     for spec in OPERATION_COMPONENT_SPECS
+}
+OPERATION_COMPONENT_ANALYSIS_METHODS = {
+    "C01_intake_operation": {
+        "analysis_method": "point_in_time_source_candidate_and_sector_intake_review",
+        "evidence_role": "source_candidate_context_readiness",
+        "label_role": "forward_return_labels_only_for_intake_opportunity_review",
+    },
+    "C02_entry_operation": {
+        "analysis_method": "entry_candidate_rank_signal_and_action_gate_review",
+        "evidence_role": "entry_gate_and_underlying_action_surface",
+        "label_role": "post_replay_return_labels_for_entry_quality_review",
+    },
+    "C03_lifecycle_operation": {
+        "analysis_method": "portfolio_lifecycle_state_transition_and_replacement_policy_review",
+        "evidence_role": "open_position_state_and_replacement_policy_evidence",
+        "label_role": "operational_state_transition_counts_not_future_return_decision_inputs",
+    },
+    "C04_expression_review_operation": {
+        "analysis_method": "option_expression_funnel_materialization_and_contract_path_review",
+        "evidence_role": "option_expression_candidate_set_and_selected_contract_path",
+        "label_role": "post_replay_return_labels_for_expression_quality_review",
+    },
+    "C05_order_intent_operation": {
+        "analysis_method": "order_intent_sizing_capacity_and_budget_contract_review",
+        "evidence_role": "sizing_notional_capacity_and_order_intent_evidence",
+        "label_role": "capacity_counterfactual_labels_are_post_replay_diagnostics",
+    },
+    "C06_execution_gate_operation": {
+        "analysis_method": "execution_path_fill_and_materialization_gate_review",
+        "evidence_role": "selected_contract_path_fill_and_execution_gate_evidence",
+        "label_role": "fill_coverage_status_not_model_alpha_label",
+    },
+    "C07_failure_review_operation": {
+        "analysis_method": "settled_failure_review_and_residual_gap_explanation_review",
+        "evidence_role": "post_action_failure_review_and_settlement_evidence",
+        "label_role": "settled_outcomes_are_review_labels_not_m06_decision_inputs",
+    },
 }
 OPERATION_REVIEW_PROJECTION_BY_SURFACE = {
     "C01_background_context_surface": {
@@ -496,6 +533,10 @@ OPERATION_COMPONENT_METRIC_FIELDNAMES = [
     "metric_family",
     "metric_name",
     "metric_scope",
+    "analysis_method",
+    "evidence_role",
+    "label_role",
+    "required_evidence_status",
     "availability_status",
     "reason_codes",
     "point_in_time_input_fields",
@@ -606,6 +647,7 @@ def build_model_group_layer_attribution(
     rows = tuple(_load_jsonl(decision_rows_path))
     if not rows:
         raise ValueError(f"decision rows are empty: {decision_rows_path}")
+    replay_receipt = _load_json_file(replay_receipt_path)
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
     run_id_value = run_id or "model_group_layer_attribution_" + now.strftime("%Y%m%dT%H%M%SZ")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -659,6 +701,7 @@ def build_model_group_layer_attribution(
     operation_component_flow_rows = _operation_component_flow_rows(
         decision_surface_rows,
         operation_review_projection_rows,
+        replay_receipt=replay_receipt,
     )
     target_selection_universe_rows = _load_csv_rows(target_selection_universe_metrics_path)
     model_candidate_selection_trace_path = _resolved_model_candidate_selection_trace_path(
@@ -683,6 +726,7 @@ def build_model_group_layer_attribution(
         target_selection_universe_rows=target_selection_universe_rows,
         portfolio_capacity_rows=portfolio_capacity_rows,
         model_candidate_selection_trace_rows=model_candidate_selection_trace_rows,
+        replay_receipt=replay_receipt,
     )
     operation_component_metric_report = _operation_component_metric_report(operation_component_metric_rows)
     sector_opportunity_packet_path = _sector_opportunity_packet_path(target_selection_universe_metrics_path)
@@ -2459,6 +2503,8 @@ def _operation_review_projection_matrix_rows(
 def _operation_component_flow_rows(
     decision_surface_rows: Sequence[Mapping[str, Any]],
     operation_review_projection_rows: Sequence[Mapping[str, Any]],
+    *,
+    replay_receipt: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     first_projection_by_decision = {
         str(row.get("decision_id") or ""): row
@@ -2474,13 +2520,8 @@ def _operation_component_flow_rows(
     for spec in OPERATION_COMPONENT_SPECS:
         component_id = str(spec["operation_component_id"])
         component_index = int(spec["component_index"])
-        if not bool(spec["entry_path_participant"]):
-            output.append(
-                _operation_component_not_applicable_row(
-                    spec=spec,
-                    review_projection_rows=operation_review_projection_rows,
-                )
-            )
+        if component_id == "C03_lifecycle_operation":
+            output.append(_operation_component_lifecycle_flow_row(spec=spec, replay_receipt=replay_receipt))
             continue
         current_order = entry_order[component_id]
         entered_rows = [
@@ -2574,39 +2615,86 @@ def _operation_component_flow_rows(
     return output
 
 
-def _operation_component_not_applicable_row(
+def _operation_component_lifecycle_flow_row(
     *,
     spec: Mapping[str, Any],
-    review_projection_rows: Sequence[Mapping[str, Any]],
+    replay_receipt: Mapping[str, Any],
 ) -> dict[str, Any]:
     component_id = str(spec["operation_component_id"])
+    summary = _as_mapping(replay_receipt.get("portfolio_selection_summary"))
+    if not summary:
+        applicability_status = "missing_lifecycle_state_evidence"
+        input_count = 0
+        output_count = 0
+        blocked_count = 0
+        eligible_count = 0
+        first_limiting_count = 0
+        stage_verdict = "insufficient_evidence"
+        verdict_basis = "portfolio_lifecycle_summary_missing_from_replay_receipt"
+        outcome_metric_available = False
+    else:
+        replacement_evaluated = int(_float(summary.get("portfolio_replacement_evaluated_count"), default=0.0))
+        replacement_triggered = int(_float(summary.get("portfolio_replacement_triggered_count"), default=0.0))
+        blocked_count = sum(
+            int(_float(summary.get(key), default=0.0))
+            for key in (
+                "portfolio_replacement_blocked_by_threshold_count",
+                "portfolio_replacement_blocked_by_expression_count",
+                "portfolio_replacement_blocked_by_allocation_count",
+                "portfolio_allocation_contract_violation_count",
+            )
+        )
+        continued_count = int(_float(summary.get("portfolio_existing_position_continued_count"), default=0.0))
+        input_count = int(
+            _float(
+                summary.get("m04_trade_intent_count")
+                if summary.get("m04_trade_intent_count") not in {None, ""}
+                else summary.get("candidate_count"),
+                default=0.0,
+            )
+        )
+        output_count = int(_float(summary.get("final_position_count"), default=0.0))
+        eligible_count = replacement_evaluated + continued_count + replacement_triggered
+        first_limiting_count = blocked_count
+        outcome_metric_available = True
+        applicability_status = "portfolio_lifecycle_state_reviewed"
+        if int(_float(summary.get("portfolio_allocation_contract_violation_count"), default=0.0)) > 0:
+            stage_verdict = "first_observed_deterioration"
+            verdict_basis = "portfolio_allocation_contract_violation_present"
+        elif blocked_count > replacement_triggered and replacement_evaluated:
+            stage_verdict = "lifecycle_replacement_pressure_observed"
+            verdict_basis = "replacement_attempts_more_often_blocked_than_triggered"
+        elif eligible_count > 0:
+            stage_verdict = "neutral_measured"
+            verdict_basis = "portfolio_lifecycle_summary_published"
+        else:
+            stage_verdict = "neutral_or_unmeasured"
+            verdict_basis = "no_lifecycle_transitions_reported"
     return {
         "component_index": int(spec["component_index"]),
         "operation_component_id": component_id,
         "runtime_component_ref": str(spec["runtime_component_ref"]),
         "operation_component_label": str(spec["operation_component_label"]),
         "operation_role": str(spec["operation_role"]),
-        "applicability_status": "not_applicable_for_candidate_entry_replay",
-        "input_count": 0,
-        "output_count": 0,
-        "dropped_or_blocked_count": 0,
+        "applicability_status": applicability_status,
+        "input_count": input_count,
+        "output_count": output_count,
+        "dropped_or_blocked_count": blocked_count,
         "censored_count": 0,
-        "settled_metric_eligible_count": 0,
+        "settled_metric_eligible_count": eligible_count,
         "settled_metric_excluded_count": 0,
-        "first_limiting_projection_count": sum(
-            1 for row in review_projection_rows if row.get("operation_component_id") == component_id
-        ),
-        "first_limiting_projections": ";".join(_operation_component_projection_refs(component_id)),
+        "first_limiting_projection_count": first_limiting_count,
+        "first_limiting_projections": "portfolio_replacement_or_allocation_block" if first_limiting_count else "",
         "review_projection_refs": ";".join(_operation_component_projection_refs(component_id)),
-        "outcome_metric_available": False,
+        "outcome_metric_available": outcome_metric_available,
         "mean_prediction_score": None,
         "score_label_spearman": None,
         "score_return_spearman": None,
         "mean_realized_return": None,
         "hit_rate": None,
         "tail_loss_count": 0,
-        "stage_verdict": "not_applicable",
-        "verdict_basis": "candidate_entry_replay_does_not_operate_lifecycle_component",
+        "stage_verdict": stage_verdict,
+        "verdict_basis": verdict_basis,
         "threshold_selection_performed": False,
         "retraining_performed": False,
         "fixed_input_only": True,
@@ -2669,12 +2757,13 @@ def _operation_component_metric_rows(
     target_selection_universe_rows: Sequence[Mapping[str, Any]],
     portfolio_capacity_rows: Sequence[Mapping[str, Any]],
     model_candidate_selection_trace_rows: Sequence[Mapping[str, Any]],
+    replay_receipt: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     output.extend(_target_selection_metric_rows(rows, target_selection_universe_rows))
     output.extend(_model_candidate_selection_metric_rows(rows, model_candidate_selection_trace_rows))
     output.append(_entry_signal_metric_row(rows))
-    output.append(_lifecycle_metric_row())
+    output.extend(_lifecycle_metric_rows(replay_receipt))
     output.append(_option_expression_metric_row(rows))
     output.append(_order_intent_metric_row(rows, portfolio_capacity_rows))
     output.append(_execution_gate_metric_row(rows))
@@ -3012,17 +3101,80 @@ def _entry_signal_metric_row(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any
     )
 
 
-def _lifecycle_metric_row() -> dict[str, Any]:
-    return _operation_component_metric_row(
-        component_id="C03_lifecycle_operation",
-        metric_family="position_lifecycle_quality",
-        metric_name="existing_position_lifecycle_outcome",
-        metric_scope="candidate_entry_replay",
-        availability_status="not_applicable",
-        reason_codes=["candidate_entry_replay_does_not_operate_lifecycle_component"],
-        point_in_time_input_fields=[],
-        future_outcome_fields=[],
-    )
+def _lifecycle_metric_rows(replay_receipt: Mapping[str, Any]) -> list[dict[str, Any]]:
+    summary = _as_mapping(replay_receipt.get("portfolio_selection_summary"))
+    if not summary:
+        return [
+            _operation_component_metric_row(
+                component_id="C03_lifecycle_operation",
+                metric_family="portfolio_lifecycle_state",
+                metric_name="portfolio_lifecycle_state_evidence_coverage",
+                metric_scope="replay_execution_receipt",
+                availability_status="data_gap",
+                reason_codes=["portfolio_lifecycle_summary_missing"],
+                point_in_time_input_fields=["portfolio_state_after", "portfolio_selection_diagnostics"],
+                future_outcome_fields=[],
+                row_count=0,
+                required_evidence_status="missing_required_lifecycle_evidence",
+            )
+        ]
+    replacement_evaluated = int(_float(summary.get("portfolio_replacement_evaluated_count"), default=0.0))
+    replacement_triggered = int(_float(summary.get("portfolio_replacement_triggered_count"), default=0.0))
+    threshold_blocked = int(_float(summary.get("portfolio_replacement_blocked_by_threshold_count"), default=0.0))
+    expression_blocked = int(_float(summary.get("portfolio_replacement_blocked_by_expression_count"), default=0.0))
+    allocation_blocked = int(_float(summary.get("portfolio_replacement_blocked_by_allocation_count"), default=0.0))
+    allocation_violations = int(_float(summary.get("portfolio_allocation_contract_violation_count"), default=0.0))
+    continued_count = int(_float(summary.get("portfolio_existing_position_continued_count"), default=0.0))
+    final_position_count = int(_float(summary.get("final_position_count"), default=0.0))
+    candidate_count = int(_float(summary.get("candidate_count"), default=0.0))
+    return [
+        _operation_component_metric_row(
+            component_id="C03_lifecycle_operation",
+            metric_family="portfolio_lifecycle_state",
+            metric_name="held_position_continuity_and_final_state",
+            metric_scope="replay_portfolio_selection_summary",
+            availability_status="computed",
+            reason_codes=[],
+            point_in_time_input_fields=[
+                "portfolio_existing_position_continued_count",
+                "final_position_count",
+                "position_invalidation_policy",
+            ],
+            future_outcome_fields=[],
+            row_count=candidate_count,
+            eligible_row_count=continued_count + final_position_count,
+            selected_count=final_position_count,
+            selected_target_present_count=continued_count,
+            value=(continued_count / candidate_count) if candidate_count else 0.0,
+            required_evidence_status="published",
+        ),
+        _operation_component_metric_row(
+            component_id="C03_lifecycle_operation",
+            metric_family="portfolio_replacement_policy",
+            metric_name="replacement_evaluation_trigger_block_balance",
+            metric_scope="replay_portfolio_selection_summary",
+            availability_status="computed",
+            reason_codes=[
+                f"threshold_blocked:{threshold_blocked}",
+                f"expression_blocked:{expression_blocked}",
+                f"allocation_blocked:{allocation_blocked}",
+                f"allocation_violations:{allocation_violations}",
+            ],
+            point_in_time_input_fields=[
+                "portfolio_replacement_evaluated_count",
+                "portfolio_replacement_triggered_count",
+                "portfolio_switch_minimum_rank_score_delta",
+            ],
+            future_outcome_fields=[],
+            row_count=replacement_evaluated,
+            eligible_row_count=replacement_evaluated,
+            selected_count=replacement_triggered,
+            selected_target_present_count=final_position_count,
+            opportunity_cost_to_best_mean=float(threshold_blocked + expression_blocked + allocation_blocked),
+            value=(replacement_triggered / replacement_evaluated) if replacement_evaluated else 0.0,
+            required_evidence_status="published",
+        ),
+    ]
 
 
 def _option_expression_metric_row(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -3170,8 +3322,10 @@ def _operation_component_metric_row(
     opportunity_cost_to_best_mean: float | None = None,
     opportunity_cost_to_median_mean: float | None = None,
     value: float | None = None,
+    required_evidence_status: str | None = None,
 ) -> dict[str, Any]:
     component = OPERATION_COMPONENT_BY_ID.get(component_id) or {}
+    method = OPERATION_COMPONENT_ANALYSIS_METHODS.get(component_id, {})
     return {
         "component_index": int(component.get("component_index") or 0),
         "operation_component_id": component_id,
@@ -3180,6 +3334,11 @@ def _operation_component_metric_row(
         "metric_family": metric_family,
         "metric_name": metric_name,
         "metric_scope": metric_scope,
+        "analysis_method": method.get("analysis_method", ""),
+        "evidence_role": method.get("evidence_role", ""),
+        "label_role": method.get("label_role", ""),
+        "required_evidence_status": required_evidence_status
+        or ("published" if availability_status == "computed" else "missing_or_incomplete"),
         "availability_status": availability_status,
         "reason_codes": ";".join(reason_codes),
         "point_in_time_input_fields": ";".join(point_in_time_input_fields),
@@ -3226,6 +3385,10 @@ def _operation_component_metric_report(rows: Sequence[Mapping[str, Any]]) -> dic
             "metric_count": len(rows),
             "availability_status_counts": dict(Counter(str(row.get("availability_status") or "") for row in rows)),
             "metric_family_counts": dict(Counter(str(row.get("metric_family") or "") for row in rows)),
+            "analysis_method_counts": dict(Counter(str(row.get("analysis_method") or "") for row in rows)),
+            "required_evidence_status_counts": dict(
+                Counter(str(row.get("required_evidence_status") or "") for row in rows)
+            ),
             "components_with_metric_data_gaps": sorted(
                 {
                     str(row.get("operation_component_id") or "")
@@ -3248,6 +3411,7 @@ def _operation_component_metric_report(rows: Sequence[Mapping[str, Any]]) -> dic
             "Future outcome fields are ex-post diagnostic labels only.",
             "Target-selection ranks require a fixed point-in-time visible universe input.",
             "Metric data gaps are evidence gaps, not neutral component performance.",
+            "Components share the operation metric envelope, but each component owns a distinct analysis_method and evidence_role.",
         ],
     }
 
@@ -3289,6 +3453,14 @@ def _operation_component_metric_effectiveness_review(
                 flags.append("selected_candidates_mean_model_rank_outside_top_25")
             if value is not None and value < 0.01:
                 flags.append("low_selected_share_of_model_option_signal_candidates")
+        elif metric_name == "replacement_evaluation_trigger_block_balance":
+            blocked = _float(row.get("opportunity_cost_to_best_mean"))
+            evaluated = _float(row.get("row_count"))
+            if blocked is not None and evaluated is not None and evaluated > 0 and blocked / evaluated > 0.5:
+                flags.append("lifecycle_replacements_mostly_blocked")
+        elif metric_name == "held_position_continuity_and_final_state":
+            if value is not None and value == 0:
+                flags.append("no_held_position_continuity_observed")
     if flags:
         return {"status": "weak_effectiveness_observed", "flags": sorted(set(flags))}
     if computed_rows:
@@ -3492,7 +3664,11 @@ def _operation_component_internal_review_refs(
             "parameter_replay_review.csv",
             "suspect_parameter_counterfactual.csv",
         ],
-        "C03_lifecycle_operation": [],
+        "C03_lifecycle_operation": [
+            "replay_execution_receipt.json",
+            "portfolio_selection_summary",
+            "portfolio_replay_policy",
+        ],
         "C04_expression_review_operation": [
             "operation_review_projection_matrix.csv",
             "m05_selection_mechanics.csv",
@@ -3556,6 +3732,9 @@ def _operation_component_missing_review_outputs(
             missing.append("event_state_component_internal_score_or_candidate_delta")
         if int(entry_mapping.get("diagnostic_surface_count") or 0) <= 0:
             missing.append("underlying_entry_decision_score_diagnostics")
+    if component_id == "C03_lifecycle_operation":
+        if any(str(row.get("availability_status") or "") == "data_gap" for row in metric_rows):
+            missing.append("portfolio_lifecycle_state_evidence")
     if component_id == "C04_expression_review_operation":
         m05_mapping = mapping_by_surface.get("C05_option_expression_surface") or {}
         if int(m05_mapping.get("explicit_ref_count") or 0) <= 0:
@@ -3590,7 +3769,7 @@ def _can_assign_operation_fault(
     }:
         return False
     return (
-        applicability_status != "not_applicable_for_candidate_entry_replay"
+        applicability_status != "missing_lifecycle_state_evidence"
         and survival_verdict in {
             "first_observed_deterioration",
             "amplifies_prior_damage",
@@ -3608,8 +3787,8 @@ def _operation_component_interpretation_status(
     can_assign_operation_fault: bool,
     metric_effectiveness_status: str,
 ) -> str:
-    if applicability_status == "not_applicable_for_candidate_entry_replay":
-        return "not_applicable_for_candidate_entry_replay"
+    if applicability_status == "missing_lifecycle_state_evidence":
+        return "operation_review_incomplete_missing_lifecycle_state_evidence"
     if survival_verdict in {
         "first_observed_deterioration",
         "amplifies_prior_damage",
