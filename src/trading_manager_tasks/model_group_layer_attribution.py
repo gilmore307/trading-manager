@@ -596,6 +596,8 @@ OPERATION_COMPONENT_ACTION_FIELDNAMES = [
     "pit_feasible_action_set_ref",
     "pit_feasible_action_count",
     "pit_feasible_action_set_status",
+    "review_boundary_ref",
+    "review_boundary_status",
     "component_objective",
     "chosen_action",
     "best_available_action_by_future_outcome",
@@ -604,6 +606,10 @@ OPERATION_COMPONENT_ACTION_FIELDNAMES = [
     "chosen_rank_ex_post",
     "component_correctness_class",
     "post_replay_label_basis",
+    "upstream_decision_state_policy",
+    "downstream_review_input_policy",
+    "upstream_error_isolation_scope",
+    "responsibility_assignment_policy",
     "decision_time_evidence_fields",
     "post_replay_label_fields",
     "realized_return",
@@ -1927,6 +1933,22 @@ def _operation_post_replay_label_basis(component_id: str, row: Mapping[str, Any]
     return "settled outcomes classify incidents after replay decisions are fixed"
 
 
+def _operation_review_boundary_status(
+    *,
+    feasible_action_set_status: str,
+    first_limiting_component: str,
+    component_id: str,
+    first_limiting_reason: str,
+) -> str:
+    if first_limiting_component == component_id and first_limiting_reason:
+        return "boundary_or_handoff_failure_reported"
+    if feasible_action_set_status == "published":
+        return "received_boundary_complete"
+    if feasible_action_set_status == "count_only":
+        return "received_boundary_partial_count_only"
+    return "received_boundary_missing"
+
+
 def _truthy(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -3042,6 +3064,8 @@ def _operation_component_action_row(
     first_limiting_reason = str(surface.get("first_limiting_surface_reason") or first_projection.get("review_projection") or "")
     chosen_action = _operation_chosen_action(component_id, row, layer_label_row)
     best_available_action = _operation_best_available_action(component_id, row, layer_label_row)
+    feasible_action_set_ref = _operation_feasible_action_set_ref(component_id, row, layer_label_row)
+    feasible_action_set_status = _operation_feasible_action_set_status(row, layer_label_row)
     common = {
         "source_decision_id": decision_id,
         "source_decision_index": decision_index,
@@ -3056,9 +3080,16 @@ def _operation_component_action_row(
         "evidence_role": method.get("evidence_role", ""),
         "label_role": method.get("label_role", ""),
         "trigger_state": _operation_trigger_state(component_id, row, lifecycle_summary),
-        "pit_feasible_action_set_ref": _operation_feasible_action_set_ref(component_id, row, layer_label_row),
+        "pit_feasible_action_set_ref": feasible_action_set_ref,
         "pit_feasible_action_count": _operation_feasible_action_count(component_id, row, layer_label_row),
-        "pit_feasible_action_set_status": _operation_feasible_action_set_status(row, layer_label_row),
+        "pit_feasible_action_set_status": feasible_action_set_status,
+        "review_boundary_ref": feasible_action_set_ref,
+        "review_boundary_status": _operation_review_boundary_status(
+            feasible_action_set_status=feasible_action_set_status,
+            first_limiting_component=first_limiting_component,
+            component_id=component_id,
+            first_limiting_reason=first_limiting_reason,
+        ),
         "component_objective": OPERATION_COMPONENT_OBJECTIVES.get(component_id, ""),
         "chosen_action": chosen_action,
         "best_available_action_by_future_outcome": best_available_action,
@@ -3067,6 +3098,10 @@ def _operation_component_action_row(
         "chosen_rank_ex_post": _operation_chosen_rank_ex_post(row, layer_label_row),
         "component_correctness_class": _operation_component_correctness_class(component_id, row, layer_label_row),
         "post_replay_label_basis": _operation_post_replay_label_basis(component_id, row),
+        "upstream_decision_state_policy": "received_upstream_state_is_fixed_review_input",
+        "downstream_review_input_policy": "judge_component_only_against_received_decision_time_inputs",
+        "upstream_error_isolation_scope": "attribute_upstream_defects_to_earliest_layer_or_boundary",
+        "responsibility_assignment_policy": "component_local_correctness_given_received_inputs",
         "realized_return": _round(_float(row.get("realized_return"))) if row.get("realized_return") not in {None, ""} else None,
         "regret_to_best_available": _operation_regret_to_best_available(row, layer_label_row),
         "impact_normalized_severity_score": _round(abs(_float(row.get("realized_return")))) if row.get("realized_return") not in {None, ""} else None,

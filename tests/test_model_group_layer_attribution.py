@@ -363,6 +363,21 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(c02_action["pit_feasible_action_set_ref"], "decision_time_entry_actions")
             self.assertEqual(c02_action["pit_feasible_action_set_status"], "published")
             self.assertEqual(c02_action["pit_feasible_action_count"], "2")
+            self.assertEqual(c02_action["review_boundary_ref"], "decision_time_entry_actions")
+            self.assertEqual(c02_action["review_boundary_status"], "received_boundary_complete")
+            self.assertEqual(c02_action["upstream_decision_state_policy"], "received_upstream_state_is_fixed_review_input")
+            self.assertEqual(
+                c02_action["downstream_review_input_policy"],
+                "judge_component_only_against_received_decision_time_inputs",
+            )
+            self.assertEqual(
+                c02_action["upstream_error_isolation_scope"],
+                "attribute_upstream_defects_to_earliest_layer_or_boundary",
+            )
+            self.assertEqual(
+                c02_action["responsibility_assignment_policy"],
+                "component_local_correctness_given_received_inputs",
+            )
             self.assertEqual(c02_action["best_available_action_by_future_outcome"], "baseline_action")
             self.assertEqual(c02_action["component_correctness_class"], "incorrect")
             self.assertEqual(c02_action["regret_to_best_available"], "0.01")

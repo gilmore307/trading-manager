@@ -130,6 +130,16 @@ before it can affect a live block, reduce, exit, or human-review path.
 Evaluation may use attribution evidence, but evaluation must not silently invent
 attribution labels inside promotion scoring.
 
+Replay review writes `replay_layer_decision_review_rows.jsonl` for the Replay
+Decisions surface before M06 residual-event attribution. These M01-M05 rows are
+judged only against the point-in-time input state and candidate set available to
+that layer at the replay decision clock. They carry review-boundary reference
+and status, upstream-state isolation policy, downstream-input policy,
+upstream-error isolation scope, and responsibility-assignment policy so an
+upstream defect is assigned to the earliest layer or boundary where it became
+knowable instead of rolling into downstream blame. Future returns and
+best-available labels remain post-replay review labels only.
+
 M04/M05 boundary attribution is a manager-side diagnostic helper for this
 failure-attribution lane. `scripts/tasks/build_model_group_layer_attribution.py`
 reads an existing replay `decision_rows.jsonl` and writes compact cohort, score
@@ -147,10 +157,15 @@ and C07 with decision time, target, operation action/status, input/output
 summary, block reason, trigger state, point-in-time feasible action-set
 reference/count/status, component objective, chosen action, best available
 post-replay label action, chosen/best return, ex-post rank when known,
-component correctness class, label basis, realized return, and regret. Future
-facts in this ledger are review labels only: they may rank the actions that were
-visible and feasible at decision time, but they must not become replay decision
-inputs.
+component correctness class, label basis, review-boundary status, upstream-state
+isolation policy, downstream-input policy, responsibility assignment policy,
+realized return, and regret. Future facts in this ledger are review labels only:
+they may rank the actions that were visible and feasible at decision time, but
+they must not become replay decision inputs. Downstream operation rows are judged
+against the upstream state and candidate set they actually received; upstream
+defects are attributed to the earliest layer or boundary where they became
+knowable, while handoff/interface failures remain explicit boundary failures
+instead of being forced into pure upstream or downstream blame.
 These files use live/replay action
 components as the first axis: C01 intake, C02 entry, C03 lifecycle, C04
 expression review, C05 order intent, C06 execution gate, and C07 failure review.

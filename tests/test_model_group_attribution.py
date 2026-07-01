@@ -274,6 +274,32 @@ class ModelGroupAttributionTests(unittest.TestCase):
             )
             self.assertEqual(receipt["layer_review_diagnostic_summary"]["row_count"], 25)
             self.assertNotIn("model_06_residual_event_governance", {row["layer_id"] for row in layer_review_rows})
+            first_layer_row = layer_review_rows[0]
+            self.assertIn("review_boundary_ref", first_layer_row)
+            self.assertIn(
+                first_layer_row["review_boundary_status"],
+                {"received_boundary_complete", "received_boundary_missing_evidence"},
+            )
+            self.assertIn(
+                "received_boundary_complete",
+                {row["review_boundary_status"] for row in layer_review_rows},
+            )
+            self.assertEqual(
+                first_layer_row["upstream_decision_state_policy"],
+                "received_upstream_state_is_fixed_review_input",
+            )
+            self.assertEqual(
+                first_layer_row["downstream_review_input_policy"],
+                "judge_layer_only_against_received_decision_time_inputs",
+            )
+            self.assertEqual(
+                first_layer_row["upstream_error_isolation_scope"],
+                "attribute_upstream_defects_to_earliest_layer_or_boundary",
+            )
+            self.assertEqual(
+                first_layer_row["responsibility_assignment_policy"],
+                "layer_local_correctness_given_received_inputs",
+            )
             self.assertIn("replay_review_performance_summary_ref", receipt)
             self.assertIn("layer_attribution_report_ref", receipt)
             performance_summary = json.loads(

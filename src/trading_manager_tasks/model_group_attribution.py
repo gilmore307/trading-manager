@@ -942,6 +942,8 @@ def _layer_review_row(
     method = REPLAY_LAYER_REVIEW_METHODS.get(layer_id, {})
     classification = _layer_review_classification(row, layer_id=layer_id, diagnostics=diagnostics, trace_row=trace_row)
     correctness = str(classification["correctness_class"])
+    selected_output_ref = _layer_ref(row, layer_id) or diagnostics.get("model_ref") or classification.get("selected_output_ref")
+    effective_decision_status = str(classification["effective_decision_status"])
     return {
         "contract_type": REPLAY_LAYER_REVIEW_ROW_CONTRACT_TYPE,
         "stage_id": "model_group.replay_review",
@@ -960,6 +962,14 @@ def _layer_review_row(
         "path_conditioning_policy": _path_conditioning_policy(row),
         "path_scope": _path_scope(row),
         "candidate_set_scope": classification["candidate_set_scope"],
+        "review_boundary_ref": selected_output_ref or classification["candidate_set_scope"],
+        "review_boundary_status": "received_boundary_complete"
+        if effective_decision_status == "measured"
+        else "received_boundary_missing_evidence",
+        "upstream_decision_state_policy": "received_upstream_state_is_fixed_review_input",
+        "downstream_review_input_policy": "judge_layer_only_against_received_decision_time_inputs",
+        "upstream_error_isolation_scope": "attribute_upstream_defects_to_earliest_layer_or_boundary",
+        "responsibility_assignment_policy": "layer_local_correctness_given_received_inputs",
         "layer_id": layer_id,
         "layer_label": layer_label,
         "layer_order": layer_order,
@@ -971,8 +981,8 @@ def _layer_review_row(
         if method.get("post_replay_label_fields")
         else "point_in_time_diagnostic_only",
         "effective_decision": _effective_layer_decision(row, layer_id=layer_id, diagnostics=diagnostics, trace_row=trace_row),
-        "effective_decision_status": classification["effective_decision_status"],
-        "selected_output_ref": _layer_ref(row, layer_id) or diagnostics.get("model_ref") or classification.get("selected_output_ref"),
+        "effective_decision_status": effective_decision_status,
+        "selected_output_ref": selected_output_ref,
         "chosen_action": classification["chosen_action"],
         "available_action": classification["available_action"],
         "best_available_action_by_future_outcome": classification["best_available_action_by_future_outcome"],
