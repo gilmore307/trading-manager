@@ -523,6 +523,43 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertIsNone(updated.last_stall_agent_error_ref)
         handler.assert_not_called()
 
+    def test_scheduler_progress_stall_refreshes_current_nonprogress_selection(self):
+        state = SchedulerDaemonState(
+            start_month="2026-05",
+            end_month="2026-05",
+            last_decision_status="executed",
+            last_reason_code="workflow_stage_executed",
+            last_work_selection_reason="model_group_replay_review_ready",
+            last_progress_utc="2026-01-01T00:00:00+00:00",
+        )
+        selection = SimpleNamespace(
+            start_month="2026-05",
+            end_month="2026-05",
+            reason_code="waiting_for_next_training_fold_to_complete",
+            completed_months=["2026-05"],
+            open_months=[],
+            blocked_target_symbol=None,
+        )
+        with tempfile.TemporaryDirectory() as raw_tmp, patch(
+            "trading_manager_tasks.scheduler_daemon.handle_server_error"
+        ) as handler, patch(
+            "trading_manager_tasks.scheduler_daemon.active_model_worker_target_symbol", return_value=None
+        ), patch(
+            "trading_manager_tasks.scheduler_daemon.select_next_historical_work", return_value=selection
+        ):
+            tmp = Path(raw_tmp)
+            updated = handle_scheduler_progress_stall(
+                state,
+                storage_root=tmp / "storage",
+                state_path=tmp / "runtime" / "state.json",
+                decision_log_path=tmp / "runtime" / "decisions.jsonl",
+                stall_seconds=600,
+            )
+
+        self.assertEqual(updated.last_work_selection_reason, "waiting_for_next_training_fold_to_complete")
+        self.assertIsNone(updated.last_stall_agent_error_ref)
+        handler.assert_not_called()
+
     def test_scheduler_progress_stall_reports_model_group_lifecycle_hold(self):
         state = SchedulerDaemonState(
             start_month="2016-01",

@@ -1877,6 +1877,14 @@ def handle_scheduler_progress_stall(
         stall_seconds=stall_seconds,
     ):
         return state
+    refreshed_state = apply_auto_work_selection(
+        state,
+        storage_root=storage_root,
+        default_start_month=state.start_month,
+        default_end_month=state.end_month,
+    )
+    if refreshed_state is not state and _scheduler_waiting_for_known_nonprogress_boundary(refreshed_state):
+        return refreshed_state
     if state.last_stall_agent_error_ref:
         return state
     last_alert = _parse_utc_iso(state.last_stall_agent_call_utc)
