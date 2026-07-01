@@ -187,6 +187,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertTrue((output_dir / "operation_component_review_packet.json").exists())
             self.assertTrue((output_dir / "operation_component_metrics.csv").exists())
             self.assertTrue((output_dir / "operation_component_metrics_report.json").exists())
+            self.assertTrue((output_dir / "operation_component_action_rows.csv").exists())
             self.assertTrue((output_dir / "high_score_filled_tail_loss_matches.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review.csv").exists())
             self.assertTrue((output_dir / "parameter_replay_review_report.json").exists())
@@ -321,6 +322,22 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     "availability_status"
                 ],
                 "data_gap",
+            )
+            with (output_dir / "operation_component_action_rows.csv").open(encoding="utf-8") as handle:
+                action_rows = list(csv.DictReader(handle))
+            self.assertTrue(action_rows)
+            self.assertIn("operation_action", action_rows[0])
+            self.assertEqual(
+                {
+                    "C01_intake_operation",
+                    "C02_entry_operation",
+                    "C03_lifecycle_operation",
+                    "C04_expression_review_operation",
+                    "C05_order_intent_operation",
+                    "C06_execution_gate_operation",
+                    "C07_failure_review_operation",
+                },
+                {row["operation_component_id"] for row in action_rows},
             )
             operation_packet = json.loads(
                 (output_dir / "operation_component_review_packet.json").read_text(encoding="utf-8")

@@ -558,6 +558,35 @@ OPERATION_COMPONENT_METRIC_FIELDNAMES = [
     "retraining_performed",
     "fixed_input_only",
 ]
+OPERATION_COMPONENT_ACTION_FIELDNAMES = [
+    "operation_action_row_id",
+    "source_decision_id",
+    "source_decision_index",
+    "decision_time",
+    "replay_month",
+    "target_symbol",
+    "operation_component_id",
+    "runtime_component_ref",
+    "operation_component_label",
+    "component_index",
+    "operation_action",
+    "operation_status",
+    "input_ref",
+    "input_summary",
+    "output_ref",
+    "output_summary",
+    "block_reason",
+    "analysis_method",
+    "evidence_role",
+    "label_role",
+    "decision_time_evidence_fields",
+    "post_replay_label_fields",
+    "realized_return",
+    "regret_to_best_available",
+    "impact_normalized_severity_score",
+    "review_status",
+    "fixed_input_only",
+]
 MODEL_CANDIDATE_SELECTION_SUMMARY_FIELDNAMES = [
     "timestamp",
     "model_rank_within_timestamp",
@@ -703,6 +732,12 @@ def build_model_group_layer_attribution(
         operation_review_projection_rows,
         replay_receipt=replay_receipt,
     )
+    operation_component_action_rows = _operation_component_action_rows(
+        rows=rows,
+        decision_surface_rows=decision_surface_rows,
+        operation_review_projection_rows=operation_review_projection_rows,
+        replay_receipt=replay_receipt,
+    )
     target_selection_universe_rows = _load_csv_rows(target_selection_universe_metrics_path)
     model_candidate_selection_trace_path = _resolved_model_candidate_selection_trace_path(
         model_candidate_selection_trace_path=model_candidate_selection_trace_path,
@@ -802,6 +837,11 @@ def build_model_group_layer_attribution(
         output_dir / "operation_component_metrics.csv",
         operation_component_metric_rows,
         fieldnames=OPERATION_COMPONENT_METRIC_FIELDNAMES,
+    )
+    _write_csv(
+        output_dir / "operation_component_action_rows.csv",
+        operation_component_action_rows,
+        fieldnames=OPERATION_COMPONENT_ACTION_FIELDNAMES,
     )
     _write_csv(
         output_dir / "model_candidate_selection_summary.csv",
@@ -961,6 +1001,8 @@ def build_model_group_layer_attribution(
         "operation_component_metrics_ref": str(output_dir / "operation_component_metrics.csv"),
         "operation_component_metrics_report_ref": str(output_dir / "operation_component_metrics_report.json"),
         "operation_component_metrics_summary": operation_component_metric_report["summary"],
+        "operation_component_action_rows_ref": str(output_dir / "operation_component_action_rows.csv"),
+        "operation_component_action_row_count": len(operation_component_action_rows),
         "canonical_operation_components": [
             {
                 "operation_component_id": str(spec["operation_component_id"]),
@@ -1658,6 +1700,16 @@ def _float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _regret_to_best_available(row: Mapping[str, Any]) -> float | None:
+    if row.get("regret_to_best_available") not in {None, ""}:
+        return _float(row.get("regret_to_best_available"))
+    if row.get("best_available_action_return") not in {None, ""} and row.get("chosen_action_return") not in {None, ""}:
+        return max(0.0, _float(row.get("best_available_action_return")) - _float(row.get("chosen_action_return")))
+    if row.get("baseline_return") not in {None, ""} and row.get("realized_return") not in {None, ""}:
+        return max(0.0, _float(row.get("baseline_return")) - _float(row.get("realized_return")))
+    return None
 
 
 def _truthy(value: Any) -> bool:
@@ -2699,6 +2751,252 @@ def _operation_component_lifecycle_flow_row(
         "retraining_performed": False,
         "fixed_input_only": True,
     }
+
+
+def _operation_component_action_rows(
+    *,
+    rows: Sequence[Mapping[str, Any]],
+    decision_surface_rows: Sequence[Mapping[str, Any]],
+    operation_review_projection_rows: Sequence[Mapping[str, Any]],
+    replay_receipt: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    surface_by_decision = {
+        str(row.get("decision_id") or ""): row
+        for row in decision_surface_rows
+    }
+    first_projection_by_decision = {
+        str(row.get("decision_id") or ""): row
+        for row in operation_review_projection_rows
+    }
+    lifecycle_summary = _as_mapping(replay_receipt.get("portfolio_selection_summary"))
+    action_rows: list[dict[str, Any]] = []
+    for decision_index, row in enumerate(rows, start=1):
+        decision_id = str(row.get("decision_id") or f"decision_{decision_index:08d}")
+        surface = surface_by_decision.get(decision_id, {})
+        first_projection = first_projection_by_decision.get(decision_id, {})
+        for component_id in (
+            "C01_intake_operation",
+            "C02_entry_operation",
+            "C03_lifecycle_operation",
+            "C04_expression_review_operation",
+            "C05_order_intent_operation",
+            "C06_execution_gate_operation",
+            "C07_failure_review_operation",
+        ):
+            action_rows.append(
+                _operation_component_action_row(
+                    row=row,
+                    decision_id=decision_id,
+                    decision_index=decision_index,
+                    component_id=component_id,
+                    surface=surface,
+                    first_projection=first_projection,
+                    lifecycle_summary=lifecycle_summary,
+                )
+            )
+    return action_rows
+
+
+def _operation_component_action_row(
+    *,
+    row: Mapping[str, Any],
+    decision_id: str,
+    decision_index: int,
+    component_id: str,
+    surface: Mapping[str, Any],
+    first_projection: Mapping[str, Any],
+    lifecycle_summary: Mapping[str, Any],
+) -> dict[str, Any]:
+    component = OPERATION_COMPONENT_BY_ID[component_id]
+    method = OPERATION_COMPONENT_ANALYSIS_METHODS.get(component_id, {})
+    target = str(row.get("target_symbol") or row.get("target_ref") or "")
+    timestamp = str(row.get("timestamp") or row.get("decision_time") or "")
+    replay_month = str(row.get("replay_month") or timestamp[:7])
+    first_limiting_component = str(first_projection.get("operation_component_id") or "")
+    first_limiting_reason = str(surface.get("first_limiting_surface_reason") or first_projection.get("review_projection") or "")
+    common = {
+        "source_decision_id": decision_id,
+        "source_decision_index": decision_index,
+        "decision_time": timestamp,
+        "replay_month": replay_month,
+        "target_symbol": target,
+        "operation_component_id": component_id,
+        "runtime_component_ref": str(component.get("runtime_component_ref") or ""),
+        "operation_component_label": str(component.get("operation_component_label") or ""),
+        "component_index": int(component.get("component_index") or 0),
+        "analysis_method": method.get("analysis_method", ""),
+        "evidence_role": method.get("evidence_role", ""),
+        "label_role": method.get("label_role", ""),
+        "realized_return": _round(_float(row.get("realized_return"))) if row.get("realized_return") not in {None, ""} else None,
+        "regret_to_best_available": _round(_regret_to_best_available(row)),
+        "impact_normalized_severity_score": _round(abs(_float(row.get("realized_return")))) if row.get("realized_return") not in {None, ""} else None,
+        "review_status": "reviewable_from_replay_row",
+        "fixed_input_only": True,
+    }
+    if component_id == "C01_intake_operation":
+        return {
+            **common,
+            "operation_action_row_id": f"{decision_id}:c01",
+            "operation_action": "prepare_point_in_time_inputs",
+            "operation_status": "inputs_ready",
+            "input_ref": str(row.get("candidate_set_scope") or ""),
+            "input_summary": f"{target} at {timestamp}",
+            "output_ref": str(row.get("model_evidence_mode") or "model_evidence_chain"),
+            "output_summary": ";".join(str(value) for value in row.get("model_evidence_chain") or []),
+            "block_reason": first_limiting_reason if first_limiting_component == component_id else "",
+            "decision_time_evidence_fields": "model_evidence_chain;candidate_set_scope;model_layer_diagnostics",
+            "post_replay_label_fields": "",
+        }
+    if component_id == "C02_entry_operation":
+        status = str(row.get("decision_status") or "")
+        return {
+            **common,
+            "operation_action_row_id": f"{decision_id}:c02",
+            "operation_action": str(row.get("decision_action") or row.get("action") or ""),
+            "operation_status": status,
+            "input_ref": str(row.get("candidate_set_scope") or ""),
+            "input_summary": _entry_operation_summary(row),
+            "output_ref": str(row.get("decision_intended_side") or row.get("decision_intended_action") or ""),
+            "output_summary": str(row.get("decision_action") or row.get("action") or ""),
+            "block_reason": first_limiting_reason if first_limiting_component == component_id else "",
+            "decision_time_evidence_fields": "prediction_score;decision_action;model_04_unified_decision",
+            "post_replay_label_fields": "realized_return;directional_underlying_return",
+        }
+    if component_id == "C03_lifecycle_operation":
+        lifecycle_status = "portfolio_lifecycle_state_reviewed" if lifecycle_summary else "missing_lifecycle_state_evidence"
+        return {
+            **common,
+            "operation_action_row_id": f"{decision_id}:c03",
+            "operation_action": "check_portfolio_lifecycle_and_replacement",
+            "operation_status": lifecycle_status,
+            "input_ref": "portfolio_selection_summary" if lifecycle_summary else "",
+            "input_summary": _lifecycle_operation_summary(lifecycle_summary),
+            "output_ref": "portfolio_position_state",
+            "output_summary": _lifecycle_operation_output(lifecycle_summary),
+            "block_reason": first_limiting_reason if first_limiting_component == component_id else "",
+            "decision_time_evidence_fields": "portfolio_selection_summary;replacement_review",
+            "post_replay_label_fields": "",
+        }
+    if component_id == "C04_expression_review_operation":
+        path_status = str(row.get("selected_option_path_status") or surface.get("selected_option_path_status") or row.get("fill_status") or "")
+        return {
+            **common,
+            "operation_action_row_id": f"{decision_id}:c04",
+            "operation_action": str(row.get("decision_expression_type") or row.get("selected_expression_type") or ""),
+            "operation_status": path_status,
+            "input_ref": str(row.get("asset_expression_route") or ""),
+            "input_summary": _option_expression_summary(row),
+            "output_ref": str(row.get("instrument_ref") or surface.get("selected_option_contract_ref") or ""),
+            "output_summary": str(row.get("decision_instrument_scope") or row.get("asset_class") or ""),
+            "block_reason": first_limiting_reason if first_limiting_component == component_id else "",
+            "decision_time_evidence_fields": "decision_expression_type;selected_option_path_status;eligible_candidate_count",
+            "post_replay_label_fields": "realized_return;baseline_return",
+        }
+    if component_id == "C05_order_intent_operation":
+        return {
+            **common,
+            "operation_action_row_id": f"{decision_id}:c05",
+            "operation_action": "create_sized_order_intent",
+            "operation_status": str(row.get("decision_status") or ""),
+            "input_ref": str(row.get("account_sleeve_id") or ""),
+            "input_summary": _order_intent_summary(row),
+            "output_ref": str(row.get("instrument_ref") or ""),
+            "output_summary": str(row.get("decision_intended_action") or row.get("action") or ""),
+            "block_reason": first_limiting_reason if first_limiting_component == component_id else "",
+            "decision_time_evidence_fields": "account_sleeve_id;planned_notional;cost;decision_intended_action",
+            "post_replay_label_fields": "",
+        }
+    if component_id == "C06_execution_gate_operation":
+        return {
+            **common,
+            "operation_action_row_id": f"{decision_id}:c06",
+            "operation_action": "simulate_execution_gate_and_fill",
+            "operation_status": str(row.get("fill_status") or ""),
+            "input_ref": str(row.get("instrument_ref") or ""),
+            "input_summary": str(row.get("decision_instrument_scope") or row.get("asset_class") or ""),
+            "output_ref": str(row.get("fill_status") or ""),
+            "output_summary": _execution_output_summary(row),
+            "block_reason": first_limiting_reason if first_limiting_component == component_id else "",
+            "decision_time_evidence_fields": "instrument_ref;fill_status;asset_class",
+            "post_replay_label_fields": "realized_return;fill_status",
+        }
+    return {
+        **common,
+        "operation_action_row_id": f"{decision_id}:c07",
+        "operation_action": "review_settled_failure_and_residual_gap",
+        "operation_status": "reviewed",
+        "input_ref": str(row.get("miss_attribution_layer") or ""),
+        "input_summary": str(row.get("miss_attribution_layer") or "settled_outcome_review"),
+        "output_ref": str(row.get("first_gap_component") or first_projection.get("review_projection") or ""),
+        "output_summary": _failure_review_summary(row),
+        "block_reason": first_limiting_reason if first_limiting_component == component_id else "",
+        "decision_time_evidence_fields": "decision_status;fill_status;miss_attribution_layer",
+        "post_replay_label_fields": "realized_return;baseline_return;regret_to_best_available;outcome_label",
+    }
+
+
+def _entry_operation_summary(row: Mapping[str, Any]) -> str:
+    parts = [
+        f"score={_round(_float(row.get('prediction_score')))}" if row.get("prediction_score") not in {None, ""} else "",
+        f"side={row.get('decision_intended_side')}" if row.get("decision_intended_side") not in {None, ""} else "",
+        f"confidence_min={row.get('entry_minimum_alpha_confidence')}" if row.get("entry_minimum_alpha_confidence") not in {None, ""} else "",
+    ]
+    return "; ".join(part for part in parts if part)
+
+
+def _lifecycle_operation_summary(summary: Mapping[str, Any]) -> str:
+    if not summary:
+        return "portfolio lifecycle summary missing"
+    return (
+        f"continued={int(_float(summary.get('portfolio_existing_position_continued_count'), default=0.0))}; "
+        f"replacement_evaluated={int(_float(summary.get('portfolio_replacement_evaluated_count'), default=0.0))}; "
+        f"replacement_triggered={int(_float(summary.get('portfolio_replacement_triggered_count'), default=0.0))}"
+    )
+
+
+def _lifecycle_operation_output(summary: Mapping[str, Any]) -> str:
+    if not summary:
+        return "missing_lifecycle_state_evidence"
+    return (
+        f"final_positions={int(_float(summary.get('final_position_count'), default=0.0))}; "
+        f"allocation_violations={int(_float(summary.get('portfolio_allocation_contract_violation_count'), default=0.0))}"
+    )
+
+
+def _option_expression_summary(row: Mapping[str, Any]) -> str:
+    parts = [
+        f"expression={row.get('decision_expression_type')}" if row.get("decision_expression_type") not in {None, ""} else "",
+        f"route={row.get('asset_expression_route')}" if row.get("asset_expression_route") not in {None, ""} else "",
+        f"contract={row.get('instrument_ref')}" if row.get("instrument_ref") not in {None, ""} else "",
+    ]
+    return "; ".join(part for part in parts if part)
+
+
+def _order_intent_summary(row: Mapping[str, Any]) -> str:
+    parts = [
+        f"sleeve={row.get('account_sleeve_id')}" if row.get("account_sleeve_id") not in {None, ""} else "",
+        f"cost={_round(_float(row.get('cost')))}" if row.get("cost") not in {None, ""} else "",
+        f"action={row.get('decision_intended_action') or row.get('action')}" if (row.get("decision_intended_action") or row.get("action")) not in {None, ""} else "",
+    ]
+    return "; ".join(part for part in parts if part)
+
+
+def _execution_output_summary(row: Mapping[str, Any]) -> str:
+    parts = [
+        f"fill={row.get('fill_status')}" if row.get("fill_status") not in {None, ""} else "",
+        f"return={_round(_float(row.get('realized_return')))}" if row.get("realized_return") not in {None, ""} else "",
+        f"baseline={_round(_float(row.get('baseline_return')))}" if row.get("baseline_return") not in {None, ""} else "",
+    ]
+    return "; ".join(part for part in parts if part)
+
+
+def _failure_review_summary(row: Mapping[str, Any]) -> str:
+    parts = [
+        f"outcome={row.get('outcome_label')}" if row.get("outcome_label") not in {None, ""} else "",
+        f"regret={_round(_regret_to_best_available(row))}",
+        f"gap={row.get('first_gap_component') or row.get('miss_attribution_layer')}",
+    ]
+    return "; ".join(part for part in parts if part)
 
 
 def _operation_order_for_decision(

@@ -140,7 +140,12 @@ parameter-level replay summaries. The canonical review entry is
 `operation_component_review_packet.csv`, `operation_component_flow.csv`, and
 `operation_review_projection_matrix.csv`. `operation_component_metrics.csv` and
 `operation_component_metrics_report.json` add component-specific diagnostic
-metrics under that same action axis. These files use live/replay action
+metrics under that same action axis. `operation_component_action_rows.csv`
+publishes the concrete replay operation ledger used by dashboard focus mode:
+each selected replay decision is expanded across C01, C02, C03, C04, C05, C06,
+and C07 with decision time, target, operation action/status, input/output
+summary, block reason, evidence role, label role, realized return, and regret.
+These files use live/replay action
 components as the first axis: C01 intake, C02 entry, C03 lifecycle, C04
 expression review, C05 order intent, C06 execution gate, and C07 failure review.
 Models and legacy decision surfaces are not treated as components. Instead,
