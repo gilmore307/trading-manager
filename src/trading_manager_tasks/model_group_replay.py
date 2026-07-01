@@ -1143,6 +1143,7 @@ def _after_cost_alpha_model_status(
     path: Path,
     *,
     parent_checkpoint_ref: str | None = None,
+    allow_unspecified_parent_checkpoint: bool = False,
     fold_id: str | None = None,
     legacy_fold_id: str | None = None,
     target_symbol: str | None = None,
@@ -1161,7 +1162,9 @@ def _after_cost_alpha_model_status(
         training_summary = {}
     training_mode = str(training_summary.get("training_mode") or "").strip()
     cumulative_learning_mode = str(training_summary.get("cumulative_learning_mode") or "").strip()
+    update_mode = str(training_summary.get("update_mode") or "").strip()
     sample_count = _int_value(training_summary.get("sample_count"))
+    cumulative_sample_count = _int_value(training_summary.get("cumulative_sample_count") or sample_count)
     if training_mode == "policy_bundle_no_supervised_fit" or sample_count <= 0:
         return {
             "compatible": False,
@@ -1172,6 +1175,16 @@ def _after_cost_alpha_model_status(
             "contract_type": contract_type or None,
             "model_type": model_type or None,
             "score_policy": score_policy or None,
+        }
+    if parent_checkpoint_ref and update_mode == "continued_from_parent_checkpoint":
+        return {
+            "compatible": False,
+            "reason": "after-cost alpha artifact uses fold-local parent checkpoint update instead of cumulative training rows",
+            "after_cost_alpha_model_ref": str(path),
+            "training_mode": training_mode or None,
+            "update_mode": update_mode,
+            "sample_count": sample_count,
+            "cumulative_sample_count": cumulative_sample_count,
         }
     expected_fold_ids = {value for value in (fold_id, legacy_fold_id) if value}
     if expected_fold_ids and artifact_fold_id not in expected_fold_ids:
@@ -1215,7 +1228,7 @@ def _after_cost_alpha_model_status(
             "training_mode": training_mode or None,
             "sample_count": sample_count,
         }
-    if not parent_checkpoint_ref and artifact_parent_checkpoint_ref:
+    if not parent_checkpoint_ref and artifact_parent_checkpoint_ref and not allow_unspecified_parent_checkpoint:
         return {
             "compatible": False,
             "reason": "first fold after-cost alpha artifact unexpectedly declares a parent checkpoint",
@@ -1244,7 +1257,9 @@ def _after_cost_alpha_model_status(
         "learning_contract": learning_contract or None,
         "cumulative_learning_mode": cumulative_learning_mode or None,
         "training_mode": training_mode or None,
+        "update_mode": update_mode or None,
         "sample_count": sample_count,
+        "cumulative_sample_count": cumulative_sample_count,
         "contract_type": contract_type or None,
         "model_type": model_type or None,
         "score_policy": score_policy or None,

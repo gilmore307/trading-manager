@@ -51,7 +51,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--candidate-fold-id")
     parser.add_argument("--candidate-training-target")
     parser.add_argument("--after-cost-alpha-model-json", type=Path, default=DEFAULT_ALPHA_MODEL_JSON)
-    parser.add_argument("--replay-month", required=True)
+    parser.add_argument(
+        "--replay-month",
+        help="Run one replay month. Omit to run the full frozen replay dataset.",
+    )
     parser.add_argument("--progress-path", type=Path)
     parser.add_argument("--run-id-prefix", default="model_group_replay_auto_option")
     parser.add_argument("--exclude-crypto", action="store_true")
@@ -69,13 +72,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-provider-calls", type=int, default=300)
     parser.add_argument("--max-seconds", type=float, default=0.0)
     parser.add_argument("--execute-provider-acquisition", action="store_true")
+    parser.add_argument(
+        "--collect-all-option-feature-requirements",
+        action="store_true",
+        help="Ask replay to collect option-feature requirements beyond the first backoff frontier.",
+    )
     parser.add_argument("--status-jsonl", type=Path)
     parser.add_argument("--latest-status-json", type=Path)
     args = parser.parse_args(argv)
 
     _validate_args(parser, args)
     _normalize_candidate_scope(args)
-    model_artifact_status = _after_cost_alpha_model_status(args.after_cost_alpha_model_json)
+    model_artifact_status = _after_cost_alpha_model_status(
+        args.after_cost_alpha_model_json,
+        allow_unspecified_parent_checkpoint=True,
+        fold_id=args.candidate_fold_id,
+        target_symbol=args.candidate_training_target,
+    )
     if not model_artifact_status["compatible"]:
         _emit(
             {
@@ -399,15 +412,17 @@ def _run_replay(args: argparse.Namespace, *, run_id: str, database_url: str | No
         str(args.candidate_training_target or ""),
         "--after-cost-alpha-model-json",
         str(args.after_cost_alpha_model_json),
-        "--replay-month",
-        args.replay_month,
     ]
+    if args.replay_month:
+        command.extend(["--replay-month", args.replay_month])
     if args.progress_path is not None:
         command.extend(["--progress-path", str(args.progress_path)])
     if args.exclude_crypto:
         command.append("--exclude-crypto")
     if args.exclude_equity:
         command.append("--exclude-equity")
+    if args.collect_all_option_feature_requirements:
+        command.append("--collect-all-option-feature-requirements")
     if database_url:
         command.extend(["--option-feature-database-url", database_url, "--candidate-handoff-database-url", database_url])
 
@@ -445,9 +460,10 @@ def _selected_option_path_missing_count(receipt: dict[str, Any]) -> int:
         return 0
 
 
-def _run_id(prefix: str, replay_month: str, attempt: int) -> str:
+def _run_id(prefix: str, replay_month: str | None, attempt: int) -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    return f"{prefix}_{timestamp}_{replay_month.replace('-', '_')}_attempt_{attempt:02d}"
+    scope = replay_month.replace("-", "_") if replay_month else "full"
+    return f"{prefix}_{timestamp}_{scope}_attempt_{attempt:02d}"
 
 
 def _run_id_prefix(args: argparse.Namespace) -> str:
