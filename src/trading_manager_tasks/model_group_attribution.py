@@ -1044,13 +1044,26 @@ def _m01_background_context_classification(diagnostics: Mapping[str, Any]) -> di
             chosen_action="background_context_not_reported",
             basis="M01 diagnostics are missing from the replay decision row",
         )
-    return _diagnostic_only_layer_classification(
+    acceptable = (
+        (state_quality is None or state_quality >= 0.60)
+        and (stress is None or stress <= 0.70)
+        and (transition is None or transition <= 0.65)
+    )
+    severity = _diagnostic_threshold_severity(
+        0.60 - state_quality if state_quality is not None else None,
+        stress - 0.70 if stress is not None else None,
+        transition - 0.65 if transition is not None else None,
+    )
+    return _simple_layer_classification(
+        correct=acceptable,
         candidate_set_scope="background_context_state",
-        observed_state="background_context_state_observed",
-        basis=(
-            "M01 publishes point-in-time context diagnostics only; current replay evidence does not "
-            "contain a layer-specific scored context decision or best-available context alternative"
-        ),
+        chosen_action="accept_background_context_state",
+        fallback_action="withhold_or_downweight_background_context",
+        basis="point_in_time_background_context_quality_stress_transition_thresholds",
+        failure_type="weak_or_stressed_background_context_accepted",
+        first_gap_mechanism="background_context_quality_or_stress_threshold",
+        selected_output_ref=diagnostics.get("model_ref"),
+        diagnostic_severity_score=severity,
     )
 
 
@@ -1110,13 +1123,28 @@ def _m03_event_state_classification(diagnostics: Mapping[str, Any]) -> dict[str,
             chosen_action="event_state_not_reported",
             basis="M03 event-state diagnostics are missing from the replay decision row",
         )
-    return _diagnostic_only_layer_classification(
+    acceptable = (
+        (uncertainty is None or uncertainty <= 0.60)
+        and (block is None or block <= 0.50)
+        and (disable is None or disable <= 0.50)
+        and (path_risk is None or path_risk <= 0.60)
+    )
+    severity = _diagnostic_threshold_severity(
+        uncertainty - 0.60 if uncertainty is not None else None,
+        block - 0.50 if block is not None else None,
+        disable - 0.50 if disable is not None else None,
+        path_risk - 0.60 if path_risk is not None else None,
+    )
+    return _simple_layer_classification(
+        correct=acceptable,
         candidate_set_scope="selected_path_event_state",
-        observed_state="event_state_observed",
-        basis=(
-            "M03 publishes point-in-time event-state diagnostics only; current replay evidence does not "
-            "contain a layer-specific scored event-state decision or best-available event-state alternative"
-        ),
+        chosen_action="accept_event_state",
+        fallback_action="block_or_downweight_event_state",
+        basis="point_in_time_event_uncertainty_block_disable_path_risk_thresholds",
+        failure_type="event_risk_state_accepted_without_required_downweight",
+        first_gap_mechanism="event_pressure_or_path_risk_threshold",
+        selected_output_ref=diagnostics.get("model_ref"),
+        diagnostic_severity_score=severity,
     )
 
 
@@ -1212,30 +1240,6 @@ def _simple_layer_classification(
         "failure_type": "none" if correct else failure_type,
         "first_gap_mechanism": first_gap_mechanism,
         "selected_output_ref": selected_output_ref,
-    }
-
-
-def _diagnostic_only_layer_classification(
-    *,
-    candidate_set_scope: str,
-    observed_state: str,
-    basis: str,
-) -> dict[str, Any]:
-    return {
-        "candidate_set_scope": candidate_set_scope,
-        "effective_decision_status": "diagnostic_only",
-        "chosen_action": observed_state,
-        "available_action": [observed_state],
-        "best_available_action_by_future_outcome": "not_determinable_from_current_review",
-        "chosen_action_return": None,
-        "best_available_action_return": None,
-        "correctness_class": "indeterminate",
-        "scoring_status": "diagnostic_published_not_scored",
-        "classification_basis": basis,
-        "regret_to_best_available": None,
-        "impact_normalized_severity_score": None,
-        "failure_type": "none",
-        "first_gap_mechanism": "no_gap",
     }
 
 
