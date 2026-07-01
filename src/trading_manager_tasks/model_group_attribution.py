@@ -964,7 +964,7 @@ def _layer_review_row(
         "candidate_set_scope": classification["candidate_set_scope"],
         "review_boundary_ref": selected_output_ref or classification["candidate_set_scope"],
         "review_boundary_status": "received_boundary_complete"
-        if effective_decision_status == "measured"
+        if effective_decision_status in {"measured", "diagnostic_only"}
         else "received_boundary_missing_evidence",
         "upstream_decision_state_policy": "received_upstream_state_is_fixed_review_input",
         "downstream_review_input_policy": "judge_layer_only_against_received_decision_time_inputs",
@@ -1044,23 +1044,13 @@ def _m01_background_context_classification(diagnostics: Mapping[str, Any]) -> di
             chosen_action="background_context_not_reported",
             basis="M01 diagnostics are missing from the replay decision row",
         )
-    acceptable = (state_quality is None or state_quality >= 0.5) and (stress is None or stress <= 0.8) and (
-        transition is None or transition <= 0.8
-    )
-    severity = _diagnostic_threshold_severity(
-        0.5 - state_quality if state_quality is not None else None,
-        stress - 0.8 if stress is not None else None,
-        transition - 0.8 if transition is not None else None,
-    )
-    return _simple_layer_classification(
-        correct=acceptable,
+    return _diagnostic_only_layer_classification(
         candidate_set_scope="background_context_state",
-        chosen_action="accept_background_context_state",
-        fallback_action="withhold_or_downweight_poor_background_context",
-        basis="point_in_time_background_state_quality_and_risk_thresholds",
-        failure_type="poor_background_context_accepted",
-        first_gap_mechanism="background_context_risk_gate",
-        diagnostic_severity_score=severity,
+        observed_state="background_context_state_observed",
+        basis=(
+            "M01 publishes point-in-time context diagnostics only; current replay evidence does not "
+            "contain a layer-specific scored context decision or best-available context alternative"
+        ),
     )
 
 
@@ -1120,24 +1110,13 @@ def _m03_event_state_classification(diagnostics: Mapping[str, Any]) -> dict[str,
             chosen_action="event_state_not_reported",
             basis="M03 event-state diagnostics are missing from the replay decision row",
         )
-    correct = (block is None or block <= 0.5) and (disable is None or disable <= 0.5) and (
-        uncertainty is None or uncertainty <= 0.8
-    ) and (path_risk is None or path_risk <= 0.8)
-    severity = _diagnostic_threshold_severity(
-        block - 0.5 if block is not None else None,
-        disable - 0.5 if disable is not None else None,
-        uncertainty - 0.8 if uncertainty is not None else None,
-        path_risk - 0.8 if path_risk is not None else None,
-    )
-    return _simple_layer_classification(
-        correct=correct,
+    return _diagnostic_only_layer_classification(
         candidate_set_scope="selected_path_event_state",
-        chosen_action="allow_path_event_state",
-        fallback_action="block_or_downweight_event_risk_path",
-        basis="point_in_time_event_pressure_and_uncertainty_thresholds",
-        failure_type="event_risk_state_allowed",
-        first_gap_mechanism="event_risk_gate",
-        diagnostic_severity_score=severity,
+        observed_state="event_state_observed",
+        basis=(
+            "M03 publishes point-in-time event-state diagnostics only; current replay evidence does not "
+            "contain a layer-specific scored event-state decision or best-available event-state alternative"
+        ),
     )
 
 
@@ -1233,6 +1212,30 @@ def _simple_layer_classification(
         "failure_type": "none" if correct else failure_type,
         "first_gap_mechanism": first_gap_mechanism,
         "selected_output_ref": selected_output_ref,
+    }
+
+
+def _diagnostic_only_layer_classification(
+    *,
+    candidate_set_scope: str,
+    observed_state: str,
+    basis: str,
+) -> dict[str, Any]:
+    return {
+        "candidate_set_scope": candidate_set_scope,
+        "effective_decision_status": "diagnostic_only",
+        "chosen_action": observed_state,
+        "available_action": [observed_state],
+        "best_available_action_by_future_outcome": "not_determinable_from_current_review",
+        "chosen_action_return": None,
+        "best_available_action_return": None,
+        "correctness_class": "indeterminate",
+        "scoring_status": "diagnostic_published_not_scored",
+        "classification_basis": basis,
+        "regret_to_best_available": None,
+        "impact_normalized_severity_score": None,
+        "failure_type": "none",
+        "first_gap_mechanism": "no_gap",
     }
 
 

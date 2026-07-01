@@ -75,6 +75,19 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "directional_underlying_return": -0.005,
                             "option_direction_consistency_status": "aligned",
                             "target_expected_move_abs_return": 0.02,
+                            "model_layer_diagnostics": {
+                                "model_01_background_context": {
+                                    "state_quality_score": 0.7,
+                                    "market_risk_stress_score": 0.45,
+                                    "transition_risk_score": 0.35,
+                                },
+                                "model_03_event_state": {
+                                    "event_uncertainty_score_1D": 0.1,
+                                    "event_entry_block_pressure_score_1D": 0.0,
+                                    "event_strategy_disable_pressure_score_1D": 0.0,
+                                    "event_path_risk_score_1D": 0.05,
+                                },
+                            },
                         }
                     ),
                     json.dumps(
@@ -275,6 +288,10 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(receipt["layer_review_diagnostic_summary"]["row_count"], 25)
             self.assertNotIn("model_06_residual_event_governance", {row["layer_id"] for row in layer_review_rows})
             first_layer_row = layer_review_rows[0]
+            self.assertEqual(first_layer_row["layer_id"], "model_01_background_context")
+            self.assertEqual(first_layer_row["correctness_class"], "indeterminate")
+            self.assertEqual(first_layer_row["scoring_status"], "diagnostic_published_not_scored")
+            self.assertIsNone(first_layer_row["regret_to_best_available"])
             self.assertIn("review_boundary_ref", first_layer_row)
             self.assertIn(
                 first_layer_row["review_boundary_status"],
