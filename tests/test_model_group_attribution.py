@@ -65,6 +65,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "impact_exposure_time": "2021-01-05T10:10:00-05:00",
                             "future_outcome_window": "2021-01-05T11:00:00-05:00->2021-01-05T16:00:00-05:00",
                             "realized_return": -0.01,
+                            "planned_position_notional_usd": 5000.0,
+                            "target_allocation_fraction": 0.2,
                             "decision_intended_action": "open_long",
                             "decision_intended_side": "long",
                             "decision_expression_type": "long_call",
@@ -121,6 +123,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
                             "fill_status": "simulated_filled",
                             "outcome_label": 1,
                             "realized_return": 0.04,
+                            "planned_position_notional_usd": 5000.0,
+                            "target_allocation_fraction": 0.2,
                             "baseline_return": 0.02,
                             "month": "2021-02",
                             "decision_intended_action": "open_short",
@@ -277,6 +281,14 @@ class ModelGroupAttributionTests(unittest.TestCase):
             )
             self.assertEqual(performance_summary["contract_type"], "model_group_replay_review_performance_summary")
             self.assertEqual(performance_summary["summary"]["decision_scope"]["decision_row_count"], 5)
+            target_performance = performance_summary["summary"]["target_performance"]
+            self.assertEqual(target_performance["turnover_gross_pnl_total"], 150.0)
+            self.assertAlmostEqual(target_performance["gross_pnl_total"], 149.6)
+            self.assertEqual(target_performance["capital_constrained_pnl_total"], target_performance["gross_pnl_total"])
+            self.assertLessEqual(
+                abs(target_performance["capital_constrained_pnl_total"]),
+                target_performance["initial_capital_usd"],
+            )
 
     def test_empty_replay_decision_rows_backoff_without_layer_attribution_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

@@ -1443,6 +1443,10 @@ def _replay_review_performance_summary(
         for notional, realized in zip(notional_by_row, returns)
         if notional is not None and realized is not None
     ]
+    initial_capital = _safe_float(replay_receipt.get("initial_capital_usd") or replay_receipt.get("initial_capital"))
+    capital_summary = _capital_constrained_performance(filled, initial_capital=initial_capital)
+    turnover_notional_total = sum(value for value in notional_by_row if value is not None)
+    turnover_pnl_total = sum(pnl_values)
     selected_trace_rows = [row for row in traces if _truthy(row.get("selected_by_replay"))]
     unexecutable_trace_rows = [
         row for row in traces if str(row.get("model_candidate_trace_status") or "") == "option_expression_unexecutable"
@@ -1492,13 +1496,23 @@ def _replay_review_performance_summary(
         "median_realized_return": _round_metric_nullable(_median_float(material_returns)),
         "min_realized_return": _round_metric_nullable(min(material_returns)) if material_returns else None,
         "max_realized_return": _round_metric_nullable(max(material_returns)) if material_returns else None,
-        "planned_notional_total": _round_metric_nullable(sum(value for value in notional_by_row if value is not None)),
-        "gross_pnl_total": _round_metric_nullable(sum(pnl_values)),
-        "gross_return_on_used_notional": _round_metric_nullable(
-            sum(pnl_values) / sum(value for value in notional_by_row if value is not None)
-        )
-        if sum(value for value in notional_by_row if value is not None) > 0
+        "initial_capital_usd": _round_metric_nullable(capital_summary["initial_capital_usd"]),
+        "planned_notional_total": _round_metric_nullable(turnover_notional_total),
+        "turnover_planned_notional_total": _round_metric_nullable(turnover_notional_total),
+        "turnover_gross_pnl_total": _round_metric_nullable(turnover_pnl_total),
+        "turnover_return_on_used_notional": _round_metric_nullable(turnover_pnl_total / turnover_notional_total)
+        if turnover_notional_total > 0
         else None,
+        "gross_pnl_total": _round_metric_nullable(capital_summary["capital_constrained_pnl_total"]),
+        "return_on_initial_capital": _round_metric_nullable(capital_summary["return_on_initial_capital"]),
+        "capital_constrained_pnl_total": _round_metric_nullable(capital_summary["capital_constrained_pnl_total"]),
+        "capital_constrained_return_on_initial_capital": _round_metric_nullable(
+            capital_summary["return_on_initial_capital"]
+        ),
+        "capital_constrained_final_equity_usd": _round_metric_nullable(capital_summary["final_equity_usd"]),
+        "capital_constrained_floor_hit": capital_summary["capital_floor_hit"],
+        "capital_constrained_trade_count": capital_summary["capital_constrained_trade_count"],
+        "capital_accounting_policy": capital_summary["capital_accounting_policy"],
         "top_target_returns": target_rows[:10],
         "worst_target_returns": list(reversed(target_rows[-10:])),
     }
@@ -1669,6 +1683,49 @@ def _target_performance_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str
         )
     output.sort(key=lambda item: (item["realized_return"] is None, item["realized_return"] or 0.0), reverse=True)
     return output
+
+
+def _capital_constrained_performance(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    initial_capital: float | None,
+) -> dict[str, Any]:
+    starting_capital = initial_capital if initial_capital is not None and initial_capital > 0 else 25000.0
+    equity = starting_capital
+    pnl_total = 0.0
+    constrained_trade_count = 0
+    capital_floor_hit = False
+    sorted_rows = sorted(rows, key=lambda row: _decision_time(row) or str(row.get("decision_id") or ""))
+    for row in sorted_rows:
+        realized_return = _safe_float(row.get("realized_return"))
+        planned_notional = _safe_float(row.get("planned_position_notional_usd"))
+        if realized_return is None or planned_notional is None or planned_notional <= 0:
+            continue
+        if equity <= 0:
+            capital_floor_hit = True
+            continue
+        allocation_fraction = _safe_float(row.get("target_allocation_fraction"))
+        if allocation_fraction is None or allocation_fraction <= 0:
+            allocation_fraction = _safe_float(row.get("default_target_allocation_fraction")) or 0.20
+        capital_notional = min(planned_notional, equity * allocation_fraction)
+        if capital_notional <= 0:
+            capital_floor_hit = True
+            continue
+        pnl = capital_notional * max(realized_return, -1.0)
+        pnl_total += pnl
+        equity = max(0.0, equity + pnl)
+        constrained_trade_count += 1
+        if equity <= 0:
+            capital_floor_hit = True
+    return {
+        "initial_capital_usd": starting_capital,
+        "capital_constrained_pnl_total": pnl_total,
+        "return_on_initial_capital": pnl_total / starting_capital if starting_capital > 0 else None,
+        "final_equity_usd": equity,
+        "capital_floor_hit": capital_floor_hit,
+        "capital_constrained_trade_count": constrained_trade_count,
+        "capital_accounting_policy": "sequential_equity_curve_capped_by_current_equity_and_target_allocation",
+    }
 
 
 def _direction_expression_summary(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
