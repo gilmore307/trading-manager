@@ -334,6 +334,7 @@ def run_model_group_replay_review_if_ready(
                 else None
             ),
             model_candidate_selection_trace_path=model_candidate_selection_trace_path,
+            layer_review_rows=layer_review_rows,
             run_id=f"{run_id}_layer_attribution",
             now_utc=now,
         )

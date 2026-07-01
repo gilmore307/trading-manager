@@ -123,6 +123,32 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 output_dir=output_dir,
                 m05_unfilled_diagnostics_path=m05_path,
                 counterfactual_gate_sweep_path=gate_sweep_path,
+                layer_review_rows=[
+                    {
+                        "source_decision_id": "r1",
+                        "layer_id": "model_04_unified_decision",
+                        "candidate_set_scope": "decision_time_entry_actions",
+                        "available_action": ["open_long", "baseline_action"],
+                        "chosen_action": "open_long",
+                        "best_available_action_by_future_outcome": "baseline_action",
+                        "chosen_action_return": -0.01,
+                        "best_available_action_return": 0.0,
+                        "regret_to_best_available": 0.01,
+                        "correctness_class": "incorrect",
+                    },
+                    {
+                        "source_decision_id": "r1",
+                        "layer_id": "model_05_option_expression",
+                        "candidate_set_scope": "decision_time_expression_candidates",
+                        "available_action": ["long_call AAPL_2021-01-15_C_100", "baseline_action"],
+                        "chosen_action": "long_call AAPL_2021-01-15_C_100",
+                        "best_available_action_by_future_outcome": "baseline_action",
+                        "chosen_action_return": -0.6,
+                        "best_available_action_return": 0.0,
+                        "regret_to_best_available": 0.6,
+                        "correctness_class": "incorrect",
+                    },
+                ],
                 now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
             )
 
@@ -327,6 +353,25 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 action_rows = list(csv.DictReader(handle))
             self.assertTrue(action_rows)
             self.assertIn("operation_action", action_rows[0])
+            self.assertIn("trigger_state", action_rows[0])
+            self.assertIn("pit_feasible_action_set_ref", action_rows[0])
+            self.assertIn("component_objective", action_rows[0])
+            self.assertIn("best_available_action_by_future_outcome", action_rows[0])
+            self.assertIn("component_correctness_class", action_rows[0])
+            c02_action = next(row for row in action_rows if row["operation_component_id"] == "C02_entry_operation")
+            self.assertEqual(c02_action["trigger_state"], "candidate_triggered")
+            self.assertEqual(c02_action["pit_feasible_action_set_ref"], "decision_time_entry_actions")
+            self.assertEqual(c02_action["pit_feasible_action_set_status"], "published")
+            self.assertEqual(c02_action["pit_feasible_action_count"], "2")
+            self.assertEqual(c02_action["best_available_action_by_future_outcome"], "baseline_action")
+            self.assertEqual(c02_action["component_correctness_class"], "incorrect")
+            self.assertEqual(c02_action["regret_to_best_available"], "0.01")
+            self.assertEqual(c02_action["post_replay_label_basis"], "future outcome ranks available entry actions after point-in-time gating")
+            c04_action = next(row for row in action_rows if row["operation_component_id"] == "C04_expression_review_operation")
+            self.assertEqual(c04_action["pit_feasible_action_set_ref"], "decision_time_expression_candidates")
+            self.assertEqual(c04_action["chosen_action"], "long_call AAPL_2021-01-15_C_100")
+            self.assertEqual(c04_action["best_available_action_by_future_outcome"], "baseline_action")
+            self.assertEqual(c04_action["regret_to_best_available"], "0.6")
             self.assertEqual(
                 {
                     "C01_intake_operation",

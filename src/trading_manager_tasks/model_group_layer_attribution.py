@@ -406,6 +406,19 @@ OPERATION_COMPONENT_ANALYSIS_METHODS = {
         "label_role": "settled_outcomes_are_review_labels_not_m06_decision_inputs",
     },
 }
+OPERATION_COMPONENT_OBJECTIVES = {
+    "C01_intake_operation": "publish point-in-time eligible candidates and context without future labels",
+    "C02_entry_operation": "admit or suppress model trade intent within the decision-time feasible action set",
+    "C03_lifecycle_operation": "apply legal portfolio lifecycle transitions before new exposure or replacement",
+    "C04_expression_review_operation": "materialize the requested exposure into the best feasible tradable expression",
+    "C05_order_intent_operation": "convert feasible expression into capital-constrained sized order intent",
+    "C06_execution_gate_operation": "execute or reject the order plan under replay/live fill and broker-safety rules",
+    "C07_failure_review_operation": "classify settled operational failures without feeding labels back into decisions",
+}
+OPERATION_COMPONENT_LAYER_LABEL_SOURCE = {
+    "C02_entry_operation": "model_04_unified_decision",
+    "C04_expression_review_operation": "model_05_option_expression",
+}
 OPERATION_REVIEW_PROJECTION_BY_SURFACE = {
     "C01_background_context_surface": {
         "operation_component_id": "C01_intake_operation",
@@ -579,6 +592,18 @@ OPERATION_COMPONENT_ACTION_FIELDNAMES = [
     "analysis_method",
     "evidence_role",
     "label_role",
+    "trigger_state",
+    "pit_feasible_action_set_ref",
+    "pit_feasible_action_count",
+    "pit_feasible_action_set_status",
+    "component_objective",
+    "chosen_action",
+    "best_available_action_by_future_outcome",
+    "chosen_action_return",
+    "best_available_action_return",
+    "chosen_rank_ex_post",
+    "component_correctness_class",
+    "post_replay_label_basis",
     "decision_time_evidence_fields",
     "post_replay_label_fields",
     "realized_return",
@@ -660,6 +685,7 @@ def build_model_group_layer_attribution(
     counterfactual_gate_sweep_path: Path | None = None,
     target_selection_universe_metrics_path: Path | None = None,
     model_candidate_selection_trace_path: Path | None = None,
+    layer_review_rows: Sequence[Mapping[str, Any]] = (),
     run_id: str | None = None,
     now_utc: datetime | None = None,
     tail_row_limit: int = DEFAULT_TAIL_ROW_LIMIT,
@@ -737,6 +763,7 @@ def build_model_group_layer_attribution(
         decision_surface_rows=decision_surface_rows,
         operation_review_projection_rows=operation_review_projection_rows,
         replay_receipt=replay_receipt,
+        layer_review_rows=layer_review_rows,
     )
     target_selection_universe_rows = _load_csv_rows(target_selection_universe_metrics_path)
     model_candidate_selection_trace_path = _resolved_model_candidate_selection_trace_path(
@@ -1710,6 +1737,194 @@ def _regret_to_best_available(row: Mapping[str, Any]) -> float | None:
     if row.get("baseline_return") not in {None, ""} and row.get("realized_return") not in {None, ""}:
         return max(0.0, _float(row.get("baseline_return")) - _float(row.get("realized_return")))
     return None
+
+
+def _string_list(value: Any) -> list[str]:
+    if value is None or value == "":
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return [str(item) for item in value if item not in {None, ""}]
+    text = str(value)
+    if not text:
+        return []
+    return [part.strip() for part in text.split(";") if part.strip()]
+
+
+def _operation_trigger_state(component_id: str, row: Mapping[str, Any], lifecycle_summary: Mapping[str, Any]) -> str:
+    if component_id in {"C01_intake_operation", "C07_failure_review_operation"}:
+        return "clock_triggered"
+    if component_id == "C02_entry_operation":
+        if any(row.get(field) not in {None, ""} for field in ("candidate_set_scope", "decision_status", "decision_action", "action")):
+            return "candidate_triggered"
+        return "missing_candidate_scope"
+    if component_id == "C03_lifecycle_operation":
+        if lifecycle_summary:
+            return "position_or_intent_state_triggered"
+        return "missing_lifecycle_state_evidence"
+    if component_id == "C04_expression_review_operation":
+        if row.get("decision_expression_type") not in {None, ""} or row.get("selected_expression_type") not in {None, ""}:
+            return "intent_triggered"
+        return "not_triggered_no_expression_intent"
+    if component_id == "C05_order_intent_operation":
+        if row.get("instrument_ref") not in {None, ""} or row.get("decision_intended_action") not in {None, ""}:
+            return "materialized_intent_triggered"
+        return "not_triggered_no_materialized_instrument"
+    if component_id == "C06_execution_gate_operation":
+        if row.get("instrument_ref") not in {None, ""} or row.get("fill_status") not in {None, ""}:
+            return "order_plan_or_fill_state_triggered"
+        return "not_triggered_no_order_plan"
+    return "not_reported"
+
+
+def _operation_layer_label_row(
+    *,
+    component_id: str,
+    decision_id: str,
+    layer_review_by_decision_layer: Mapping[tuple[str, str], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    layer_id = OPERATION_COMPONENT_LAYER_LABEL_SOURCE.get(component_id)
+    if not layer_id:
+        return {}
+    return layer_review_by_decision_layer.get((decision_id, layer_id), {})
+
+
+def _operation_available_actions(row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> list[str]:
+    actions = _string_list(layer_label_row.get("available_action"))
+    if actions:
+        return actions
+    return _string_list(row.get("available_action"))
+
+
+def _operation_feasible_action_set_ref(component_id: str, row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> str:
+    if layer_label_row:
+        return str(layer_label_row.get("candidate_set_scope") or OPERATION_COMPONENT_LAYER_LABEL_SOURCE.get(component_id) or "")
+    if component_id == "C01_intake_operation":
+        return str(row.get("candidate_set_scope") or "point_in_time_candidate_universe")
+    if component_id == "C02_entry_operation":
+        return "decision_time_entry_actions"
+    if component_id == "C03_lifecycle_operation":
+        return "decision_time_portfolio_lifecycle_transitions"
+    if component_id == "C04_expression_review_operation":
+        return str(row.get("asset_expression_route") or row.get("candidate_set_scope") or "decision_time_expression_candidates")
+    if component_id == "C05_order_intent_operation":
+        return "decision_time_capital_and_sizing_actions"
+    if component_id == "C06_execution_gate_operation":
+        return "decision_time_broker_safe_order_and_fill_states"
+    return "settled_component_incident_labels"
+
+
+def _operation_feasible_action_count(component_id: str, row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> int | None:
+    action_count = len(_operation_available_actions(row, layer_label_row))
+    if action_count:
+        return action_count
+    for field in (
+        "eligible_candidate_count",
+        "candidate_count_after_filter",
+        "candidate_count_before_filter",
+    ):
+        if row.get(field) not in {None, ""}:
+            return int(_float(row.get(field)))
+    if component_id in {"C02_entry_operation", "C05_order_intent_operation", "C06_execution_gate_operation"}:
+        return None
+    return None
+
+
+def _operation_feasible_action_set_status(row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> str:
+    if _operation_available_actions(row, layer_label_row):
+        return "published"
+    if any(row.get(field) not in {None, ""} for field in ("eligible_candidate_count", "candidate_count_after_filter")):
+        return "count_only"
+    return "not_published"
+
+
+def _operation_chosen_action(component_id: str, row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> str:
+    if layer_label_row.get("chosen_action") not in {None, ""}:
+        return str(layer_label_row.get("chosen_action"))
+    if component_id == "C01_intake_operation":
+        return "publish_inputs"
+    if component_id == "C02_entry_operation":
+        return str(row.get("chosen_action") or row.get("decision_action") or row.get("action") or "")
+    if component_id == "C03_lifecycle_operation":
+        return str(row.get("lifecycle_action") or "apply_lifecycle_state")
+    if component_id == "C04_expression_review_operation":
+        return str(row.get("instrument_ref") or row.get("decision_expression_type") or row.get("selected_expression_type") or "")
+    if component_id == "C05_order_intent_operation":
+        return str(row.get("decision_intended_action") or row.get("action") or "create_sized_order_intent")
+    if component_id == "C06_execution_gate_operation":
+        return str(row.get("fill_status") or "simulate_execution")
+    return "review_settled_failure"
+
+
+def _operation_best_available_action(component_id: str, row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> str:
+    if layer_label_row.get("best_available_action_by_future_outcome") not in {None, ""}:
+        return str(layer_label_row.get("best_available_action_by_future_outcome"))
+    explicit = str(row.get("best_available_action_by_future_outcome") or "")
+    if explicit:
+        return explicit
+    if component_id in {"C01_intake_operation", "C03_lifecycle_operation", "C05_order_intent_operation"}:
+        return "not_determinable_from_current_review"
+    return "not_published"
+
+
+def _operation_chosen_rank_ex_post(row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> int | None:
+    if layer_label_row.get("chosen_rank_ex_post") not in {None, ""}:
+        return int(_float(layer_label_row.get("chosen_rank_ex_post")))
+    if row.get("chosen_rank_ex_post") not in {None, ""}:
+        return int(_float(row.get("chosen_rank_ex_post")))
+    chosen = str(layer_label_row.get("chosen_action") or row.get("chosen_action") or "")
+    best = str(layer_label_row.get("best_available_action_by_future_outcome") or row.get("best_available_action_by_future_outcome") or "")
+    if chosen and best and chosen == best:
+        return 1
+    if best:
+        return None
+    return None
+
+
+def _operation_component_correctness_class(component_id: str, row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> str:
+    if layer_label_row.get("correctness_class") not in {None, ""}:
+        return str(layer_label_row.get("correctness_class"))
+    best = _operation_best_available_action(component_id, row, layer_label_row)
+    if best in {"not_published", "not_determinable_from_current_review"}:
+        return "not_scored"
+    chosen = _operation_chosen_action(component_id, row, layer_label_row)
+    regret = _regret_to_best_available(row)
+    if chosen and chosen == best:
+        return "best_available"
+    if regret is not None and regret <= 0:
+        return "acceptable_no_regret"
+    if regret is not None:
+        return "regretful_choice"
+    return "not_scored"
+
+
+def _operation_action_return(row: Mapping[str, Any], layer_label_row: Mapping[str, Any], field: str) -> float | None:
+    if layer_label_row.get(field) not in {None, ""}:
+        return _round(_float(layer_label_row.get(field)))
+    if row.get(field) not in {None, ""}:
+        return _round(_float(row.get(field)))
+    return None
+
+
+def _operation_regret_to_best_available(row: Mapping[str, Any], layer_label_row: Mapping[str, Any]) -> float | None:
+    if layer_label_row.get("regret_to_best_available") not in {None, ""}:
+        return _round(_float(layer_label_row.get("regret_to_best_available")))
+    return _round(_regret_to_best_available(row))
+
+
+def _operation_post_replay_label_basis(component_id: str, row: Mapping[str, Any]) -> str:
+    if component_id == "C01_intake_operation":
+        return "future labels audit opportunity coverage only; not used to construct candidate inputs"
+    if component_id == "C02_entry_operation":
+        return "future outcome ranks available entry actions after point-in-time gating"
+    if component_id == "C03_lifecycle_operation":
+        return "lifecycle correctness requires position-state transition labels; current row labels are diagnostic only"
+    if component_id == "C04_expression_review_operation":
+        return "future option/underlying outcome ranks only decision-time feasible expressions"
+    if component_id == "C05_order_intent_operation":
+        return "future outcomes audit sizing opportunity cost under account constraints"
+    if component_id == "C06_execution_gate_operation":
+        return "future settlement audits fill and execution quality after order plan emission"
+    return "settled outcomes classify incidents after replay decisions are fixed"
 
 
 def _truthy(value: Any) -> bool:
@@ -2759,6 +2974,7 @@ def _operation_component_action_rows(
     decision_surface_rows: Sequence[Mapping[str, Any]],
     operation_review_projection_rows: Sequence[Mapping[str, Any]],
     replay_receipt: Mapping[str, Any],
+    layer_review_rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     surface_by_decision = {
         str(row.get("decision_id") or ""): row
@@ -2767,6 +2983,10 @@ def _operation_component_action_rows(
     first_projection_by_decision = {
         str(row.get("decision_id") or ""): row
         for row in operation_review_projection_rows
+    }
+    layer_review_by_decision_layer = {
+        (str(row.get("source_decision_id") or ""), str(row.get("layer_id") or "")): row
+        for row in layer_review_rows
     }
     lifecycle_summary = _as_mapping(replay_receipt.get("portfolio_selection_summary"))
     action_rows: list[dict[str, Any]] = []
@@ -2792,6 +3012,11 @@ def _operation_component_action_rows(
                     surface=surface,
                     first_projection=first_projection,
                     lifecycle_summary=lifecycle_summary,
+                    layer_label_row=_operation_layer_label_row(
+                        component_id=component_id,
+                        decision_id=decision_id,
+                        layer_review_by_decision_layer=layer_review_by_decision_layer,
+                    ),
                 )
             )
     return action_rows
@@ -2806,6 +3031,7 @@ def _operation_component_action_row(
     surface: Mapping[str, Any],
     first_projection: Mapping[str, Any],
     lifecycle_summary: Mapping[str, Any],
+    layer_label_row: Mapping[str, Any],
 ) -> dict[str, Any]:
     component = OPERATION_COMPONENT_BY_ID[component_id]
     method = OPERATION_COMPONENT_ANALYSIS_METHODS.get(component_id, {})
@@ -2814,6 +3040,8 @@ def _operation_component_action_row(
     replay_month = str(row.get("replay_month") or timestamp[:7])
     first_limiting_component = str(first_projection.get("operation_component_id") or "")
     first_limiting_reason = str(surface.get("first_limiting_surface_reason") or first_projection.get("review_projection") or "")
+    chosen_action = _operation_chosen_action(component_id, row, layer_label_row)
+    best_available_action = _operation_best_available_action(component_id, row, layer_label_row)
     common = {
         "source_decision_id": decision_id,
         "source_decision_index": decision_index,
@@ -2827,8 +3055,20 @@ def _operation_component_action_row(
         "analysis_method": method.get("analysis_method", ""),
         "evidence_role": method.get("evidence_role", ""),
         "label_role": method.get("label_role", ""),
+        "trigger_state": _operation_trigger_state(component_id, row, lifecycle_summary),
+        "pit_feasible_action_set_ref": _operation_feasible_action_set_ref(component_id, row, layer_label_row),
+        "pit_feasible_action_count": _operation_feasible_action_count(component_id, row, layer_label_row),
+        "pit_feasible_action_set_status": _operation_feasible_action_set_status(row, layer_label_row),
+        "component_objective": OPERATION_COMPONENT_OBJECTIVES.get(component_id, ""),
+        "chosen_action": chosen_action,
+        "best_available_action_by_future_outcome": best_available_action,
+        "chosen_action_return": _operation_action_return(row, layer_label_row, "chosen_action_return"),
+        "best_available_action_return": _operation_action_return(row, layer_label_row, "best_available_action_return"),
+        "chosen_rank_ex_post": _operation_chosen_rank_ex_post(row, layer_label_row),
+        "component_correctness_class": _operation_component_correctness_class(component_id, row, layer_label_row),
+        "post_replay_label_basis": _operation_post_replay_label_basis(component_id, row),
         "realized_return": _round(_float(row.get("realized_return"))) if row.get("realized_return") not in {None, ""} else None,
-        "regret_to_best_available": _round(_regret_to_best_available(row)),
+        "regret_to_best_available": _operation_regret_to_best_available(row, layer_label_row),
         "impact_normalized_severity_score": _round(abs(_float(row.get("realized_return")))) if row.get("realized_return") not in {None, ""} else None,
         "review_status": "reviewable_from_replay_row",
         "fixed_input_only": True,

@@ -144,7 +144,13 @@ metrics under that same action axis. `operation_component_action_rows.csv`
 publishes the concrete replay operation ledger used by dashboard focus mode:
 each selected replay decision is expanded across C01, C02, C03, C04, C05, C06,
 and C07 with decision time, target, operation action/status, input/output
-summary, block reason, evidence role, label role, realized return, and regret.
+summary, block reason, trigger state, point-in-time feasible action-set
+reference/count/status, component objective, chosen action, best available
+post-replay label action, chosen/best return, ex-post rank when known,
+component correctness class, label basis, realized return, and regret. Future
+facts in this ledger are review labels only: they may rank the actions that were
+visible and feasible at decision time, but they must not become replay decision
+inputs.
 These files use live/replay action
 components as the first axis: C01 intake, C02 entry, C03 lifecycle, C04
 expression review, C05 order intent, C06 execution gate, and C07 failure review.
