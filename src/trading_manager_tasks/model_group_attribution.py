@@ -44,13 +44,13 @@ EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS = ("model_06_residual_event_governance",)
 REPLAY_LAYER_REVIEW_METHODS = {
     "model_01_background_context": {
         "metric_family": "background_context_state_quality",
-        "analysis_method": "point_in_time_context_quality_threshold_review",
+        "analysis_method": "post_replay_selected_path_label_context_acceptance_review",
         "decision_time_input_fields": [
             "state_quality_score",
             "market_risk_stress_score",
             "transition_risk_score",
         ],
-        "post_replay_label_fields": [],
+        "post_replay_label_fields": ["directional_underlying_return", "realized_return", "baseline_return"],
     },
     "model_02_target_state": {
         "metric_family": "target_candidate_selection_quality",
@@ -65,14 +65,14 @@ REPLAY_LAYER_REVIEW_METHODS = {
     },
     "model_03_event_state": {
         "metric_family": "event_state_risk_pressure_quality",
-        "analysis_method": "point_in_time_event_pressure_threshold_review",
+        "analysis_method": "post_replay_selected_path_label_event_state_acceptance_review",
         "decision_time_input_fields": [
             "event_uncertainty_score_1D",
             "event_entry_block_pressure_score_1D",
             "event_strategy_disable_pressure_score_1D",
             "event_path_risk_score_1D",
         ],
-        "post_replay_label_fields": [],
+        "post_replay_label_fields": ["directional_underlying_return", "realized_return", "baseline_return"],
     },
     "model_04_unified_decision": {
         "metric_family": "underlying_action_quality",
@@ -1018,11 +1018,11 @@ def _layer_review_classification(
     trace_row: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     if layer_id == "model_01_background_context":
-        return _m01_background_context_classification(diagnostics)
+        return _m01_background_context_classification(row, diagnostics=diagnostics)
     if layer_id == "model_02_target_state":
         return _m02_target_state_classification(row, diagnostics=diagnostics, trace_row=trace_row)
     if layer_id == "model_03_event_state":
-        return _m03_event_state_classification(diagnostics)
+        return _m03_event_state_classification(row, diagnostics=diagnostics)
     if layer_id == "model_04_unified_decision":
         return _m04_unified_decision_classification(row)
     if layer_id == "model_05_option_expression":
@@ -1034,7 +1034,7 @@ def _layer_review_classification(
     )
 
 
-def _m01_background_context_classification(diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+def _m01_background_context_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
     state_quality = _safe_float(diagnostics.get("state_quality_score"))
     stress = _safe_float(diagnostics.get("market_risk_stress_score"))
     transition = _safe_float(diagnostics.get("transition_risk_score"))
@@ -1044,26 +1044,14 @@ def _m01_background_context_classification(diagnostics: Mapping[str, Any]) -> di
             chosen_action="background_context_not_reported",
             basis="M01 diagnostics are missing from the replay decision row",
         )
-    acceptable = (
-        (state_quality is None or state_quality >= 0.60)
-        and (stress is None or stress <= 0.70)
-        and (transition is None or transition <= 0.65)
-    )
-    severity = _diagnostic_threshold_severity(
-        0.60 - state_quality if state_quality is not None else None,
-        stress - 0.70 if stress is not None else None,
-        transition - 0.65 if transition is not None else None,
-    )
-    return _simple_layer_classification(
-        correct=acceptable,
+    return _selected_path_outcome_labeled_layer_classification(
+        row=row,
         candidate_set_scope="background_context_state",
         chosen_action="accept_background_context_state",
         fallback_action="withhold_or_downweight_background_context",
-        basis="point_in_time_background_context_quality_stress_transition_thresholds",
-        failure_type="weak_or_stressed_background_context_accepted",
-        first_gap_mechanism="background_context_quality_or_stress_threshold",
-        selected_output_ref=diagnostics.get("model_ref"),
-        diagnostic_severity_score=severity,
+        basis="post_replay_selected_path_return_label_for_background_context_acceptance",
+        failure_type="background_context_state_accepted_before_bad_selected_path_outcome",
+        first_gap_mechanism="background_context_acceptance_outcome_label",
     )
 
 
@@ -1112,7 +1100,7 @@ def _m02_target_state_classification(
     )
 
 
-def _m03_event_state_classification(diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+def _m03_event_state_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
     uncertainty = _safe_float(diagnostics.get("event_uncertainty_score_1D"))
     block = _safe_float(diagnostics.get("event_entry_block_pressure_score_1D"))
     disable = _safe_float(diagnostics.get("event_strategy_disable_pressure_score_1D"))
@@ -1123,28 +1111,14 @@ def _m03_event_state_classification(diagnostics: Mapping[str, Any]) -> dict[str,
             chosen_action="event_state_not_reported",
             basis="M03 event-state diagnostics are missing from the replay decision row",
         )
-    acceptable = (
-        (uncertainty is None or uncertainty <= 0.60)
-        and (block is None or block <= 0.50)
-        and (disable is None or disable <= 0.50)
-        and (path_risk is None or path_risk <= 0.60)
-    )
-    severity = _diagnostic_threshold_severity(
-        uncertainty - 0.60 if uncertainty is not None else None,
-        block - 0.50 if block is not None else None,
-        disable - 0.50 if disable is not None else None,
-        path_risk - 0.60 if path_risk is not None else None,
-    )
-    return _simple_layer_classification(
-        correct=acceptable,
+    return _selected_path_outcome_labeled_layer_classification(
+        row=row,
         candidate_set_scope="selected_path_event_state",
         chosen_action="accept_event_state",
         fallback_action="block_or_downweight_event_state",
-        basis="point_in_time_event_uncertainty_block_disable_path_risk_thresholds",
-        failure_type="event_risk_state_accepted_without_required_downweight",
-        first_gap_mechanism="event_pressure_or_path_risk_threshold",
-        selected_output_ref=diagnostics.get("model_ref"),
-        diagnostic_severity_score=severity,
+        basis="post_replay_selected_path_return_label_for_event_state_acceptance",
+        failure_type="event_state_accepted_before_bad_selected_path_outcome",
+        first_gap_mechanism="event_state_acceptance_outcome_label",
     )
 
 
@@ -1241,6 +1215,39 @@ def _simple_layer_classification(
         "first_gap_mechanism": first_gap_mechanism,
         "selected_output_ref": selected_output_ref,
     }
+
+
+def _selected_path_outcome_labeled_layer_classification(
+    *,
+    row: Mapping[str, Any],
+    candidate_set_scope: str,
+    chosen_action: str,
+    fallback_action: str,
+    basis: str,
+    failure_type: str,
+    first_gap_mechanism: str,
+) -> dict[str, Any]:
+    selected_path_return = _directional_underlying_return(row)
+    if selected_path_return is None:
+        selected_path_return = _safe_float(row.get("realized_return"))
+    if selected_path_return is None:
+        return _indeterminate_layer_classification(
+            candidate_set_scope=candidate_set_scope,
+            chosen_action=chosen_action,
+            basis="selected path post-replay outcome label is missing",
+        )
+    baseline = _safe_float(row.get("baseline_return")) or 0.0
+    return _return_labeled_layer_classification(
+        correct=selected_path_return >= baseline,
+        candidate_set_scope=candidate_set_scope,
+        chosen_action=chosen_action,
+        fallback_action=fallback_action,
+        chosen_return=selected_path_return,
+        baseline_return=baseline,
+        basis=basis,
+        failure_type=failure_type,
+        first_gap_mechanism=first_gap_mechanism,
+    )
 
 
 def _return_labeled_layer_classification(

@@ -289,14 +289,14 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertNotIn("model_06_residual_event_governance", {row["layer_id"] for row in layer_review_rows})
             first_layer_row = layer_review_rows[0]
             self.assertEqual(first_layer_row["layer_id"], "model_01_background_context")
-            self.assertEqual(first_layer_row["correctness_class"], "correct")
-            self.assertEqual(first_layer_row["acceptability_class"], "acceptable")
-            self.assertEqual(first_layer_row["scoring_status"], "scored_point_in_time_diagnostic")
-            self.assertEqual(first_layer_row["regret_to_best_available"], 0.0)
-            self.assertEqual(first_layer_row["impact_normalized_severity_score"], 0.0)
+            self.assertEqual(first_layer_row["correctness_class"], "incorrect")
+            self.assertEqual(first_layer_row["acceptability_class"], "unacceptable")
+            self.assertEqual(first_layer_row["scoring_status"], "scored_post_replay_outcome_label")
+            self.assertEqual(first_layer_row["regret_to_best_available"], 0.005)
+            self.assertEqual(first_layer_row["impact_normalized_severity_score"], 0.005)
             self.assertEqual(
                 first_layer_row["classification_basis"],
-                "point_in_time_background_context_quality_stress_transition_thresholds",
+                "post_replay_selected_path_return_label_for_background_context_acceptance",
             )
             self.assertIn("review_boundary_ref", first_layer_row)
             self.assertIn(
