@@ -274,7 +274,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 for line in Path(receipt["layer_review_rows_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            self.assertEqual(len(layer_review_rows), 25)
+            self.assertEqual(len(layer_review_rows), 19)
             self.assertEqual(
                 {row["layer_id"] for row in layer_review_rows},
                 {
@@ -285,18 +285,27 @@ class ModelGroupAttributionTests(unittest.TestCase):
                     "model_05_option_expression",
                 },
             )
-            self.assertEqual(receipt["layer_review_diagnostic_summary"]["row_count"], 25)
+            self.assertEqual(receipt["layer_review_diagnostic_summary"]["row_count"], 19)
             self.assertNotIn("model_06_residual_event_governance", {row["layer_id"] for row in layer_review_rows})
             first_layer_row = layer_review_rows[0]
             self.assertEqual(first_layer_row["layer_id"], "model_01_background_context")
-            self.assertEqual(first_layer_row["correctness_class"], "incorrect")
-            self.assertEqual(first_layer_row["acceptability_class"], "unacceptable")
-            self.assertEqual(first_layer_row["scoring_status"], "scored_post_replay_outcome_label")
-            self.assertEqual(first_layer_row["regret_to_best_available"], 0.005)
-            self.assertEqual(first_layer_row["impact_normalized_severity_score"], 0.005)
+            self.assertEqual(first_layer_row["source_row_kind"], "model_candidate_selection_trace")
+            self.assertEqual(first_layer_row["correctness_class"], "indeterminate")
+            self.assertEqual(first_layer_row["acceptability_class"], "indeterminate")
+            self.assertEqual(first_layer_row["scoring_status"], "full_trace_unscored_pending_outcome_label_join")
+            self.assertIsNone(first_layer_row["regret_to_best_available"])
+            self.assertIsNone(first_layer_row["impact_normalized_severity_score"])
             self.assertEqual(
                 first_layer_row["classification_basis"],
-                "post_replay_selected_path_return_label_for_background_context_acceptance",
+                "M01 full trace row is not filtered by downstream selection; joined post-replay outcome label is not published yet",
+            )
+            self.assertEqual(
+                sum(1 for row in layer_review_rows if row["layer_id"] == "model_01_background_context"),
+                3,
+            )
+            self.assertEqual(
+                sum(1 for row in layer_review_rows if row["layer_id"] == "model_04_unified_decision"),
+                5,
             )
             self.assertIn("review_boundary_ref", first_layer_row)
             self.assertIn(

@@ -40,39 +40,41 @@ REPLAY_LAYER_REVIEW_LAYERS = (
     ("model_04_unified_decision", "M04 Unified Decision"),
     ("model_05_option_expression", "M05 Option Expression"),
 )
+TRACE_SCOPED_REPLAY_LAYER_REVIEW_LAYERS = REPLAY_LAYER_REVIEW_LAYERS[:3]
+DECISION_SCOPED_REPLAY_LAYER_REVIEW_LAYERS = REPLAY_LAYER_REVIEW_LAYERS[3:]
 EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS = ("model_06_residual_event_governance",)
 REPLAY_LAYER_REVIEW_METHODS = {
     "model_01_background_context": {
         "metric_family": "background_context_state_quality",
-        "analysis_method": "post_replay_selected_path_label_context_acceptance_review",
+        "analysis_method": "full_trace_context_acceptance_review_pending_joined_outcome_labels",
         "decision_time_input_fields": [
             "state_quality_score",
             "market_risk_stress_score",
             "transition_risk_score",
         ],
-        "post_replay_label_fields": ["directional_underlying_return", "realized_return", "baseline_return"],
+        "post_replay_label_fields": ["joined_candidate_forward_return", "baseline_return"],
     },
     "model_02_target_state": {
         "metric_family": "target_candidate_selection_quality",
-        "analysis_method": "same_timestamp_candidate_rank_and_tradability_review",
+        "analysis_method": "full_trace_same_timestamp_candidate_selection_review_pending_joined_outcome_labels",
         "decision_time_input_fields": [
             "model_rank_within_timestamp",
             "target_direction_score_1D",
             "tradability_score_1D",
             "target_trend_quality_score_1D",
         ],
-        "post_replay_label_fields": [],
+        "post_replay_label_fields": ["joined_candidate_forward_return", "baseline_return"],
     },
     "model_03_event_state": {
         "metric_family": "event_state_risk_pressure_quality",
-        "analysis_method": "post_replay_selected_path_label_event_state_acceptance_review",
+        "analysis_method": "full_trace_event_state_acceptance_review_pending_joined_outcome_labels",
         "decision_time_input_fields": [
             "event_uncertainty_score_1D",
             "event_entry_block_pressure_score_1D",
             "event_strategy_disable_pressure_score_1D",
             "event_path_risk_score_1D",
         ],
-        "post_replay_label_fields": ["directional_underlying_return", "realized_return", "baseline_return"],
+        "post_replay_label_fields": ["joined_candidate_forward_return", "baseline_return"],
     },
     "model_04_unified_decision": {
         "metric_family": "underlying_action_quality",
@@ -898,21 +900,49 @@ def _build_layer_review_rows(
     max_decision_rows: int | None,
 ) -> Iterable[dict[str, Any]]:
     trace_index = _selected_trace_index(trace_rows)
-    for decision_index, row in enumerate(decision_rows, start=1):
-        if max_decision_rows is not None and decision_index > max_decision_rows:
+    trace_limit = max_decision_rows if max_decision_rows is not None else len(trace_rows)
+    trace_review_index = 0
+    for trace_row in trace_rows:
+        trace_review_index += 1
+        if trace_limit is not None and trace_review_index > trace_limit:
             break
-        source_id = str(row.get("decision_id") or row.get("replay_decision_id") or f"decision_row_{decision_index}")
-        trace_row = trace_index.get((_decision_time(row) or "", str(row.get("target_ref") or _target_symbol(row) or "")))
-        for layer_order, (layer_id, layer_label) in enumerate(REPLAY_LAYER_REVIEW_LAYERS, start=1):
+        source_id = _trace_source_id(trace_row, trace_review_index)
+        for layer_order, (layer_id, layer_label) in enumerate(TRACE_SCOPED_REPLAY_LAYER_REVIEW_LAYERS, start=1):
             yield _layer_review_row(
-                row,
-                decision_index=decision_index,
+                trace_row,
+                source_index=trace_review_index,
                 source_id=source_id,
+                source_row_kind="model_candidate_selection_trace",
                 layer_order=layer_order,
                 layer_id=layer_id,
                 layer_label=layer_label,
                 trace_row=trace_row,
             )
+    for decision_index, row in enumerate(decision_rows, start=1):
+        if max_decision_rows is not None and decision_index > max_decision_rows:
+            break
+        source_id = str(row.get("decision_id") or row.get("replay_decision_id") or f"decision_row_{decision_index}")
+        trace_row = trace_index.get((_decision_time(row) or "", str(row.get("target_ref") or _target_symbol(row) or "")))
+        for layer_order, (layer_id, layer_label) in enumerate(DECISION_SCOPED_REPLAY_LAYER_REVIEW_LAYERS, start=4):
+            yield _layer_review_row(
+                row,
+                source_index=decision_index,
+                source_id=source_id,
+                source_row_kind="selected_replay_decision",
+                layer_order=layer_order,
+                layer_id=layer_id,
+                layer_label=layer_label,
+                trace_row=trace_row,
+            )
+
+
+def _trace_source_id(row: Mapping[str, Any], index: int) -> str:
+    timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+    target = str(row.get("target_ref") or row.get("target_symbol") or "").strip()
+    if timestamp and target:
+        digest = hashlib.sha1(f"{timestamp}|{target}|{index}".encode("utf-8")).hexdigest()[:12]
+        return f"trace_row_{digest}"
+    return f"trace_row_{index}"
 
 
 def _selected_trace_index(trace_rows: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str], Mapping[str, Any]]:
@@ -930,8 +960,9 @@ def _selected_trace_index(trace_rows: Sequence[Mapping[str, Any]]) -> dict[tuple
 def _layer_review_row(
     row: Mapping[str, Any],
     *,
-    decision_index: int,
+    source_index: int,
     source_id: str,
+    source_row_kind: str,
     layer_order: int,
     layer_id: str,
     layer_label: str,
@@ -947,10 +978,11 @@ def _layer_review_row(
     return {
         "contract_type": REPLAY_LAYER_REVIEW_ROW_CONTRACT_TYPE,
         "stage_id": "model_group.replay_review",
-        "review_policy_version": "m01_m05_path_conditioned_layer_review_v1",
-        "review_id": f"replay_layer_review_{decision_index:08d}_{layer_order:02d}",
+        "review_policy_version": "m01_m03_full_trace_m04_m05_reached_layer_review_v1",
+        "review_id": f"replay_layer_review_{source_index:08d}_{layer_order:02d}",
         "source_decision_id": source_id,
-        "source_decision_index": decision_index,
+        "source_decision_index": source_index,
+        "source_row_kind": source_row_kind,
         "decision_time": decision_time,
         "impact_exposure_time": _impact_profile(row, failure_type="layer_review_outcome_context", decision_time=decision_time)[
             "impact_exposure_time"
@@ -1035,6 +1067,12 @@ def _layer_review_classification(
 
 
 def _m01_background_context_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+    if _is_model_candidate_trace_row(row):
+        return _unscored_full_trace_classification(
+            candidate_set_scope="point_in_time_visible_candidate_trace",
+            chosen_action="accept_background_context_state_for_visible_candidate",
+            basis="M01 full trace row is not filtered by downstream selection; joined post-replay outcome label is not published yet",
+        )
     state_quality = _safe_float(diagnostics.get("state_quality_score"))
     stress = _safe_float(diagnostics.get("market_risk_stress_score"))
     transition = _safe_float(diagnostics.get("transition_risk_score"))
@@ -1061,6 +1099,12 @@ def _m02_target_state_classification(
     diagnostics: Mapping[str, Any],
     trace_row: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    if _is_model_candidate_trace_row(row):
+        return _unscored_full_trace_classification(
+            candidate_set_scope="point_in_time_visible_candidate_trace",
+            chosen_action=f"score_visible_candidate:{row.get('target_ref') or row.get('target_symbol') or 'not_reported'}",
+            basis="M02 full trace row is not filtered by downstream selection; joined candidate forward-return label is not published yet",
+        )
     rank = _safe_float((trace_row or {}).get("model_rank_within_timestamp"))
     score_available = _truthy((trace_row or {}).get("model_score_available"))
     selected = _truthy((trace_row or {}).get("selected_by_replay")) if trace_row is not None else False
@@ -1101,6 +1145,12 @@ def _m02_target_state_classification(
 
 
 def _m03_event_state_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+    if _is_model_candidate_trace_row(row):
+        return _unscored_full_trace_classification(
+            candidate_set_scope="point_in_time_visible_candidate_trace",
+            chosen_action="accept_event_state_for_visible_candidate",
+            basis="M03 full trace row is not filtered by downstream selection; joined post-replay outcome label is not published yet",
+        )
     uncertainty = _safe_float(diagnostics.get("event_uncertainty_score_1D"))
     block = _safe_float(diagnostics.get("event_entry_block_pressure_score_1D"))
     disable = _safe_float(diagnostics.get("event_strategy_disable_pressure_score_1D"))
@@ -1183,6 +1233,32 @@ def _m05_option_expression_classification(row: Mapping[str, Any], *, diagnostics
         failure_type="option_expression_underperformed_or_mismatched_direction",
         first_gap_mechanism="option_expression_selection",
     )
+
+
+def _is_model_candidate_trace_row(row: Mapping[str, Any]) -> bool:
+    contract_type = str(row.get("contract_type") or "").strip()
+    return contract_type in {"model_candidate_selection_trace_row", "evaluation_model_candidate_selection_trace_row"} or (
+        "model_candidate_trace_status" in row and "selected_by_replay" in row
+    )
+
+
+def _unscored_full_trace_classification(*, candidate_set_scope: str, chosen_action: str, basis: str) -> dict[str, Any]:
+    return {
+        "candidate_set_scope": candidate_set_scope,
+        "effective_decision_status": "diagnostic_only",
+        "chosen_action": chosen_action,
+        "available_action": [chosen_action],
+        "best_available_action_by_future_outcome": "pending_joined_outcome_label",
+        "chosen_action_return": None,
+        "best_available_action_return": None,
+        "correctness_class": "indeterminate",
+        "scoring_status": "full_trace_unscored_pending_outcome_label_join",
+        "classification_basis": basis,
+        "regret_to_best_available": None,
+        "impact_normalized_severity_score": None,
+        "failure_type": "pending_joined_outcome_label",
+        "first_gap_mechanism": "pending_outcome_label_join",
+    }
 
 
 def _simple_layer_classification(
@@ -1331,6 +1407,11 @@ def _effective_layer_decision(
     trace_row: Mapping[str, Any] | None,
 ) -> str:
     if layer_id == "model_01_background_context":
+        if _is_model_candidate_trace_row(row):
+            return (
+                f"background_context_available timestamp={row.get('replay_time_pointer') or row.get('timestamp') or 'not_reported'} "
+                f"candidate={row.get('target_ref') or row.get('target_symbol') or 'not_reported'}"
+            )
         return (
             "background_context_state "
             f"quality={diagnostics.get('state_quality_score')} "
@@ -1338,6 +1419,12 @@ def _effective_layer_decision(
             f"transition={diagnostics.get('transition_risk_score')}"
         )
     if layer_id == "model_02_target_state":
+        if _is_model_candidate_trace_row(row):
+            return (
+                f"visible_candidate {row.get('target_ref') or row.get('target_symbol') or 'not_reported'} "
+                f"same_timestamp_rank={row.get('model_rank_within_timestamp')} "
+                f"trace_status={row.get('model_candidate_trace_status') or 'not_reported'}"
+            )
         rank = (trace_row or {}).get("model_rank_within_timestamp")
         return (
             f"selected_target {diagnostics.get('target_ref') or _target_symbol(row) or 'not_reported'} "
@@ -1346,6 +1433,11 @@ def _effective_layer_decision(
             f"same_timestamp_rank={rank}"
         )
     if layer_id == "model_03_event_state":
+        if _is_model_candidate_trace_row(row):
+            return (
+                f"event_state_available timestamp={row.get('replay_time_pointer') or row.get('timestamp') or 'not_reported'} "
+                f"candidate={row.get('target_ref') or row.get('target_symbol') or 'not_reported'}"
+            )
         return (
             "event_state "
             f"uncertainty_1d={diagnostics.get('event_uncertainty_score_1D')} "
@@ -1368,9 +1460,12 @@ def _effective_layer_decision(
 
 
 def _layer_trace_evidence(layer_id: str, trace_row: Mapping[str, Any] | None) -> dict[str, Any]:
-    if layer_id != "model_02_target_state" or trace_row is None:
+    if layer_id not in {"model_01_background_context", "model_02_target_state", "model_03_event_state"} or trace_row is None:
         return {}
     fields = (
+        "replay_time_pointer",
+        "timestamp",
+        "target_ref",
         "model_candidate_trace_status",
         "selected_by_replay",
         "model_rank_within_timestamp",
@@ -1385,7 +1480,7 @@ def _layer_trace_evidence(layer_id: str, trace_row: Mapping[str, Any] | None) ->
 
 def _layer_evidence_refs(layer_id: str, *, trace_row: Mapping[str, Any] | None) -> list[str]:
     refs = ["decision_rows.jsonl"]
-    if layer_id == "model_02_target_state" and trace_row is not None:
+    if layer_id in {"model_01_background_context", "model_02_target_state", "model_03_event_state"} and trace_row is not None:
         refs.append("model_candidate_selection_trace.jsonl")
     return refs
 
@@ -2460,7 +2555,7 @@ def _first_text(row: Mapping[str, Any], keys: tuple[str, ...]) -> str | None:
 
 
 def _decision_time(row: Mapping[str, Any]) -> str | None:
-    for key in ("decision_time", "timestamp", "decision_timestamp", "created_at", "created_at_utc"):
+    for key in ("decision_time", "timestamp", "replay_time_pointer", "decision_timestamp", "created_at", "created_at_utc"):
         value = str(row.get(key) or "").strip()
         if value:
             return value
@@ -2471,7 +2566,7 @@ def _replay_month(row: Mapping[str, Any]) -> str | None:
     explicit_month = str(row.get("month") or row.get("replay_month") or "").strip()
     if explicit_month:
         return explicit_month
-    timestamp = str(row.get("timestamp") or row.get("decision_timestamp") or "").strip()
+    timestamp = str(row.get("timestamp") or row.get("replay_time_pointer") or row.get("decision_timestamp") or "").strip()
     if len(timestamp) >= 7:
         return timestamp[:7]
     return None
@@ -2490,13 +2585,22 @@ def _target_symbol(row: Mapping[str, Any]) -> str | None:
 
 def _path_conditioning_policy(row: Mapping[str, Any]) -> str:
     value = _first_text(row, ("path_conditioning_policy", "replay_path_conditioning_policy"))
-    return value or "upstream_selected_path_only"
+    if value:
+        return value
+    if _is_model_candidate_trace_row(row):
+        return "point_in_time_visible_candidate_trace_not_downstream_selected_path"
+    return "upstream_selected_path_only"
 
 
 def _path_scope(row: Mapping[str, Any]) -> str:
     value = _first_text(row, ("path_scope", "replay_path_scope"))
     if value:
         return value
+    if _is_model_candidate_trace_row(row):
+        timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+        target = str(row.get("target_ref") or row.get("target_symbol") or "").strip()
+        if timestamp and target:
+            return f"visible_candidate_trace:{timestamp}:{target}"
     target = _target_symbol(row)
     if target:
         return f"selected_target:{target}"

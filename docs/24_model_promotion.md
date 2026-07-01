@@ -66,6 +66,14 @@ reported as separate oracle diagnostics, but they must not become
 layers unless their candidate set was point-in-time feasible inside the current
 selected path.
 
+Layer review denominators must not be back-filtered by downstream choices.
+M01-M03 review rows are sourced from the full point-in-time model-candidate
+selection trace. M04-M05 rows are sourced only from decisions that reached the
+underlying-action or option-expression layer. Future labels may score a layer
+only after they are joined to that layer's own point-in-time row set; selected
+trade outcomes must not be copied backward to mark full-trace M01-M03 rows
+correct or incorrect.
+
 Replay review is hindsight grading over point-in-time available choices. It may
 use future realized returns, drawdown, slippage, missed opportunity, and related
 outcome windows to score each action that was actually available at decision
