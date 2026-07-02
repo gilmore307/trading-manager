@@ -42,17 +42,18 @@ REPLAY_LAYER_REVIEW_LAYERS = (
 )
 TRACE_SCOPED_REPLAY_LAYER_REVIEW_LAYERS = REPLAY_LAYER_REVIEW_LAYERS[:3]
 DECISION_SCOPED_REPLAY_LAYER_REVIEW_LAYERS = REPLAY_LAYER_REVIEW_LAYERS[3:]
+M01_BACKGROUND_CONTEXT_LAYER = "model_01_background_context"
 EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS = ("model_06_residual_event_governance",)
 REPLAY_LAYER_REVIEW_METHODS = {
     "model_01_background_context": {
         "metric_family": "background_context_state_quality",
-        "analysis_method": "full_trace_context_acceptance_review_pending_joined_outcome_labels",
+        "analysis_method": "replay_time_background_context_state_review_pending_joined_outcome_labels",
         "decision_time_input_fields": [
             "state_quality_score",
             "market_risk_stress_score",
             "transition_risk_score",
         ],
-        "post_replay_label_fields": ["joined_candidate_forward_return", "baseline_return"],
+        "post_replay_label_fields": ["joined_context_forward_outcome_label", "baseline_return"],
     },
     "model_02_target_state": {
         "metric_family": "target_candidate_selection_quality",
@@ -900,14 +901,27 @@ def _build_layer_review_rows(
     max_decision_rows: int | None,
 ) -> Iterable[dict[str, Any]]:
     trace_index = _selected_trace_index(trace_rows)
-    trace_limit = max_decision_rows if max_decision_rows is not None else len(trace_rows)
-    trace_review_index = 0
-    for trace_row in trace_rows:
-        trace_review_index += 1
+    m01_limit = max_decision_rows
+    trace_limit = max_decision_rows
+    for m01_index, trace_row in enumerate(_m01_background_context_time_state_rows(trace_rows), start=1):
+        if m01_limit is not None and m01_index > m01_limit:
+            break
+        source_id = _trace_source_id(trace_row, m01_index)
+        yield _layer_review_row(
+            trace_row,
+            source_index=m01_index,
+            source_id=source_id,
+            source_row_kind="model_01_background_context_time_state",
+            layer_order=1,
+            layer_id=M01_BACKGROUND_CONTEXT_LAYER,
+            layer_label="M01 Background Context",
+            trace_row=trace_row,
+        )
+    for trace_review_index, trace_row in enumerate(trace_rows, start=1):
         if trace_limit is not None and trace_review_index > trace_limit:
             break
         source_id = _trace_source_id(trace_row, trace_review_index)
-        for layer_order, (layer_id, layer_label) in enumerate(TRACE_SCOPED_REPLAY_LAYER_REVIEW_LAYERS, start=1):
+        for layer_order, (layer_id, layer_label) in enumerate(TRACE_SCOPED_REPLAY_LAYER_REVIEW_LAYERS[1:], start=2):
             yield _layer_review_row(
                 trace_row,
                 source_index=trace_review_index,
@@ -936,8 +950,61 @@ def _build_layer_review_rows(
             )
 
 
+def _m01_background_context_time_state_rows(trace_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    timestamp_counts: dict[str, int] = {}
+    for row in trace_rows:
+        timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+        if timestamp:
+            timestamp_counts[timestamp] = timestamp_counts.get(timestamp, 0) + 1
+    for row in trace_rows:
+        timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+        if not timestamp or timestamp in seen:
+            continue
+        seen.add(timestamp)
+        context_row = {
+            key: value
+            for key, value in row.items()
+            if key
+            not in {
+                "target_ref",
+                "target_symbol",
+                "symbol",
+                "instrument_ref",
+                "model_rank_within_timestamp",
+                "selected_by_replay",
+                "model_candidate_trace_status",
+                "diagnostic_rank_score",
+                "alpha_score",
+                "expected_return_score",
+                "action_direction_score",
+                "trade_intensity_score",
+                "underlying_action_type",
+                "action_side",
+                "selected_option_contract_ref",
+            }
+        }
+        context_row.update(
+            {
+                "contract_type": "model_01_background_context_time_state_row",
+                "replay_time_pointer": timestamp,
+                "timestamp": timestamp,
+                "source_candidate_trace_row_count_at_time": timestamp_counts.get(timestamp, 0),
+                "point_in_time_policy": "replay_time_pointer_excludes_future_decision_inputs",
+                "diagnostic_only": True,
+                "future_outcome_label_included": False,
+            }
+        )
+        rows.append(context_row)
+    return rows
+
+
 def _trace_source_id(row: Mapping[str, Any], index: int) -> str:
     timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+    if _is_m01_background_context_time_state_row(row) and timestamp:
+        digest = hashlib.sha1(f"m01|{timestamp}".encode("utf-8")).hexdigest()[:12]
+        return f"m01_context_time_{digest}"
     target = str(row.get("target_ref") or row.get("target_symbol") or "").strip()
     if timestamp and target:
         digest = hashlib.sha1(f"{timestamp}|{target}|{index}".encode("utf-8")).hexdigest()[:12]
@@ -1067,11 +1134,17 @@ def _layer_review_classification(
 
 
 def _m01_background_context_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+    if _is_m01_background_context_time_state_row(row):
+        return _unscored_full_trace_classification(
+            candidate_set_scope="point_in_time_background_context_state",
+            chosen_action="accept_background_context_state",
+            basis="M01 background state is reviewed at replay-time granularity; joined context outcome label is not published yet",
+        )
     if _is_model_candidate_trace_row(row):
         return _unscored_full_trace_classification(
-            candidate_set_scope="point_in_time_visible_candidate_trace",
-            chosen_action="accept_background_context_state_for_visible_candidate",
-            basis="M01 full trace row is not filtered by downstream selection; joined post-replay outcome label is not published yet",
+            candidate_set_scope="invalid_m01_target_candidate_trace",
+            chosen_action="invalid_target_expanded_background_context_row",
+            basis="M01 must not be target-expanded; candidate trace rows belong to M02 or later",
         )
     state_quality = _safe_float(diagnostics.get("state_quality_score"))
     stress = _safe_float(diagnostics.get("market_risk_stress_score"))
@@ -1242,6 +1315,10 @@ def _is_model_candidate_trace_row(row: Mapping[str, Any]) -> bool:
     )
 
 
+def _is_m01_background_context_time_state_row(row: Mapping[str, Any]) -> bool:
+    return str(row.get("contract_type") or "").strip() == "model_01_background_context_time_state_row"
+
+
 def _unscored_full_trace_classification(*, candidate_set_scope: str, chosen_action: str, basis: str) -> dict[str, Any]:
     return {
         "candidate_set_scope": candidate_set_scope,
@@ -1407,6 +1484,8 @@ def _effective_layer_decision(
     trace_row: Mapping[str, Any] | None,
 ) -> str:
     if layer_id == "model_01_background_context":
+        if _is_m01_background_context_time_state_row(row):
+            return f"background_context_state timestamp={row.get('replay_time_pointer') or row.get('timestamp') or 'not_reported'}"
         if _is_model_candidate_trace_row(row):
             return (
                 f"background_context_available timestamp={row.get('replay_time_pointer') or row.get('timestamp') or 'not_reported'} "
@@ -1462,25 +1541,37 @@ def _effective_layer_decision(
 def _layer_trace_evidence(layer_id: str, trace_row: Mapping[str, Any] | None) -> dict[str, Any]:
     if layer_id not in {"model_01_background_context", "model_02_target_state", "model_03_event_state"} or trace_row is None:
         return {}
-    fields = (
-        "replay_time_pointer",
-        "timestamp",
-        "target_ref",
-        "model_candidate_trace_status",
-        "selected_by_replay",
-        "model_rank_within_timestamp",
-        "diagnostic_rank_score",
-        "alpha_score",
-        "expected_return_score",
-        "action_direction_score",
-        "trade_intensity_score",
-    )
+    if layer_id == "model_01_background_context":
+        fields = (
+            "replay_time_pointer",
+            "timestamp",
+            "source_candidate_trace_row_count_at_time",
+            "point_in_time_policy",
+            "diagnostic_only",
+            "future_outcome_label_included",
+        )
+    else:
+        fields = (
+            "replay_time_pointer",
+            "timestamp",
+            "target_ref",
+            "model_candidate_trace_status",
+            "selected_by_replay",
+            "model_rank_within_timestamp",
+            "diagnostic_rank_score",
+            "alpha_score",
+            "expected_return_score",
+            "action_direction_score",
+            "trade_intensity_score",
+        )
     return {field: trace_row.get(field) for field in fields if field in trace_row}
 
 
 def _layer_evidence_refs(layer_id: str, *, trace_row: Mapping[str, Any] | None) -> list[str]:
     refs = ["decision_rows.jsonl"]
-    if layer_id in {"model_01_background_context", "model_02_target_state", "model_03_event_state"} and trace_row is not None:
+    if layer_id == "model_01_background_context" and trace_row is not None:
+        refs.append("model_candidate_selection_trace.jsonl#unique_replay_time_background_context")
+    elif layer_id in {"model_02_target_state", "model_03_event_state"} and trace_row is not None:
         refs.append("model_candidate_selection_trace.jsonl")
     return refs
 
@@ -2587,6 +2678,8 @@ def _path_conditioning_policy(row: Mapping[str, Any]) -> str:
     value = _first_text(row, ("path_conditioning_policy", "replay_path_conditioning_policy"))
     if value:
         return value
+    if _is_m01_background_context_time_state_row(row):
+        return "point_in_time_background_context_state_not_target_expanded"
     if _is_model_candidate_trace_row(row):
         return "point_in_time_visible_candidate_trace_not_downstream_selected_path"
     return "upstream_selected_path_only"
@@ -2596,6 +2689,10 @@ def _path_scope(row: Mapping[str, Any]) -> str:
     value = _first_text(row, ("path_scope", "replay_path_scope"))
     if value:
         return value
+    if _is_m01_background_context_time_state_row(row):
+        timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
+        if timestamp:
+            return f"background_context_time_state:{timestamp}"
     if _is_model_candidate_trace_row(row):
         timestamp = str(row.get("replay_time_pointer") or row.get("timestamp") or "").strip()
         target = str(row.get("target_ref") or row.get("target_symbol") or "").strip()
