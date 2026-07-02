@@ -13,6 +13,7 @@ from trading_manager_tasks.model_training_workflow import (
     MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,
     MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID,
     MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
+    MODEL_SIX_EVENT_FEED_COVERAGE_BLOCKER,
     MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
     build_model_training_workflow_plan,
@@ -285,6 +286,39 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         ])
         self.assertTrue(
             all(MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER not in stage.blockers for stage in plan.layers[4].stages)
+        )
+
+    def test_m06_exposes_input_feature_and_model_generation_like_other_models(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2017-06",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        stages = {stage.stage_id: stage for stage in plan.layers[5].stages}
+        self.assertIn("model_06_residual_event_governance.data_acquisition", stages)
+        self.assertIn("model_06_residual_event_governance.feature_generation", stages)
+        self.assertIn("model_06_residual_event_governance.model_generation.train", stages)
+        self.assertEqual(stages["model_06_residual_event_governance.data_acquisition"].stage_type, "data_acquisition")
+        self.assertEqual(stages["model_06_residual_event_governance.feature_generation"].stage_type, "feature_generation")
+        self.assertIn("scripts/tasks/materialize_residual_event_governance_inputs.py", stages["model_06_residual_event_governance.data_acquisition"].command)
+        self.assertIn("-m", stages["model_06_residual_event_governance.feature_generation"].command)
+        self.assertIn(
+            "data_feature.m06_residual_event_governance_feature_generation",
+            stages["model_06_residual_event_governance.feature_generation"].command,
+        )
+        self.assertIn(MODEL_SIX_EVENT_FEED_COVERAGE_BLOCKER, stages["model_06_residual_event_governance.data_acquisition"].blockers)
+        self.assertIn(
+            "model_06_residual_event_governance.data_acquisition_complete",
+            stages["model_06_residual_event_governance.feature_generation"].blockers,
+        )
+        self.assertIn(
+            "model_06_residual_event_governance.feature_or_input_ready",
+            stages["model_06_residual_event_governance.model_generation.train"].blockers,
         )
 
     def test_model_generation_uses_chronological_train_validation_test_split_stages(self) -> None:

@@ -26,7 +26,7 @@ StageStatus = Literal["ready", "blocked", "complete", "not_applicable"]
 
 BASE_STACK_LAYER_COUNT = 6
 PRE_REPLAY_MODEL_GENERATION_LAYER_COUNT = BASE_STACK_LAYER_COUNT
-BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 5)
+BASE_INPUT_STAGE_LAYERS = (1, 2, 3, 5, 6)
 LAYER_ONE_REQUIRED_ALPACA_BAR_REQUESTS = 19
 LAYER_TWO_REQUIRED_ALPACA_BAR_REQUESTS = 12
 FOUNDATION_CATCH_UP_LAYERS = (1,)
@@ -293,7 +293,7 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "candidate_axis": "target_symbol;walk_forward_12_3_3_window;target_candidate_id;residual_event_context_id",
         "candidate_progression_policy": "train residual event intervention, overblock/underblock, missed-event, and underlying-vs-option failure attribution after M04/M05 thesis formation",
         "data_surface": "M01 background, M03 event state, M04 decision, optional M05 expression, event observations, and settled replay/failure evidence",
-        "feature_cli": None,
+        "feature_cli": "trading-data-m06-residual-event-governance-feature-generation",
     },
 )
 
@@ -782,6 +782,7 @@ def _build_layer_workflow(
     selected_target_symbol: str | None,
     foundation_catch_up_only: bool,
     model_three_event_observation_blockers: tuple[str, ...],
+    model_six_event_feed_coverage_blockers: tuple[str, ...],
     model_two_target_local_feed_blockers: tuple[str, ...],
     target_option_overlay_required: bool,
 ) -> LayerWorkflow:
@@ -831,6 +832,10 @@ def _build_layer_workflow(
         acquisition_blockers = (MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,) if target_option_overlay_required else ()
         acquisition_status = "blocked" if acquisition_blockers else "not_applicable"
         acquisition_gate = None
+    elif layer == 6:
+        acquisition_blockers = upstream_model_blockers + model_six_event_feed_coverage_blockers
+        acquisition_status = "blocked" if acquisition_blockers else "ready"
+        acquisition_gate = None
     else:
         acquisition_status, acquisition_blockers, acquisition_gate = "blocked", _upstream_model_ready_blockers(
             tuple(meta["depends_on_layers"]),
@@ -871,6 +876,17 @@ def _build_layer_workflow(
             "PYTHONPATH=src",
             "python3",
             "scripts/tasks/materialize_layer_four_event_observation_inputs.py",
+            "--start-month",
+            "${START_MONTH}",
+            "--end-month",
+            "${END_MONTH}",
+            "--write",
+        ]
+    elif layer == 6:
+        acquisition_command = [
+            "PYTHONPATH=src",
+            "python3",
+            "scripts/tasks/materialize_residual_event_governance_inputs.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -1140,6 +1156,11 @@ def build_model_training_workflow_plan(
         end_month=end_month,
         trading_storage_root=resolved_trading_storage_root,
     )
+    model_six_event_feed_coverage_blockers = _event_feed_coverage_blockers(
+        start_month=start_month,
+        end_month=end_month,
+        trading_storage_root=resolved_trading_storage_root,
+    )
     model_two_target_local_feed_blockers = _model_two_target_local_feed_blockers(
         start_month=start_month,
         end_month=end_month,
@@ -1157,6 +1178,7 @@ def build_model_training_workflow_plan(
             selected_target_symbol=normalized_target_symbol,
             foundation_catch_up_only=foundation_catch_up_only,
             model_three_event_observation_blockers=model_three_event_observation_blockers,
+            model_six_event_feed_coverage_blockers=model_six_event_feed_coverage_blockers,
             model_two_target_local_feed_blockers=model_two_target_local_feed_blockers,
             target_option_overlay_required=target_option_overlay_required,
         )
