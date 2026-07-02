@@ -101,7 +101,7 @@ semantic decision:
 | `admissible_for_modelability_review` | Mechanical gates passed; Codex may judge projection mode and probability-function class. |
 | `admissible_for_context_only_review` | The packet is deterministic risk context, not a quantitative impact-family candidate. |
 | `blocked_missing_same_family_evidence` | Same-family count is below the required threshold. |
-| `blocked_mixed_family` | The sample contains multiple incompatible subtypes, such as product price increases and decreases in one packet. |
+| `blocked_mixed_family` | The sample contains multiple incompatible mechanisms in one packet. Signed parameters such as product-price increase versus decrease stay inside one price-change family. |
 | `blocked_missing_structured_evidence` | Required structured inputs, clocks, expectations, surprise fields, or clean subtype fields are missing. |
 | `blocked_missing_modelability_gates` | The family is mechanically coherent, but controls, overlap/confounder, leakage, horizon labels, or fold calibration are not ready. |
 
@@ -121,9 +121,13 @@ Every evidence packet must also publish a deterministic next-action route:
 | `admissible_for_context_only_review` | Run `event-context-projection-review`; do not run probability-function modelability review. |
 | `admissible_for_modelability_review` | Run `event-family-modelability-review` to judge projection mode and probability-function class. |
 
-The routing field is owned by the program. Codex may execute the named semantic
-review skill when routed there, but it must not override provider acquisition,
-gate generation, training, or model activation.
+The routing field is owned by the program. The
+`run_event_family_modelability_next_actions.py` route runner must consume it and
+write the next program queue artifact: acquisition task keys, structured
+enrichment plan, modelability-gate build plan, or semantic-review handoff. Codex
+may execute the named semantic review skill only when routed there, but it must
+not override provider acquisition, gate generation, training, or model
+activation.
 
 ## Probability Function Classes
 
@@ -225,6 +229,10 @@ The route is:
 3. Build `model_06_event_family_modelability_evidence_packet` from acquired
    same-family PIT evidence.
 4. Follow the packet's deterministic `required_next_action`.
+   The route runner writes `model_06_event_family_modelability_next_action_route`
+   and `model_06_event_family_modelability_next_action_summary` artifacts so a
+   blocked packet enters the next program queue instead of becoming a human or
+   chat-level stopping point.
 5. Run `event-family-modelability-review` only for packets with
    `admissible_for_modelability_review`; blocked packets must first be repaired
    by the program-owned route named by the packet.

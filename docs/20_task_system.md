@@ -125,11 +125,15 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    same-family PIT observations. The packet must pass deterministic admissibility
    gates before Codex modelability review; mixed-family packets, packets missing
    structured event parameters, and packets missing controls/calibration remain
-   blocked instead of being relabeled as context-only. Codex review consumes an
-   admissible packet and performs no provider calls. Program gates own coverage,
-   dedupe, overlap/confounder checks, stop/retry conditions, and review readiness;
-   agents only perform semantic review that deterministic code cannot reliably
-   encode. A single event cannot establish the family function type.
+   blocked instead of being relabeled as context-only. The next-action runner
+   consumes the packet readiness state and writes the next program-owned route
+   artifact: acquisition task keys, structured evidence enrichment plan,
+   modelability-gate build plan, or semantic review handoff. Codex review
+   consumes only admissible semantic-review handoffs and performs no provider
+   calls. Program gates own coverage, dedupe, overlap/confounder checks,
+   stop/retry conditions, and review readiness; agents only perform semantic
+   review that deterministic code cannot reliably encode. A single event cannot
+   establish the family function type.
 8. Evaluation. Evaluation consumes replay traces, replay-review rows, and attribution packets to
    score the candidate component bundle against baselines, calibration,
    stability, leakage, portfolio behavior, and failure explanations.
