@@ -99,7 +99,7 @@ class EventFamilyModelabilityNextActionTests(unittest.TestCase):
             self.assertEqual(payload["contract_type"], "model_06_event_family_structured_evidence_enrichment_plan")
             self.assertIn("actual/surprise fields when applicable", payload["required_outputs"])
 
-    def test_missing_modelability_gates_queues_gate_builder(self) -> None:
+    def test_missing_modelability_gates_writes_gate_build_receipt(self) -> None:
         packet = build_event_family_modelability_evidence_packet(
             event_family_id="target_product_price_change_news",
             target_symbol="AAPL",
@@ -124,12 +124,58 @@ class EventFamilyModelabilityNextActionTests(unittest.TestCase):
                 write_files=True,
             )
 
-            self.assertEqual(route.route_status, "queued_for_modelability_gate_builder")
+            self.assertEqual(route.route_status, "blocked_missing_modelability_gate_inputs")
             self.assertEqual(route.next_action_owner, "program_modelability_gate_builder")
             payload = json.loads(Path(route.route_plan["action_artifact_path"]).read_text(encoding="utf-8"))
-            self.assertEqual(payload["contract_type"], "model_06_event_family_modelability_gate_build_plan")
+            self.assertEqual(payload["contract_type"], "model_06_event_family_modelability_gate_build_receipt")
             self.assertIn("matched_control_gate", payload["missing_gates"])
+            self.assertEqual(payload["gate_results"]["matched_control_gate"], "blocked_missing_gate_input_artifact")
             self.assertFalse(payload["codex_review_allowed"])
+
+    def test_macro_result_without_consensus_is_parked_after_structured_enrichment(self) -> None:
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="cpi_release",
+            target_symbol="AAPL",
+            target_cik="0000320193",
+            start_month="2024-01",
+            end_month="2024-12",
+            scheduled_macro_release_rows=[
+                {
+                    "event_id": "cpi-2024-01",
+                    "event_time": "2024-01-11T08:30:00-05:00",
+                    "scheduled_known_at": "2024-01-11T08:30:00-05:00",
+                    "result_available_time": "2024-01-11T08:30:00-05:00",
+                    "event_type": "cpi_release",
+                    "event_scope": "macro",
+                    "country": "US",
+                    "symbol": "CPI",
+                    "source_priority": "trading_economics_calendar_web",
+                    "source_url": "",
+                    "raw_artifact_ref": "calendar/cpi-2024-01",
+                    "actual_payload": {"raw": "3.4%", "value": 3.4},
+                    "consensus_payload": {},
+                    "surprise_payload": {},
+                }
+            ],
+            same_family_observation_count=8,
+            minimum_same_family_observations=8,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            route = route_packet_next_action(
+                packet,
+                storage_root=root / "storage",
+                packet_root=root / "packets",
+                next_action_root=root / "routes",
+                write_files=True,
+            )
+
+            self.assertEqual(route.route_status, "parked_missing_expectation_baseline_source")
+            payload = json.loads(Path(route.route_plan["action_artifact_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(payload["contract_type"], "model_06_event_family_structured_evidence_gap_receipt")
+            self.assertEqual(payload["macro_release_result_counts"]["actual_value_count"], 1)
+            self.assertEqual(payload["macro_release_result_counts"]["consensus_value_count"], 0)
 
     def test_context_only_admissible_packet_queues_semantic_review_handoff(self) -> None:
         packet = build_event_family_modelability_evidence_packet(
@@ -209,7 +255,7 @@ class EventFamilyModelabilityNextActionTests(unittest.TestCase):
 
         self.assertEqual(summary.contract_type, MODELABILITY_NEXT_ACTION_SUMMARY_CONTRACT_TYPE)
         self.assertEqual(summary.event_family_count, 1)
-        self.assertEqual(summary.routes[0].route_status, "queued_for_modelability_gate_builder")
+        self.assertEqual(summary.routes[0].route_status, "blocked_missing_modelability_gate_inputs")
 
 
 if __name__ == "__main__":

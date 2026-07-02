@@ -364,6 +364,45 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.observations[0].normalized_event_parameters["source_category"], "scheduled_macro_release")
         self.assertEqual(packet.observations[0].normalized_event_parameters["event_kind"], "cpi_release")
 
+    def test_cpi_release_with_actual_consensus_surprise_reaches_modelability_gates(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="consumer_price_index",
+            target_symbol="",
+            target_cik="",
+            start_month="2024-01",
+            end_month="2024-12",
+            scheduled_macro_release_rows=[
+                {
+                    "event_id": "cpi-2024-01",
+                    "event_time": "2024-01-11T08:30:00-05:00",
+                    "scheduled_known_at": "2024-01-01T00:00:00-05:00",
+                    "result_available_time": "2024-01-11T08:30:00-05:00",
+                    "released_at": "2024-01-11T08:30:00-05:00",
+                    "event_type": "cpi_release",
+                    "event_scope": "macro",
+                    "country": "US",
+                    "symbol": "CPI",
+                    "source_priority": "approved_calendar",
+                    "source_url": "https://example.test/cpi",
+                    "raw_artifact_ref": "calendar/cpi-2024-01",
+                    "actual_payload": {"raw": "3.4%", "value": 3.4, "unit": "percent"},
+                    "consensus_payload": {"raw": "3.2%", "value": 3.2, "unit": "percent"},
+                    "surprise_payload": {"value": 0.2, "unit": "percent"},
+                }
+            ],
+            same_family_observation_count=8,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.event_family_id, "cpi_release")
+        self.assertEqual(packet.readiness_status, "blocked_missing_modelability_gates")
+        self.assertEqual(packet.deterministic_gate_results["structured_evidence_gate"], "passed_minimum_structured_evidence")
+        self.assertTrue(packet.deterministic_gate_results["structured_evidence_detail"]["actual_consensus_surprise_available"])
+        self.assertEqual(packet.observations[0].available_time, "2024-01-11T08:30:00-05:00")
+        self.assertEqual(packet.observations[0].normalized_event_parameters["actual_value"], 3.4)
+        self.assertEqual(packet.observations[0].normalized_event_parameters["consensus_value"], 3.2)
+        self.assertEqual(packet.observations[0].normalized_event_parameters["surprise_value"], 0.2)
+
 
 if __name__ == "__main__":
     unittest.main()

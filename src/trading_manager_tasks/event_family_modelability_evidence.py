@@ -233,7 +233,7 @@ ANALYST_PRICE_TARGET_TERMS = (
 )
 
 MACRO_RELEASE_EVENT_TYPE_TERMS = {
-    "cpi_release": ("cpi", "consumer price index"),
+    "cpi_release": ("cpi", "consumer price index", "inflation rate", "core inflation rate"),
     "ppi_release": ("ppi", "producer price index"),
 }
 
@@ -905,24 +905,31 @@ def fetch_scheduled_macro_release_rows_from_database(
     event_type_patterns = [f"%{term}%" for term in terms]
     family_filter = """
           AND (
-            event_type ILIKE ANY(%s)
-            OR COALESCE(symbol, '') ILIKE ANY(%s)
-            OR COALESCE(raw_artifact_ref, '') ILIKE ANY(%s)
+            e.event_type ILIKE ANY(%s)
+            OR COALESCE(e.symbol, '') ILIKE ANY(%s)
+            OR COALESCE(e.raw_artifact_ref, '') ILIKE ANY(%s)
           )
     """
     count_query = """
         SELECT count(*) AS row_count
-        FROM trading_data.calendar_scheduled_event
-        WHERE event_time >= %s
-          AND event_time < %s
+        FROM trading_data.calendar_scheduled_event e
+        WHERE e.event_time >= %s
+          AND e.event_time < %s
     """ + family_filter
     sample_query = """
-        SELECT *
-        FROM trading_data.calendar_scheduled_event
-        WHERE event_time >= %s
-          AND event_time < %s
+        SELECT e.*,
+               r.released_at,
+               r.available_time AS result_available_time,
+               r.actual_payload,
+               r.consensus_payload,
+               r.surprise_payload
+        FROM trading_data.calendar_scheduled_event e
+        LEFT JOIN trading_data.calendar_event_result r
+          ON r.event_id = e.event_id
+        WHERE e.event_time >= %s
+          AND e.event_time < %s
     """ + family_filter + """
-        ORDER BY event_time
+        ORDER BY e.event_time
         LIMIT %s
     """
     with psycopg.connect(_database_url(database_url), row_factory=dict_row) as connection:
@@ -1145,8 +1152,14 @@ def build_scheduled_macro_release_observations(
         event_id = str(row.get("event_id") or "").strip()
         event_time = _stringify_time(row.get("event_time"))
         known_at = _stringify_time(row.get("scheduled_known_at"))
+        result_available_time = _stringify_time(row.get("result_available_time")) or _stringify_time(
+            row.get("available_time")
+        )
         event_type = str(row.get("event_type") or "").strip()
         country = str(row.get("country") or "").strip()
+        actual_payload = row.get("actual_payload") if isinstance(row.get("actual_payload"), Mapping) else {}
+        consensus_payload = row.get("consensus_payload") if isinstance(row.get("consensus_payload"), Mapping) else {}
+        surprise_payload = row.get("surprise_payload") if isinstance(row.get("surprise_payload"), Mapping) else {}
         normalized_event_parameters = {
             "event_kind": event_family_id,
             "source_category": "scheduled_macro_release",
@@ -1158,15 +1171,27 @@ def build_scheduled_macro_release_observations(
             "source_priority": str(row.get("source_priority") or "").strip(),
             "source_url": str(row.get("source_url") or "").strip(),
             "raw_artifact_ref": str(row.get("raw_artifact_ref") or "").strip(),
+            "result_available_time": result_available_time,
+            "released_at": _stringify_time(row.get("released_at")),
+            "actual_payload": dict(actual_payload),
+            "consensus_payload": dict(consensus_payload),
+            "surprise_payload": dict(surprise_payload),
         }
+        if actual_payload.get("value") is not None:
+            normalized_event_parameters["actual_value"] = actual_payload.get("value")
+        if consensus_payload.get("value") is not None:
+            normalized_event_parameters["consensus_value"] = consensus_payload.get("value")
+        if surprise_payload.get("value") is not None:
+            normalized_event_parameters["surprise_value"] = surprise_payload.get("value")
+        available_time = result_available_time or known_at
         observations.append(
             EventFamilyObservation(
                 event_ref=f"scheduled-macro-release://{event_id or event_time}",
                 event_family_id=event_family_id,
                 target_symbol="",
                 target_cik="",
-                available_time=known_at,
-                pit_clock_quality="timestamped" if known_at else "missing_scheduled_known_at",
+                available_time=available_time,
+                pit_clock_quality="timestamped" if available_time else "missing_release_available_time",
                 form="",
                 fiscal_year="",
                 fiscal_period="",

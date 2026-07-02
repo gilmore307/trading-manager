@@ -24,6 +24,7 @@ from .event_family_modelability_evidence import (
     DEFAULT_OBSERVATION_SAMPLE_LIMIT,
     DEFAULT_PACKET_ROOT,
     EventFamilyModelabilityEvidencePacket,
+    MACRO_RELEASE_EVENT_TYPE_TERMS,
     build_packet_from_database,
     packet_output_path,
     persist_packet,
@@ -117,6 +118,25 @@ def _write_json_if_requested(payload: Mapping[str, Any], path: Path, *, write_fi
 
 
 def _structured_enrichment_payload(packet: EventFamilyModelabilityEvidencePacket) -> dict[str, Any]:
+    macro_release_result_counts = _macro_release_result_counts(packet)
+    if macro_release_result_counts and macro_release_result_counts["actual_value_count"] > 0:
+        return {
+            "contract_type": "model_06_event_family_structured_evidence_gap_receipt",
+            "source_contract_type": packet.contract_type,
+            "event_family_id": packet.event_family_id,
+            "target_symbol": packet.target_symbol,
+            "target_cik": packet.target_cik,
+            "start_month": packet.start_month,
+            "end_month": packet.end_month,
+            "readiness_reasons": list(packet.readiness_reasons),
+            "program_owner": "program_enrichment",
+            "route_status": "parked_missing_expectation_baseline_source",
+            "provider_dispatch_allowed": False,
+            "provider_calls": 0,
+            "codex_review_allowed": False,
+            "macro_release_result_counts": macro_release_result_counts,
+            "completion_gate": "add or materialize PIT consensus/forecast baseline source, then rebuild evidence packet",
+        }
     return {
         "contract_type": "model_06_event_family_structured_evidence_enrichment_plan",
         "source_contract_type": packet.contract_type,
@@ -136,22 +156,46 @@ def _structured_enrichment_payload(packet: EventFamilyModelabilityEvidencePacket
     }
 
 
-def _modelability_gate_payload(packet: EventFamilyModelabilityEvidencePacket) -> dict[str, Any]:
+def _macro_release_result_counts(packet: EventFamilyModelabilityEvidencePacket) -> dict[str, int]:
+    if packet.event_family_id not in MACRO_RELEASE_EVENT_TYPE_TERMS:
+        return {}
+    actual_count = 0
+    consensus_count = 0
+    surprise_count = 0
+    for observation in packet.observations:
+        parameters = observation.normalized_event_parameters
+        if parameters.get("actual_value") not in (None, ""):
+            actual_count += 1
+        if parameters.get("consensus_value") not in (None, ""):
+            consensus_count += 1
+        if parameters.get("surprise_value") not in (None, ""):
+            surprise_count += 1
     return {
-        "contract_type": "model_06_event_family_modelability_gate_build_plan",
+        "observation_count": len(packet.observations),
+        "actual_value_count": actual_count,
+        "consensus_value_count": consensus_count,
+        "surprise_value_count": surprise_count,
+    }
+
+
+def _modelability_gate_payload(packet: EventFamilyModelabilityEvidencePacket) -> dict[str, Any]:
+    missing_gates = list(packet.next_action_plan.get("missing_gates") or ())
+    return {
+        "contract_type": "model_06_event_family_modelability_gate_build_receipt",
         "source_contract_type": packet.contract_type,
         "event_family_id": packet.event_family_id,
         "target_symbol": packet.target_symbol,
         "target_cik": packet.target_cik,
         "start_month": packet.start_month,
         "end_month": packet.end_month,
-        "missing_gates": list(packet.next_action_plan.get("missing_gates") or ()),
+        "missing_gates": missing_gates,
+        "gate_results": {gate: "blocked_missing_gate_input_artifact" for gate in missing_gates},
         "required_outputs": list(packet.next_action_plan.get("required_outputs") or ()),
         "program_owner": "program_modelability_gate_builder",
-        "route_status": "queued_for_modelability_gate_builder",
+        "route_status": "blocked_missing_modelability_gate_inputs",
         "provider_calls": 0,
         "codex_review_allowed": False,
-        "completion_gate": packet.next_action_plan.get("completion_gate"),
+        "completion_gate": "materialize matched controls, overlap/confounder evidence, leakage checks, horizon labels, and fold calibration before rebuilding the packet",
     }
 
 
@@ -216,22 +260,27 @@ def route_packet_next_action(
         _write_json_if_requested(acquisition_plan.summary_row(), route_dir / "acquisition_plan.json", write_files=write_files)
     elif packet.next_action_owner == "program_enrichment":
         payload = _structured_enrichment_payload(packet)
-        route_status = "queued_for_program_enrichment"
+        route_status = str(payload["route_status"])
+        artifact_name = (
+            "structured_evidence_gap_receipt.json"
+            if payload["contract_type"] == "model_06_event_family_structured_evidence_gap_receipt"
+            else "structured_evidence_enrichment_plan.json"
+        )
         route_plan = {
             "action_artifact_type": payload["contract_type"],
-            "action_artifact_path": str(route_dir / "structured_evidence_enrichment_plan.json"),
+            "action_artifact_path": str(route_dir / artifact_name),
             **payload,
         }
-        _write_json_if_requested(payload, route_dir / "structured_evidence_enrichment_plan.json", write_files=write_files)
+        _write_json_if_requested(payload, route_dir / artifact_name, write_files=write_files)
     elif packet.next_action_owner == "program_modelability_gate_builder":
         payload = _modelability_gate_payload(packet)
-        route_status = "queued_for_modelability_gate_builder"
+        route_status = str(payload["route_status"])
         route_plan = {
             "action_artifact_type": payload["contract_type"],
-            "action_artifact_path": str(route_dir / "modelability_gate_build_plan.json"),
+            "action_artifact_path": str(route_dir / "modelability_gate_build_receipt.json"),
             **payload,
         }
-        _write_json_if_requested(payload, route_dir / "modelability_gate_build_plan.json", write_files=write_files)
+        _write_json_if_requested(payload, route_dir / "modelability_gate_build_receipt.json", write_files=write_files)
     elif packet.next_action_owner == "codex_semantic_review":
         payload = _semantic_review_handoff_payload(packet)
         route_status = "queued_for_codex_semantic_review"

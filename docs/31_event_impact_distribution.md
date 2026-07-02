@@ -116,7 +116,7 @@ Every evidence packet must also publish a deterministic next-action route:
 |---|---|
 | `blocked_missing_same_family_evidence` | Prepare bounded same-family event acquisition when source coverage is missing; if covered sources still do not provide enough observations, park the family and wait for future same-family events. |
 | `blocked_mixed_family` | Run event taxonomy / interpretation refinement, split concrete subfamilies, then rebuild separate packets. |
-| `blocked_missing_structured_evidence` | Enrich structured PIT fields such as release clocks, expectation/consensus, actual/surprise, subtype, and fixed horizon labels. |
+| `blocked_missing_structured_evidence` | Run the program enrichment route for structured PIT fields such as release clocks, expectation/consensus, actual/surprise, subtype, and fixed horizon labels. |
 | `blocked_missing_modelability_gates` | Build deterministic modelability gates: matched controls, overlap/confounder assessment, leakage assessment, fixed horizon labels, and fold calibration. |
 | `admissible_for_context_only_review` | Run `event-context-projection-review`; do not run probability-function modelability review. |
 | `admissible_for_modelability_review` | Run `event-family-modelability-review` to judge projection mode and probability-function class. |
@@ -128,6 +128,14 @@ enrichment plan, modelability-gate build plan, or semantic-review handoff. Codex
 may execute the named semantic review skill only when routed there, but it must
 not override provider acquisition, gate generation, training, or model
 activation.
+
+For macro-release families such as `cpi_release` and `ppi_release`,
+`enrich_event_family_structured_evidence.py` materializes existing reviewed
+Trading Economics calendar source files into `calendar_scheduled_event` and
+`calendar_event_result` before packets are rebuilt. If the source contains
+actual values but lacks consensus or forecast baselines, the rebuilt packet must
+remain `blocked_missing_structured_evidence` rather than being promoted to
+modelability review.
 
 ## Probability Function Classes
 
