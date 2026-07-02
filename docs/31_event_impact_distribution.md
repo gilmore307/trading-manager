@@ -127,17 +127,29 @@ taxonomy, modelability reasoning, probability-function class fit, and
 context-only rationale. They must not control provider dispatch, expand scope,
 train parameters, or replace deterministic gates.
 
-## AAPL Earnings Trial Route
+## Modelability Trial Route
 
-The first trial route is AAPL `company_earnings_or_financial_results`:
+The first implemented trial route supports several program-built M06 evidence
+packets:
+
+- AAPL `company_earnings_or_financial_results` from SEC company financials.
+- AAPL `target_news_or_disclosure` from symbol-scoped Alpaca news rows.
+- `market_session_calendar_event` from deterministic non-weekend market
+  holiday / early-close calendar rows.
+- `scheduled_macro_release` from structured scheduled macro calendar rows.
+
+The route is:
 
 1. Create `model_06_event_family_modelability_acquisition_plan`.
 2. Dispatch bounded provider tasks through the reviewed event-feed dispatcher.
 3. Build `model_06_event_family_modelability_evidence_packet` from acquired
    same-family PIT evidence.
-4. Run `event-family-modelability-review` after skills are applied.
+4. Run `event-family-modelability-review`.
 5. If M06 accepts a projection mode and probability-function class, train M03
    parameter mappings through a separate PIT-safe training path.
 
 The evidence packet is not a modelability decision. It is only the deterministic
-input bundle for Codex semantic review.
+input bundle for Codex semantic review. Current trial reviews show that sample
+count alone is not enough: impact-function or conditional-effect approval still
+requires subtype homogeneity, matched controls, leakage/overlap checks, and
+fold-frozen calibration/ablation evidence.

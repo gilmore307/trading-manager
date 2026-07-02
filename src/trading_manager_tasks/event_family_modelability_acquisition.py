@@ -48,6 +48,9 @@ EVENT_FAMILY_ALIASES = {
     "economic_release": "scheduled_macro_release",
     "news": "target_news_or_disclosure",
     "disclosure": "target_news_or_disclosure",
+    "market_session": "market_session_calendar_event",
+    "market_calendar": "market_session_calendar_event",
+    "exchange_calendar": "market_session_calendar_event",
 }
 
 

@@ -74,6 +74,83 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.readiness_status, "blocked_missing_same_family_evidence")
         self.assertEqual(packet.deterministic_gate_results["same_family_sample_gate"], "blocked")
 
+    def test_builds_target_news_packet_with_truncated_observation_sample(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="target_news_or_disclosure",
+            target_symbol="AAPL",
+            target_cik="0000320193",
+            start_month="2024-01",
+            end_month="2024-12",
+            target_news_rows=[
+                {
+                    "id": "n1",
+                    "timeline_headline": "Apple announces product update",
+                    "summary": "AAPL event summary",
+                    "created_at": "2024-01-03T14:30:00Z",
+                    "updated_at": "2024-01-03T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n1",
+                }
+            ],
+            same_family_observation_count=12,
+            minimum_same_family_observations=8,
+            observation_sample_limit=1,
+        )
+
+        self.assertEqual(packet.event_family_id, "target_news_or_disclosure")
+        self.assertEqual(packet.same_family_observation_count, 12)
+        self.assertEqual(packet.observation_sample_count, 1)
+        self.assertTrue(packet.observation_rows_truncated)
+        self.assertEqual(packet.readiness_status, "ready_for_codex_modelability_review")
+        self.assertEqual(packet.observations[0].affected_scope, "target")
+        self.assertEqual(packet.observations[0].affected_entities, ("AAPL",))
+
+    def test_builds_market_session_calendar_packet(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="market_session_calendar_event",
+            target_symbol="",
+            target_cik="",
+            start_month="2026-01",
+            end_month="2026-12",
+            market_session_rows=[
+                {
+                    "venue": "NASDAQ",
+                    "calendar_date": "2026-01-19",
+                    "timezone": "America/New_York",
+                    "is_trading_day": False,
+                    "session_type": "closed",
+                    "open_time": None,
+                    "close_time": None,
+                    "holiday_name": "Martin Luther King Jr. Day",
+                    "source_priority": "deterministic_rule",
+                    "source_ref": "unit-test",
+                }
+            ],
+            same_family_observation_count=10,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.event_family_id, "market_session_calendar_event")
+        self.assertEqual(packet.deterministic_gate_results["pit_clock_gate"], "passed")
+        self.assertEqual(packet.observations[0].affected_scope, "market")
+        self.assertEqual(packet.observations[0].source_name, "calendar_market_session")
+
+    def test_blocks_empty_scheduled_macro_release_packet(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="scheduled_macro_release",
+            target_symbol="",
+            target_cik="",
+            start_month="2024-01",
+            end_month="2024-12",
+            scheduled_macro_release_rows=[],
+            same_family_observation_count=0,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.event_family_id, "scheduled_macro_release")
+        self.assertEqual(packet.readiness_status, "blocked_missing_same_family_evidence")
+        self.assertEqual(packet.deterministic_gate_results["same_family_sample_gate"], "blocked")
+
 
 if __name__ == "__main__":
     unittest.main()
