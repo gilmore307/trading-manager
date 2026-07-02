@@ -152,6 +152,82 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.observations[0].event_ref, "alpaca-news://n2")
         self.assertEqual(packet.observations[0].normalized_event_parameters["product_price_change_direction"], "decrease")
 
+    def test_builds_target_product_launch_news_packet(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="product_launch_news",
+            target_symbol="AAPL",
+            target_cik="0000320193",
+            start_month="2024-01",
+            end_month="2024-12",
+            target_news_rows=[
+                {
+                    "id": "n1",
+                    "timeline_headline": "Apple unveils new iPhone lineup",
+                    "summary": "The company introduced new devices.",
+                    "created_at": "2024-09-09T17:30:00Z",
+                    "updated_at": "2024-09-09T17:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n1",
+                }
+            ],
+            same_family_observation_count=8,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.event_family_id, "target_product_launch_news")
+        self.assertEqual(packet.readiness_status, "ready_for_codex_modelability_review")
+        self.assertEqual(packet.observations[0].normalized_event_parameters["event_subtype"], "product_launch_or_announcement")
+
+    def test_builds_target_supply_chain_disruption_news_packet(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="supply_chain_disruption_news",
+            target_symbol="AAPL",
+            target_cik="0000320193",
+            start_month="2024-01",
+            end_month="2024-12",
+            target_news_rows=[
+                {
+                    "id": "n1",
+                    "timeline_headline": "Apple supplier disruption delays shipments",
+                    "summary": "Production delays affected device shipments.",
+                    "created_at": "2024-04-03T14:30:00Z",
+                    "updated_at": "2024-04-03T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n1",
+                }
+            ],
+            same_family_observation_count=8,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.event_family_id, "target_supply_chain_disruption_news")
+        self.assertEqual(packet.observations[0].normalized_event_parameters["event_subtype"], "supply_chain_disruption")
+
+    def test_builds_target_regulatory_antitrust_news_packet(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="regulatory_antitrust_news",
+            target_symbol="AAPL",
+            target_cik="0000320193",
+            start_month="2024-01",
+            end_month="2024-12",
+            target_news_rows=[
+                {
+                    "id": "n1",
+                    "timeline_headline": "EU antitrust regulators probe Apple App Store rules",
+                    "summary": "The regulatory investigation focuses on platform policies.",
+                    "created_at": "2024-03-03T14:30:00Z",
+                    "updated_at": "2024-03-03T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n1",
+                }
+            ],
+            same_family_observation_count=8,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.event_family_id, "target_regulatory_antitrust_news")
+        self.assertEqual(packet.observations[0].normalized_event_parameters["event_subtype"], "regulatory_or_antitrust_action")
+
     def test_builds_market_session_calendar_packet(self):
         packet = build_event_family_modelability_evidence_packet(
             event_family_id="market_session_calendar_event",

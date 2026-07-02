@@ -167,6 +167,10 @@ packets:
 
 - AAPL `company_earnings_or_financial_results` from SEC company financials.
 - AAPL `target_product_price_change_news` from symbol-scoped Alpaca news rows.
+- AAPL `target_product_launch_news` from symbol-scoped Alpaca news rows.
+- AAPL `target_supply_chain_disruption_news` from symbol-scoped Alpaca news
+  rows.
+- AAPL `target_regulatory_antitrust_news` from symbol-scoped Alpaca news rows.
 - `market_session_calendar_event` from deterministic non-weekend market
   holiday / early-close calendar rows.
 - `cpi_release` and `ppi_release` from structured scheduled macro calendar

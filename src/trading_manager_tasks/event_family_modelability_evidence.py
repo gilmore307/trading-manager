@@ -65,6 +65,32 @@ PRODUCT_PRICE_SUBJECT_TERMS = (
     "device",
     "devices",
 )
+PRODUCT_LAUNCH_SUBJECT_TERMS = (
+    "iphone",
+    "ipad",
+    "mac",
+    "macbook",
+    "airpods",
+    "apple watch",
+    "app store",
+    "icloud",
+    "vision pro",
+    "apple tv",
+    "apple intelligence",
+)
+TARGET_NEWS_CONTEXT_TERMS = (
+    "apple",
+    "aapl",
+    "iphone",
+    "ipad",
+    "mac",
+    "macbook",
+    "airpods",
+    "apple watch",
+    "app store",
+    "icloud",
+    "vision pro",
+)
 PRODUCT_PRICE_INCREASE_PHRASES = (
     "price hike",
     "price hikes",
@@ -108,6 +134,82 @@ PRODUCT_PRICE_DECREASE_PHRASES = (
     "discount",
     "discounts",
 )
+PRODUCT_LAUNCH_PHRASES = (
+    "launches",
+    "launched",
+    "unveils",
+    "unveiled",
+    "introduces",
+    "introduced",
+    "announces new",
+    "announced new",
+    "debut",
+    "debuts",
+    "release of",
+    "releases new",
+    "rolls out",
+    "rolled out",
+)
+SUPPLY_CHAIN_DISRUPTION_PHRASES = (
+    "production cut",
+    "production cuts",
+    "shipment delay",
+    "shipment delays",
+    "supply shortage",
+    "supply shortages",
+    "component shortage",
+    "component shortages",
+    "factory shutdown",
+    "factory disruptions",
+    "supply chain disruption",
+    "supply chain disruptions",
+)
+SUPPLY_CHAIN_CONTEXT_TERMS = (
+    "supply chain",
+    "supplier",
+    "suppliers",
+    "factory",
+    "factories",
+    "shipment",
+    "shipments",
+    "production",
+)
+SUPPLY_CHAIN_DISRUPTION_TERMS = (
+    "shortage",
+    "shortages",
+    "delay",
+    "delays",
+    "delayed",
+    "disruption",
+    "disruptions",
+)
+REGULATORY_ANTITRUST_PHRASES = (
+    "antitrust",
+    "regulator",
+    "regulators",
+    "regulatory",
+    "probe",
+    "investigation",
+    "investigations",
+    "lawsuit",
+    "lawsuits",
+    "fine",
+    "fines",
+    "european union",
+    "doj",
+    "department of justice",
+    "app store rules",
+)
+TARGET_REGULATORY_CONTEXT_TERMS = (
+    "apple",
+    "aapl",
+    "iphone",
+    "ipad",
+    "mac",
+    "app store",
+    "icloud",
+    "apple pay",
+)
 ANALYST_PRICE_TARGET_TERMS = (
     "price target",
     "analyst",
@@ -123,6 +225,27 @@ ANALYST_PRICE_TARGET_TERMS = (
 MACRO_RELEASE_EVENT_TYPE_TERMS = {
     "cpi_release": ("cpi", "consumer price index"),
     "ppi_release": ("ppi", "producer price index"),
+}
+
+NEWS_EVENT_FAMILY_SQL_TERMS = {
+    "target_product_price_change_news": (
+        PRODUCT_PRICE_CHANGE_TERMS,
+        PRODUCT_PRICE_SUBJECT_TERMS,
+        (*PRODUCT_PRICE_INCREASE_PHRASES, *PRODUCT_PRICE_DECREASE_PHRASES),
+    ),
+    "target_product_launch_news": (
+        PRODUCT_LAUNCH_SUBJECT_TERMS,
+        PRODUCT_LAUNCH_PHRASES,
+    ),
+    "target_supply_chain_disruption_news": (
+        TARGET_NEWS_CONTEXT_TERMS,
+        SUPPLY_CHAIN_CONTEXT_TERMS,
+        SUPPLY_CHAIN_DISRUPTION_TERMS,
+    ),
+    "target_regulatory_antitrust_news": (
+        TARGET_REGULATORY_CONTEXT_TERMS,
+        REGULATORY_ANTITRUST_PHRASES,
+    ),
 }
 
 
@@ -302,13 +425,58 @@ def _product_price_change_direction(text: str) -> str:
     return ""
 
 
+def _target_product_launch_match(text: str) -> bool:
+    if _text_contains_any(text, ANALYST_PRICE_TARGET_TERMS):
+        return False
+    matching_segments = [
+        segment
+        for segment in _event_text_segments(text)
+        if _text_contains_any(segment, TARGET_NEWS_CONTEXT_TERMS)
+        and _text_contains_any(segment, PRODUCT_LAUNCH_SUBJECT_TERMS)
+        and _text_contains_any(segment, PRODUCT_LAUNCH_PHRASES)
+    ]
+    return bool(matching_segments)
+
+
+def _target_supply_chain_disruption_match(text: str) -> bool:
+    lowered = text.lower()
+    if _text_contains_any(lowered, ANALYST_PRICE_TARGET_TERMS):
+        return False
+    if not _text_contains_any(lowered, TARGET_NEWS_CONTEXT_TERMS):
+        return False
+    if _text_contains_any(lowered, SUPPLY_CHAIN_DISRUPTION_PHRASES):
+        return True
+    return _text_contains_any(lowered, SUPPLY_CHAIN_CONTEXT_TERMS) and _text_contains_any(
+        lowered, SUPPLY_CHAIN_DISRUPTION_TERMS
+    )
+
+
+def _target_regulatory_antitrust_match(text: str) -> bool:
+    lowered = text.lower()
+    if _text_contains_any(lowered, ANALYST_PRICE_TARGET_TERMS):
+        return False
+    return _text_contains_any(lowered, TARGET_REGULATORY_CONTEXT_TERMS) and _text_contains_any(
+        lowered, REGULATORY_ANTITRUST_PHRASES
+    )
+
+
+def _news_event_family_subtype(text: str, *, event_family_id: str) -> str:
+    if event_family_id == "target_product_price_change_news":
+        return _product_price_change_direction(text)
+    if event_family_id == "target_product_launch_news":
+        return "product_launch_or_announcement" if _target_product_launch_match(text) else ""
+    if event_family_id == "target_supply_chain_disruption_news":
+        return "supply_chain_disruption" if _target_supply_chain_disruption_match(text) else ""
+    if event_family_id == "target_regulatory_antitrust_news":
+        return "regulatory_or_antitrust_action" if _target_regulatory_antitrust_match(text) else ""
+    return ""
+
+
 def _news_row_matches_event_family(row: Mapping[str, Any], *, event_family_id: str) -> bool:
     headline = str(row.get("timeline_headline") or "").strip()
     summary = str(row.get("summary") or "").strip()
     text = f"{headline}\n{summary}"
-    if event_family_id == "target_product_price_change_news":
-        return bool(_product_price_change_direction(text))
-    return False
+    return bool(_news_event_family_subtype(text, event_family_id=event_family_id))
 
 
 def _scheduled_macro_release_matches_event_family(row: Mapping[str, Any], *, event_family_id: str) -> bool:
@@ -378,18 +546,23 @@ def fetch_target_news_rows_from_database(
     start = _month_start(start_month)
     end = _month_end_exclusive(end_month)
     pattern = f'%"{symbol}"%'
-    if event_family_id != "target_product_price_change_news":
+    family_term_groups = NEWS_EVENT_FAMILY_SQL_TERMS.get(event_family_id)
+    if not family_term_groups:
         raise TaskSystemError(f"unsupported concrete news event family: {event_family_id}")
-    price_patterns = [f"%{term}%" for term in PRODUCT_PRICE_CHANGE_TERMS]
-    subject_patterns = [f"%{term}%" for term in PRODUCT_PRICE_SUBJECT_TERMS]
-    direction_patterns = [f"%{term}%" for term in (*PRODUCT_PRICE_INCREASE_PHRASES, *PRODUCT_PRICE_DECREASE_PHRASES)]
     analyst_exclusion_patterns = [f"%{term}%" for term in ANALYST_PRICE_TARGET_TERMS]
-    family_filter = """
-          AND (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))
-          AND (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))
-          AND (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))
-          AND NOT (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))
-    """
+    family_filter_parts = []
+    family_filter_params: list[list[str]] = []
+    for term_group in family_term_groups:
+        patterns = [f"%{term}%" for term in term_group]
+        family_filter_parts.append(
+            "AND (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))"
+        )
+        family_filter_params.extend([patterns, patterns])
+    family_filter_parts.append(
+        "AND NOT (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))"
+    )
+    family_filter_params.extend([analyst_exclusion_patterns, analyst_exclusion_patterns])
+    family_filter = "\n".join(family_filter_parts)
     broad_query = """
         SELECT id, timeline_headline, summary, created_at, updated_at,
                symbols, event_link_url
@@ -402,17 +575,7 @@ def fetch_target_news_rows_from_database(
     """
     with psycopg.connect(_database_url(database_url), row_factory=dict_row) as connection:
         with connection.cursor() as cursor:
-            filter_params = (
-                subject_patterns,
-                subject_patterns,
-                price_patterns,
-                price_patterns,
-                direction_patterns,
-                direction_patterns,
-                analyst_exclusion_patterns,
-                analyst_exclusion_patterns,
-            )
-            cursor.execute(broad_query, (start, end, pattern, *filter_params))
+            cursor.execute(broad_query, (start, end, pattern, *family_filter_params))
             filtered_rows = [
                 row
                 for row in _normalize_fact_rows(cursor.fetchall())
@@ -610,7 +773,8 @@ def build_target_news_observations(
         updated_at = _stringify_time(row.get("updated_at"))
         headline = str(row.get("timeline_headline") or "").strip()
         summary = str(row.get("summary") or "").strip()
-        price_change_direction = _product_price_change_direction(f"{headline}\n{summary}")
+        text = f"{headline}\n{summary}"
+        event_subtype = _news_event_family_subtype(text, event_family_id=event_family_id)
         symbols = row.get("symbols")
         if isinstance(symbols, str):
             affected_entities = (target_symbol.upper(),)
@@ -619,16 +783,18 @@ def build_target_news_observations(
         else:
             affected_entities = _target_entities(target_symbol)
         normalized_event_parameters = {
-            "event_kind": "target_product_price_change_news",
+            "event_kind": event_family_id,
             "source_category": "news",
             "headline": headline,
             "summary_available": bool(summary),
-            "product_price_change_direction": price_change_direction,
+            "event_subtype": event_subtype,
             "updated_at": updated_at,
             "symbols": list(affected_entities),
             "source_url": str(row.get("event_link_url") or "").strip(),
             "raw_source_table": "trading_data.feed_03_alpaca_news",
         }
+        if event_family_id == "target_product_price_change_news":
+            normalized_event_parameters["product_price_change_direction"] = event_subtype
         observations.append(
             EventFamilyObservation(
                 event_ref=f"alpaca-news://{row_id or created_at}",
@@ -790,7 +956,7 @@ def build_event_family_modelability_evidence_packet(
             event_family_id=canonical_family,
         )
         source_family_gate = "sec_company_financials_grouped_by_accession"
-    elif canonical_family == "target_product_price_change_news":
+    elif canonical_family in NEWS_EVENT_FAMILY_SQL_TERMS:
         sample_rows = _bounded_rows(target_news_rows, limit=observation_sample_limit)
         observations = build_target_news_observations(
             rows=sample_rows,
@@ -798,7 +964,7 @@ def build_event_family_modelability_evidence_packet(
             target_cik=target_cik,
             event_family_id=canonical_family,
         )
-        source_family_gate = "alpaca_news_product_price_change_rows"
+        source_family_gate = f"alpaca_news_{canonical_family}_rows"
     elif canonical_family == "market_session_calendar_event":
         sample_rows = _bounded_rows(market_session_rows, limit=observation_sample_limit)
         observations = build_market_session_observations(rows=sample_rows, event_family_id=canonical_family)
@@ -895,7 +1061,7 @@ def build_packet_from_database(
             minimum_same_family_observations=minimum_same_family_observations,
             observation_sample_limit=observation_sample_limit,
         )
-    if canonical_family == "target_product_price_change_news":
+    if canonical_family in NEWS_EVENT_FAMILY_SQL_TERMS:
         row_count, rows = fetch_target_news_rows_from_database(
             target_symbol=target_symbol,
             event_family_id=canonical_family,

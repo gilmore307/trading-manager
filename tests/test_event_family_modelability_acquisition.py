@@ -59,9 +59,16 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
         self.assertEqual(canonical_event_family_id("earnings-release"), "company_earnings_or_financial_results")
         self.assertEqual(canonical_event_family_id("cpi"), "cpi_release")
         self.assertEqual(canonical_event_family_id("product-pricing-change"), "target_product_price_change_news")
+        self.assertEqual(canonical_event_family_id("product-launch"), "target_product_launch_news")
+        self.assertEqual(canonical_event_family_id("supply-chain-disruption"), "target_supply_chain_disruption_news")
+        self.assertEqual(canonical_event_family_id("regulatory-antitrust"), "target_regulatory_antitrust_news")
         self.assertEqual(
             required_feeds_for_event_family("financial_results"),
             ("08_feed_sec_company_financials", "03_feed_alpaca_news", "05_feed_gdelt_news"),
+        )
+        self.assertEqual(
+            required_feeds_for_event_family("target_product_launch_news"),
+            ("03_feed_alpaca_news", "05_feed_gdelt_news"),
         )
 
     def test_rejects_source_buckets_as_event_families(self):

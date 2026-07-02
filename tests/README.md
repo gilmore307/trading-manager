@@ -25,6 +25,8 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - `test_drain_model_group_replay_option_features.py`
 - `test_event_feed_backfill.py`
 - `test_event_feed_dispatch.py`
+- `test_event_family_modelability_acquisition.py`
+- `test_event_family_modelability_evidence.py`
 - `test_event_model_regeneration_plan.py`
 - `test_failure_register.py`
 - `test_governance_checks.py`
