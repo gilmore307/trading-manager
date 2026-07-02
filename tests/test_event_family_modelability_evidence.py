@@ -84,7 +84,7 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
 
     def test_builds_concrete_product_price_news_packet_with_truncated_observation_sample(self):
         packet = build_event_family_modelability_evidence_packet(
-            event_family_id="target_product_price_increase_news",
+            event_family_id="target_product_price_change_news",
             target_symbol="AAPL",
             target_cik="0000320193",
             start_month="2024-01",
@@ -105,7 +105,7 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
             observation_sample_limit=1,
         )
 
-        self.assertEqual(packet.event_family_id, "target_product_price_increase_news")
+        self.assertEqual(packet.event_family_id, "target_product_price_change_news")
         self.assertEqual(packet.same_family_observation_count, 12)
         self.assertEqual(packet.observation_sample_count, 1)
         self.assertTrue(packet.observation_rows_truncated)
@@ -131,9 +131,9 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
                 target_news_rows=[],
             )
 
-    def test_product_price_decrease_news_family_excludes_analyst_price_targets(self):
+    def test_product_price_change_news_family_excludes_analyst_price_targets(self):
         packet = build_event_family_modelability_evidence_packet(
-            event_family_id="target_product_price_decrease_news",
+            event_family_id="target_product_price_change_news",
             target_symbol="AAPL",
             target_cik="0000320193",
             start_month="2024-01",
@@ -162,41 +162,48 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         )
 
         self.assertEqual(packet.observation_sample_count, 1)
-        self.assertEqual(packet.event_family_id, "target_product_price_decrease_news")
+        self.assertEqual(packet.event_family_id, "target_product_price_change_news")
         self.assertEqual(packet.observations[0].event_ref, "alpaca-news://n2")
         self.assertEqual(packet.observations[0].normalized_event_parameters["product_price_change_direction"], "decrease")
 
-    def test_rejects_product_price_change_direction_bucket(self):
-        with self.assertRaisesRegex(Exception, "source/category bucket"):
-            build_event_family_modelability_evidence_packet(
-                event_family_id="target_product_price_change_news",
-                target_symbol="AAPL",
-                target_cik="0000320193",
-                start_month="2024-01",
-                end_month="2024-12",
-                target_news_rows=[
-                    {
-                        "id": "n1",
-                        "timeline_headline": "Apple raises prices on iPhone",
-                        "summary": "",
-                        "created_at": "2024-01-03T14:30:00Z",
-                        "updated_at": "2024-01-03T14:35:00Z",
-                        "symbols": ["AAPL"],
-                        "event_link_url": "https://example.test/n1",
-                    },
-                    {
-                        "id": "n2",
-                        "timeline_headline": "Apple cuts prices on iPad",
-                        "summary": "",
-                        "created_at": "2024-01-04T14:30:00Z",
-                        "updated_at": "2024-01-04T14:35:00Z",
-                        "symbols": ["AAPL"],
-                        "event_link_url": "https://example.test/n2",
-                    },
-                ],
-                same_family_observation_count=8,
-                minimum_same_family_observations=8,
-            )
+    def test_product_price_change_family_allows_signed_direction_parameters(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="target_product_price_change_news",
+            target_symbol="AAPL",
+            target_cik="0000320193",
+            start_month="2024-01",
+            end_month="2024-12",
+            target_news_rows=[
+                {
+                    "id": "n1",
+                    "timeline_headline": "Apple raises prices on iPhone",
+                    "summary": "",
+                    "created_at": "2024-01-03T14:30:00Z",
+                    "updated_at": "2024-01-03T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n1",
+                },
+                {
+                    "id": "n2",
+                    "timeline_headline": "Apple cuts prices on iPad",
+                    "summary": "",
+                    "created_at": "2024-01-04T14:30:00Z",
+                    "updated_at": "2024-01-04T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n2",
+                },
+            ],
+            same_family_observation_count=8,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.event_family_id, "target_product_price_change_news")
+        self.assertEqual(packet.deterministic_gate_results["family_purity_gate"], "passed_mechanical_subtype_check")
+        self.assertEqual(packet.deterministic_gate_results["structured_evidence_gate"], "passed_minimum_structured_evidence")
+        self.assertEqual(
+            packet.deterministic_gate_results["structured_evidence_detail"]["direction_values"],
+            ["decrease", "increase"],
+        )
 
     def test_builds_target_product_launch_news_packet(self):
         packet = build_event_family_modelability_evidence_packet(

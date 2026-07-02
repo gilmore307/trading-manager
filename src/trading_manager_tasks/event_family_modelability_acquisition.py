@@ -28,11 +28,7 @@ EVENT_FAMILY_FEED_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         "03_feed_alpaca_news",
         "05_feed_gdelt_news",
     ),
-    "target_product_price_increase_news": (
-        "03_feed_alpaca_news",
-        "05_feed_gdelt_news",
-    ),
-    "target_product_price_decrease_news": (
+    "target_product_price_change_news": (
         "03_feed_alpaca_news",
         "05_feed_gdelt_news",
     ),
@@ -57,17 +53,13 @@ EVENT_FAMILY_FEED_REQUIREMENTS: dict[str, tuple[str, ...]] = {
 }
 
 COARSE_EVENT_SOURCE_CATEGORIES = {
-    "news": "news is a source class; use a concrete news event family such as target_product_price_increase_news",
+    "news": "news is a source class; use a concrete news event family such as target_product_price_change_news",
     "target_news_or_disclosure": "target_news_or_disclosure is a source/category bucket; use a concrete news event family",
     "disclosure": "disclosure is a source/category bucket; use a concrete disclosure event family",
     "scheduled_macro_release": "scheduled_macro_release is a schedule/source category; use a concrete release family such as cpi_release or ppi_release",
     "macro": "macro is a domain bucket; use a concrete macro event family such as cpi_release or ppi_release",
     "macro_release": "macro_release is a release category; use a concrete macro event family such as cpi_release or ppi_release",
     "economic_release": "economic_release is a release category; use a concrete macro event family such as cpi_release or ppi_release",
-    "product_price_change": "product_price_change mixes directions; use target_product_price_increase_news or target_product_price_decrease_news",
-    "product_pricing_change": "product_pricing_change mixes directions; use target_product_price_increase_news or target_product_price_decrease_news",
-    "product_price_change_news": "product_price_change_news mixes directions; use target_product_price_increase_news or target_product_price_decrease_news",
-    "target_product_price_change_news": "target_product_price_change_news mixes directions; use target_product_price_increase_news or target_product_price_decrease_news",
 }
 
 TARGET_SPECIFIC_EVENT_FAMILY_ALIASES = {
@@ -102,12 +94,15 @@ EVENT_FAMILY_ALIASES = {
     "earnings_release": "company_earnings_or_financial_results",
     "financial_results": "company_earnings_or_financial_results",
     "company_financials": "company_earnings_or_financial_results",
-    "product_price_increase": "target_product_price_increase_news",
-    "product_price_increase_news": "target_product_price_increase_news",
-    "price_increase_news": "target_product_price_increase_news",
-    "product_price_decrease": "target_product_price_decrease_news",
-    "product_price_decrease_news": "target_product_price_decrease_news",
-    "price_decrease_news": "target_product_price_decrease_news",
+    "product_price_change": "target_product_price_change_news",
+    "product_pricing_change": "target_product_price_change_news",
+    "product_price_change_news": "target_product_price_change_news",
+    "product_price_increase": "target_product_price_change_news",
+    "product_price_increase_news": "target_product_price_change_news",
+    "price_increase_news": "target_product_price_change_news",
+    "product_price_decrease": "target_product_price_change_news",
+    "product_price_decrease_news": "target_product_price_change_news",
+    "price_decrease_news": "target_product_price_change_news",
     "product_launch": "target_product_launch_news",
     "product_launch_news": "target_product_launch_news",
     "supply_chain_disruption": "target_supply_chain_disruption_news",

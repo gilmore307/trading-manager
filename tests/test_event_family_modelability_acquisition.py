@@ -60,8 +60,9 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
     def test_family_aliases_resolve_to_canonical_routes(self):
         self.assertEqual(canonical_event_family_id("earnings-release"), "company_earnings_or_financial_results")
         self.assertEqual(canonical_event_family_id("cpi"), "cpi_release")
-        self.assertEqual(canonical_event_family_id("product-price-increase"), "target_product_price_increase_news")
-        self.assertEqual(canonical_event_family_id("product-price-decrease"), "target_product_price_decrease_news")
+        self.assertEqual(canonical_event_family_id("product-price-change"), "target_product_price_change_news")
+        self.assertEqual(canonical_event_family_id("product-price-increase"), "target_product_price_change_news")
+        self.assertEqual(canonical_event_family_id("product-price-decrease"), "target_product_price_change_news")
         self.assertEqual(canonical_event_family_id("product-launch"), "target_product_launch_news")
         self.assertEqual(canonical_event_family_id("supply-chain-disruption"), "target_supply_chain_disruption_news")
         self.assertEqual(canonical_event_family_id("regulatory-antitrust"), "target_regulatory_antitrust_news")
@@ -75,7 +76,7 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
         )
 
     def test_rejects_source_buckets_as_event_families(self):
-        for invalid_family in ("news", "target_news_or_disclosure", "scheduled_macro_release", "macro", "product_price_change"):
+        for invalid_family in ("news", "target_news_or_disclosure", "scheduled_macro_release", "macro"):
             with self.subTest(invalid_family=invalid_family):
                 with self.assertRaisesRegex(Exception, "not a source/category bucket"):
                     canonical_event_family_id(invalid_family)

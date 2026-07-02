@@ -238,15 +238,10 @@ MACRO_RELEASE_EVENT_TYPE_TERMS = {
 }
 
 NEWS_EVENT_FAMILY_SQL_TERMS = {
-    "target_product_price_increase_news": (
+    "target_product_price_change_news": (
         PRODUCT_PRICE_CHANGE_TERMS,
         PRODUCT_PRICE_SUBJECT_TERMS,
-        PRODUCT_PRICE_INCREASE_PHRASES,
-    ),
-    "target_product_price_decrease_news": (
-        PRODUCT_PRICE_CHANGE_TERMS,
-        PRODUCT_PRICE_SUBJECT_TERMS,
-        PRODUCT_PRICE_DECREASE_PHRASES,
+        (*PRODUCT_PRICE_INCREASE_PHRASES, *PRODUCT_PRICE_DECREASE_PHRASES),
     ),
     "target_product_launch_news": (
         PRODUCT_LAUNCH_SUBJECT_TERMS,
@@ -480,10 +475,8 @@ def _target_regulatory_antitrust_match(text: str) -> bool:
 
 
 def _news_event_family_subtype(text: str, *, event_family_id: str) -> str:
-    if event_family_id in {"target_product_price_increase_news", "target_product_price_decrease_news"}:
-        direction = _product_price_change_direction(text)
-        expected = "increase" if event_family_id == "target_product_price_increase_news" else "decrease"
-        return direction if direction == expected else ""
+    if event_family_id == "target_product_price_change_news":
+        return _product_price_change_direction(text)
     if event_family_id == "target_product_launch_news":
         return "product_launch_or_announcement" if _target_product_launch_match(text) else ""
     if event_family_id == "target_supply_chain_disruption_news":
@@ -565,17 +558,17 @@ def _structured_evidence_gate(
                 ("scheduled macro release modelability requires actual/consensus/surprise fields with timestamped release clocks",),
                 detail,
             )
-    if event_family_id in {"target_product_price_increase_news", "target_product_price_decrease_news"}:
-        expected = "increase" if event_family_id == "target_product_price_increase_news" else "decrease"
+    if event_family_id == "target_product_price_change_news":
         direction_values = {
             str(observation.normalized_event_parameters.get("product_price_change_direction") or "").strip()
             for observation in observations
         }
         detail["direction_values"] = sorted(value for value in direction_values if value)
-        if detail["direction_values"] != [expected]:
+        allowed_directions = {"increase", "decrease"}
+        if not direction_values or not direction_values.issubset(allowed_directions):
             return (
                 "blocked_missing_structured_evidence",
-                (f"product price {expected} modelability requires a clean direction-specific subtype",),
+                ("product price change modelability requires a signed direction parameter on each observation",),
                 detail,
             )
     if event_family_id in CONTEXT_ONLY_EVENT_FAMILIES:
@@ -1057,7 +1050,7 @@ def build_target_news_observations(
             "source_url": str(row.get("event_link_url") or "").strip(),
             "raw_source_table": "trading_data.feed_03_alpaca_news",
         }
-        if event_family_id in {"target_product_price_increase_news", "target_product_price_decrease_news"}:
+        if event_family_id == "target_product_price_change_news":
             normalized_event_parameters["product_price_change_direction"] = event_subtype
         observations.append(
             EventFamilyObservation(

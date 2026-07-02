@@ -66,16 +66,16 @@ Event-family IDs must be target-agnostic. Tickers, company names, sectors,
 venues, and dates are observation labels, affected entities, context fields, or
 acquisition filters; they are not part of the family boundary. AAPL earnings,
 NVDA earnings, and AMD earnings therefore belong to the same earnings family
-when their scenario mechanics match. Likewise, Apple product price increases
-and AMD product price increases should share `target_product_price_increase_news`
-instead of creating ticker-specific families.
+when their scenario mechanics match. Likewise, Apple product price changes and
+AMD product price changes should share `target_product_price_change_news`
+instead of creating ticker-specific families. Direction is a signed event
+parameter, not a separate family boundary.
 
 Valid family examples:
 
-- `target_product_price_increase_news`: target product price-increase news,
-  with target identity stored on each observation.
-- `target_product_price_decrease_news`: target product price-decrease news,
-  with target identity stored on each observation.
+- `target_product_price_change_news`: target product price increase/decrease
+  news, with target identity stored on each observation and direction stored as
+  a signed event parameter.
 - `cpi_release`: CPI release events.
 - `ppi_release`: PPI release events.
 - `company_earnings_or_financial_results`: company financial results and
@@ -85,13 +85,12 @@ Invalid family examples:
 
 - `news`: source class only.
 - `target_news_or_disclosure`: source/category bucket only.
-- `target_product_price_change_news`: direction bucket only.
 - `scheduled_macro_release`: release calendar category only.
 - `macro`: domain bucket only.
 
 M06 evidence packets must reject source/category buckets before Codex review.
 Source rows may still feed a concrete family packet, for example Alpaca/GDELT
-news rows feeding `target_product_price_increase_news`, or scheduled macro
+news rows feeding `target_product_price_change_news`, or scheduled macro
 calendar rows feeding `cpi_release`.
 
 Evidence-packet readiness is a deterministic program decision, not a Codex
@@ -209,8 +208,7 @@ The first implemented trial route supports several program-built M06 evidence
 packets:
 
 - AAPL `company_earnings_or_financial_results` from SEC company financials.
-- `target_product_price_increase_news` and `target_product_price_decrease_news`
-  from symbol-scoped Alpaca news rows.
+- `target_product_price_change_news` from symbol-scoped Alpaca news rows.
 - AAPL `target_product_launch_news` from symbol-scoped Alpaca news rows.
 - AAPL `target_supply_chain_disruption_news` from symbol-scoped Alpaca news
   rows.
