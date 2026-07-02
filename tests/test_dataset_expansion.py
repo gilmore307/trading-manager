@@ -52,7 +52,7 @@ class DatasetExpansionTests(unittest.TestCase):
 
         self.assertIsNotNone(decision)
         self.assertEqual(decision.layer, 1)
-        self.assertEqual(decision.dataset_unit_kind, "twelve_month_panel")
+        self.assertEqual(decision.dataset_unit_kind, "walk_forward_12_3_3_panel")
         self.assertFalse(decision.target_required)
         self.assertIsNone(decision.target_symbol)
         self.assertIn("fixed M01 panel", decision.task_scope_description)
@@ -100,10 +100,10 @@ class DatasetExpansionTests(unittest.TestCase):
         self.assertIsNotNone(decision)
         self.assertEqual(decision.layer, 3)
         self.assertEqual(decision.dataset_role, "forward_holdout")
-        self.assertEqual(decision.dataset_unit_kind, "target_symbol_twelve_month")
-        self.assertEqual(decision.dataset_unit_months, 12)
+        self.assertEqual(decision.dataset_unit_kind, "target_symbol_walk_forward_12_3_3")
+        self.assertEqual(decision.dataset_unit_months, 18)
         self.assertEqual(decision.target_symbol, "AAPL")
-        self.assertIn("target AAPL over 12 months", decision.task_scope_description)
+        self.assertIn("target AAPL over 18 months", decision.task_scope_description)
         self.assertIn("split_stability", decision.reason)
 
     def test_later_layer_expansion_blocks_until_target_symbol_is_named(self):
@@ -118,7 +118,7 @@ class DatasetExpansionTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.selected_decision.layer, 3)
-        self.assertEqual(plan.selected_decision.action, "select_target_symbol_for_twelve_month_unit")
+        self.assertEqual(plan.selected_decision.action, "select_target_symbol_for_walk_forward_unit")
         self.assertTrue(plan.selected_decision.target_required)
         self.assertIsNone(plan.selected_decision.target_symbol)
         self.assertEqual(plan.implementation.status, "blocked")

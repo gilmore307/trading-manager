@@ -293,17 +293,17 @@ def _decision_for_role(
     if layer_evidence.layer == 1:
         action = "prepare_layer_one_historical_training_batch"
     elif target_missing:
-        action = "select_target_symbol_for_twelve_month_unit"
+        action = "select_target_symbol_for_walk_forward_unit"
     elif layer_evidence.layer == 7:
         action = "prepare_trading_guidance_option_expression_gate"
     else:
         action = "queue_offline_dataset_materialization"
-    dataset_unit_kind = "twelve_month_panel" if layer_evidence.layer in {1, 2} else "target_symbol_twelve_month"
+    dataset_unit_kind = "walk_forward_12_3_3_panel" if layer_evidence.layer in {1, 2} else "target_symbol_walk_forward_12_3_3"
     target_text = normalized_target if normalized_target else ("UNSELECTED_TARGET" if target_required else "not_applicable")
     task_scope_description = (
-        f"{layer_evidence.layer_key}: {role} dataset unit is the fixed M{layer_evidence.layer:02d} panel over 12 months."
+        f"{layer_evidence.layer_key}: {role} dataset unit is the fixed M{layer_evidence.layer:02d} panel over {DATASET_UNIT_MONTHS} months."
         if layer_evidence.layer in {1, 2}
-        else f"{layer_evidence.layer_key}: {role} dataset unit is target {target_text} over 12 months."
+        else f"{layer_evidence.layer_key}: {role} dataset unit is target {target_text} over {DATASET_UNIT_MONTHS} months."
     )
     return DatasetExpansionDecision(
         layer=layer_evidence.layer,

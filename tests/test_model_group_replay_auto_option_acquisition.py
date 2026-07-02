@@ -18,12 +18,16 @@ assert _SPEC is not None and _SPEC.loader is not None
 _SPEC.loader.exec_module(_MODULE)
 
 
-def _write_supervised_alpha_model(path: Path) -> None:
+def _write_supervised_alpha_model(
+    path: Path, *, fold_id: str = "fold_aapl_2016", target_symbol: str = "AAPL"
+) -> None:
     path.write_text(
         json.dumps(
             {
                 "contract_type": "after_cost_alpha_model",
                 "checkpoint_ref": str(path),
+                "fold_id": fold_id,
+                "target_symbol": target_symbol,
                 "learning_contract": "replayable_cumulative_fold_checkpoint",
                 "training_summary": {
                     "cumulative_learning_mode": "cumulative_checkpoint",
@@ -43,7 +47,7 @@ class ModelGroupReplayAutoOptionAcquisitionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             alpha_model = tmp / "alpha.json"
-            _write_supervised_alpha_model(alpha_model)
+            _write_supervised_alpha_model(alpha_model, fold_id="fold_aapl_2017")
             status_path = tmp / "status.jsonl"
             latest_path = tmp / "latest.json"
             replay_calls: list[tuple[str, str, str]] = []

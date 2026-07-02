@@ -20,7 +20,7 @@ Dataset expansion decides which historical dataset role should be broadened next
 
 ## Dataset Unit
 
-For M02+ target work, the ordinary substrate unit is one target symbol over a bounded historical window. M01/M02 foundation work is targetless panel work. Global/sector M03 event-observation substrate is targetless but fold-scoped because the accepted observation pool can change by fold.
+For M02+ target work, the ordinary substrate unit is one target symbol over the same 18-month `12+3+3` walk-forward fold used by model training. M01/M02 foundation work is targetless panel work. Global/sector M03 event-observation substrate is targetless but fold-scoped because the accepted observation pool can change by fold.
 
 ## Commands
 
