@@ -31,6 +31,8 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
             self.assertEqual(plan.provider_calls, 0)
             self.assertFalse(plan.modelability_review_performed)
             self.assertIn("single event is only a candidate seed", plan.single_observation_policy)
+            self.assertIn("Program gates own acquisition scope", plan.deterministic_control_policy)
+            self.assertIn("semantic reviewers only", plan.agent_role_policy)
             self.assertEqual(
                 set(plan.required_feed_ids),
                 {"08_feed_sec_company_financials", "03_feed_alpaca_news", "05_feed_gdelt_news"},

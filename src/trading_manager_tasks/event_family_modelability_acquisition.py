@@ -59,6 +59,8 @@ class EventFamilyModelabilityAcquisitionPlan:
     event_family_modelability_review_gate: str
     projection_mode_review_scope: str
     probability_function_class_review_scope: str
+    deterministic_control_policy: str
+    agent_role_policy: str
     start_month: str
     end_month: str
     target_symbol: str
@@ -131,6 +133,8 @@ def plan_event_family_modelability_acquisition(
         event_family_modelability_review_gate="event-family-modelability-review",
         projection_mode_review_scope="impact_function_projection|conditional_effect_projection|context_only_projection|do_not_model",
         probability_function_class_review_scope="M06 selects the allowed probability-function class only after acquired same-family evidence is sufficient; M03 owns concrete parameter training.",
+        deterministic_control_policy="Program gates own acquisition scope, source coverage, sample thresholds, PIT clocks, dedupe, overlap checks, stop conditions, and review readiness.",
+        agent_role_policy="Codex skills are semantic reviewers only; they do not control provider dispatch, expand scope, decide readiness, train parameters, or perform actions that deterministic code can own.",
         start_month=start_month,
         end_month=end_month,
         target_symbol=target_symbol.upper(),
