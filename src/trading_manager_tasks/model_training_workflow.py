@@ -58,6 +58,7 @@ MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER = "model_02_target_local_feed_arti
 MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID = "model_05_option_expression.option_chain_data_acquisition"
 MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER = f"{MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID}_complete"
 MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID = "model_05_alpha_confidence.model_generation.checkpoint"
+MODEL_GROUP_REPLAY_REVIEW_COMPLETE_BLOCKER = "model_group_replay_review_complete"
 NO_LISTED_OPTION_STATUSES = {"confirmed_no_listed_options", "no_listed_options", "no_listed_options_or_unverified"}
 NO_OPTION_ASSET_CLASSES = {"crypto_spot", "spot_crypto", "crypto"}
 
@@ -184,6 +185,38 @@ class ModelTrainingWorkflowPlan:
             "foundation_catch_up_layers": list(self.foundation_catch_up_layers),
             "reusable_substrate_stage_types": list(self.reusable_substrate_stage_types),
             "post_model_generation_artifacts_policy": self.post_model_generation_artifacts_policy,
+        }
+
+
+@dataclass(frozen=True)
+class ModelPostReplayWorkflowPlan:
+    """Manager-owned post-replay workflow plan using the shared model stage vocabulary."""
+
+    contract_type: str
+    start_month: str
+    end_month: str
+    selected_target_symbol: str | None
+    layer_count: int
+    layers: tuple[LayerWorkflow, ...]
+    next_stage: WorkflowStage | None
+    trigger_stage: str
+    provider_calls: int = 0
+    model_activation_performed: bool = False
+    broker_execution_performed: bool = False
+
+    def summary_row(self) -> dict[str, Any]:
+        return {
+            "contract_type": self.contract_type,
+            "start_month": self.start_month,
+            "end_month": self.end_month,
+            "selected_target_symbol": self.selected_target_symbol,
+            "layer_count": self.layer_count,
+            "layers": [layer.summary_row() for layer in self.layers],
+            "next_stage": self.next_stage.summary_row() if self.next_stage else None,
+            "trigger_stage": self.trigger_stage,
+            "provider_calls": self.provider_calls,
+            "model_activation_performed": self.model_activation_performed,
+            "broker_execution_performed": self.broker_execution_performed,
         }
 
 
@@ -511,6 +544,29 @@ def _input_dataset_unit_for_layer(
         start_month=start_month,
         end_month=end_month,
         selected_target_symbol=selected_target_symbol,
+    )
+
+
+def _post_replay_dataset_unit_for_layer(
+    *,
+    layer: int,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None,
+) -> DatasetUnit:
+    target = _normalize_selected_target_symbol(selected_target_symbol)
+    target_text = target if target else "UNSELECTED_TARGET"
+    return DatasetUnit(
+        unit_kind="post_replay_event_universe_walk_forward_12_3_3",
+        unit_months=DATASET_UNIT_MONTHS,
+        start_month=start_month,
+        end_month=end_month,
+        target_symbol=target,
+        target_required=True,
+        description=(
+            f"M{layer:02d} post-replay unit: full PIT event universe and event-family evidence "
+            f"for target {target_text} over one 12+3+3 replay-reviewed fold."
+        ),
     )
 
 
@@ -1185,7 +1241,202 @@ def build_model_training_workflow_plan(
     )
 
 
+def _stage_status_from_blockers(blockers: tuple[str, ...]) -> StageStatus:
+    return "blocked" if blockers else "ready"
+
+
+def _stage_status_from_gate(*, complete: bool, blockers: tuple[str, ...]) -> StageStatus:
+    if complete:
+        return "complete"
+    return _stage_status_from_blockers(blockers)
+
+
+def build_model_06_post_replay_workflow_plan(
+    *,
+    start_month: str = "2016-01",
+    end_month: str = "2017-06",
+    selected_target_symbol: str | None = None,
+    replay_review_complete: bool = False,
+    event_universe_acquired: bool = False,
+    modelability_gates_complete: bool = False,
+    residual_attribution_complete: bool = False,
+    evaluation_complete: bool = False,
+    promotion_review_complete: bool = False,
+) -> ModelPostReplayWorkflowPlan:
+    """Plan the post-replay M06 lane without moving it into pre-replay training."""
+
+    meta = next(item for item in LAYER_METADATA if int(item["layer"]) == 6)
+    layer = int(meta["layer"])
+    slug = str(meta["slug"])
+    key = layer_key(layer, slug)
+    target = _normalize_selected_target_symbol(selected_target_symbol)
+    dataset_unit = _post_replay_dataset_unit_for_layer(
+        layer=layer,
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=target,
+    )
+
+    replay_review_blockers = () if replay_review_complete else (MODEL_GROUP_REPLAY_REVIEW_COMPLETE_BLOCKER,)
+    target_blockers = _with_target_blocker((), layer=layer, selected_target_symbol=target, stage_type="data_acquisition")
+
+    data_blockers = target_blockers + replay_review_blockers
+    feature_blockers = target_blockers + ((f"{key}.data_acquisition_complete",) if not event_universe_acquired else ())
+    attribution_blockers = (
+        target_blockers
+        + replay_review_blockers
+        + ((f"{key}.feature_generation_complete",) if not modelability_gates_complete else ())
+    )
+    evaluation_blockers = (f"{key}.model_generation_complete",) if not residual_attribution_complete else ()
+    promotion_blockers = (f"{key}.model_evaluation_complete",) if not evaluation_complete else ()
+    maintenance_blockers = (f"{key}.promotion_review_complete",) if not promotion_review_complete else ()
+
+    data_command = [
+        "PYTHONPATH=src",
+        "python3",
+        "scripts/tasks/materialize_residual_event_governance_inputs.py",
+        "--start-month",
+        "${START_MONTH}",
+        "--end-month",
+        "${END_MONTH}",
+        "--write",
+    ]
+    feature_command_tokens = [
+        "PYTHONPATH=src",
+        "python3",
+        "scripts/tasks/run_event_family_modelability_next_actions.py",
+        "--start-month",
+        "${START_MONTH}",
+        "--end-month",
+        "${END_MONTH}",
+        "--write-files",
+    ]
+    if target:
+        feature_command_tokens.extend(["--target-symbol", target])
+    attribution_command = [
+        "PYTHONPATH=src",
+        "python3",
+        "scripts/tasks/run_model_group_residual_event_governance.py",
+        "--contract-id",
+        "${CONTRACT_ID}",
+    ]
+
+    stages = (
+        WorkflowStage(
+            stage_id=f"{key}.data_acquisition",
+            layer=layer,
+            layer_key=key,
+            stage_type="data_acquisition",
+            description="Materialize the post-replay PIT event universe from reviewed local event artifacts and SQL inputs.",
+            status=_stage_status_from_gate(complete=event_universe_acquired, blockers=data_blockers),
+            command=data_command,
+            dataset_unit=dataset_unit,
+            blockers=data_blockers,
+            safe_without_provider_calls=True,
+            provider_calls_allowed=False,
+        ),
+        WorkflowStage(
+            stage_id=f"{key}.feature_generation",
+            layer=layer,
+            layer_key=key,
+            stage_type="feature_generation",
+            description="Build M06 event-family evidence packets and deterministic modelability gate next-action routes.",
+            status=_stage_status_from_gate(complete=modelability_gates_complete, blockers=feature_blockers),
+            command=feature_command_tokens,
+            dataset_unit=dataset_unit,
+            blockers=feature_blockers,
+            safe_without_provider_calls=True,
+            provider_calls_allowed=False,
+        ),
+        WorkflowStage(
+            stage_id=f"{key}.model_generation",
+            layer=layer,
+            layer_key=key,
+            stage_type="model_generation",
+            description="Run post-replay residual-event attribution over replay-reviewed failures and the PIT event universe.",
+            status=_stage_status_from_gate(complete=residual_attribution_complete, blockers=attribution_blockers),
+            command=attribution_command,
+            dataset_unit=dataset_unit,
+            blockers=attribution_blockers,
+            safe_without_provider_calls=True,
+            provider_calls_allowed=False,
+        ),
+        WorkflowStage(
+            stage_id=f"{key}.model_evaluation",
+            layer=layer,
+            layer_key=key,
+            stage_type="model_evaluation",
+            description="Evaluate the residual-event attribution outputs before model-group settlement and promotion.",
+            status=_stage_status_from_gate(complete=evaluation_complete, blockers=evaluation_blockers),
+            command=model_script(layer, slug, "evaluate"),
+            dataset_unit=dataset_unit,
+            blockers=evaluation_blockers,
+            safe_without_provider_calls=True,
+            provider_calls_allowed=False,
+        ),
+        WorkflowStage(
+            stage_id=f"{key}.promotion_review",
+            layer=layer,
+            layer_key=key,
+            stage_type=PROMOTION_STAGE_TYPE,
+            description="Review M06 attribution and event-family promotion evidence before downstream consumption.",
+            status=_stage_status_from_gate(complete=promotion_review_complete, blockers=promotion_blockers),
+            command=model_script(layer, slug, "review"),
+            dataset_unit=dataset_unit,
+            blockers=promotion_blockers,
+            safe_without_provider_calls=True,
+            provider_calls_allowed=False,
+        ),
+        WorkflowStage(
+            stage_id=f"{key}.maintenance",
+            layer=layer,
+            layer_key=key,
+            stage_type="maintenance",
+            description="Prepare lifecycle handoff evidence after accepted M06 post-replay attribution.",
+            status=_stage_status_from_blockers(maintenance_blockers),
+            command=maintenance_command(layer, slug),
+            dataset_unit=dataset_unit,
+            blockers=maintenance_blockers,
+            safe_without_provider_calls=True,
+            provider_calls_allowed=False,
+        ),
+    )
+    layer_workflow = LayerWorkflow(
+        layer=layer,
+        layer_key=key,
+        model_name=str(meta["model_name"]),
+        depends_on_layers=tuple(meta["depends_on_layers"]),
+        progression_mode=str(meta["progression_mode"]),
+        candidate_axis=str(meta["candidate_axis"]),
+        candidate_progression_policy=str(meta["candidate_progression_policy"]),
+        dataset_unit=dataset_unit,
+        data_surface=str(meta["data_surface"]),
+        feature_command=feature_command_tokens,
+        model_generate_command=attribution_command,
+        model_evaluate_command=model_script(layer, slug, "evaluate"),
+        promotion_review_command=model_script(layer, slug, "review"),
+        maintenance_command=maintenance_command(layer, slug),
+        stages=stages,
+    )
+    next_stage = next((stage for stage in stages if stage.status == "ready"), None)
+    return ModelPostReplayWorkflowPlan(
+        contract_type="manager_model_06_post_replay_workflow_plan",
+        start_month=start_month,
+        end_month=end_month,
+        selected_target_symbol=target,
+        layer_count=1,
+        layers=(layer_workflow,),
+        next_stage=next_stage,
+        trigger_stage="model_group.replay_review",
+    )
+
+
 def write_workflow_plan(plan: ModelTrainingWorkflowPlan, *, output: TextIO) -> None:
+    json.dump(plan.summary_row(), output, indent=2, sort_keys=True)
+    output.write("\n")
+
+
+def write_post_replay_workflow_plan(plan: ModelPostReplayWorkflowPlan, *, output: TextIO) -> None:
     json.dump(plan.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
 
@@ -1227,6 +1478,7 @@ __all__ = [
     "FOUNDATION_CATCH_UP_BLOCKER",
     "FOUNDATION_CATCH_UP_LAYERS",
     "FOLD_STACK_PROMOTION_BLOCKER",
+    "MODEL_GROUP_REPLAY_REVIEW_COMPLETE_BLOCKER",
     "MODEL_GROUP_REPLAY_COMPLETE_BLOCKER",
     "MULTI_TARGET_SYMBOL_BLOCKER",
     "MONTHLY_SUBSTRATE_LAYERS",
@@ -1241,13 +1493,16 @@ __all__ = [
     "MODEL_SIX_EVENT_FEED_COVERAGE_BLOCKER",
     "POST_MODEL_GENERATION_REBUILD_BLOCKER",
     "LayerWorkflow",
+    "ModelPostReplayWorkflowPlan",
     "ModelTrainingWorkflowPlan",
     "WorkflowStage",
+    "build_model_06_post_replay_workflow_plan",
     "build_model_training_workflow_plan",
     "count_alpaca_bar_task_keys",
     "count_layer_one_task_keys",
     "count_layer_two_task_keys",
     "write_workflow_plan",
+    "write_post_replay_workflow_plan",
 ]
 
 
