@@ -13,7 +13,7 @@ import json
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Sequence, TextIO
 
 from .control_plane import TaskSystemError
 from .monthly_backfill import MonthlyWindow, iter_monthly_windows
@@ -142,10 +142,27 @@ def _enrich_payload(payload: dict[str, Any], *, target_symbol: str, target_cik: 
     return payload
 
 
-def plan_event_feed_requests(*, start_month: str, end_month: str, target_symbol: str = DEFAULT_TARGET_SYMBOL) -> list[dict[str, Any]]:
+def _normalize_feed_ids(feed_ids: Sequence[str] = ()) -> tuple[str, ...]:
+    selected = tuple(dict.fromkeys(item.strip() for item in feed_ids if item.strip()))
+    if not selected:
+        return MONTHLY_EVENT_FEED_IDS
+    unknown = sorted(set(selected) - set(MONTHLY_EVENT_FEED_IDS))
+    if unknown:
+        raise TaskSystemError("unsupported M06 event feed ids: " + ",".join(unknown))
+    return selected
+
+
+def plan_event_feed_requests(
+    *,
+    start_month: str,
+    end_month: str,
+    target_symbol: str = DEFAULT_TARGET_SYMBOL,
+    feed_ids: Sequence[str] = (),
+) -> list[dict[str, Any]]:
+    selected_feed_ids = _normalize_feed_ids(feed_ids)
     requests: list[dict[str, Any]] = []
     for window in iter_monthly_windows(start_month, end_month):
-        for feed_id in MONTHLY_EVENT_FEED_IDS:
+        for feed_id in selected_feed_ids:
             requests.append(_base_request(feed_id, window, target_symbol=target_symbol))
     return requests
 
@@ -157,9 +174,10 @@ def prepare_event_feed_backfill(
     target_symbol: str = DEFAULT_TARGET_SYMBOL,
     target_cik: str = DEFAULT_TARGET_CIK,
     storage_root: Path = DEFAULT_STORAGE_ROOT,
+    feed_ids: Sequence[str] = (),
     write_files: bool = False,
 ) -> EventFeedBackfillSummary:
-    requests = plan_event_feed_requests(start_month=start_month, end_month=end_month, target_symbol=target_symbol)
+    requests = plan_event_feed_requests(start_month=start_month, end_month=end_month, target_symbol=target_symbol, feed_ids=feed_ids)
     task_keys: list[EventFeedTaskKey] = []
     for request in requests:
         payload = _enrich_payload(build_request_task_payload(request), target_symbol=target_symbol, target_cik=target_cik)
@@ -213,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--target-symbol", default=DEFAULT_TARGET_SYMBOL)
     parser.add_argument("--target-cik", default=DEFAULT_TARGET_CIK)
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
+    parser.add_argument("--feed-id", action="append", default=[], choices=MONTHLY_EVENT_FEED_IDS)
     parser.add_argument("--write-files", action="store_true")
     args = parser.parse_args(argv)
     summary = prepare_event_feed_backfill(
@@ -221,6 +240,7 @@ def main(argv: list[str] | None = None) -> int:
         target_symbol=args.target_symbol,
         target_cik=args.target_cik,
         storage_root=args.storage_root,
+        feed_ids=args.feed_id,
         write_files=args.write_files,
     )
     write_summary(summary, output=sys.stdout)

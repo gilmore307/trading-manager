@@ -207,6 +207,21 @@ class EventFeedDispatchTests(unittest.TestCase):
                     execute_provider_calls=True,
                 )
 
+    def test_prepare_event_feed_backfill_accepts_feed_subset(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            summary = prepare_event_feed_backfill(
+                start_month="2016-01",
+                end_month="2016-02",
+                target_symbol="AAPL",
+                storage_root=root,
+                feed_ids=["08_feed_sec_company_financials"],
+                write_files=True,
+            )
+
+        self.assertEqual(summary.task_key_count, 2)
+        self.assertEqual({item.feed_id for item in summary.task_keys}, {"08_feed_sec_company_financials"})
+
 
 if __name__ == "__main__":
     unittest.main()

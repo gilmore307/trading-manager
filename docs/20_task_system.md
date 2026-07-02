@@ -108,10 +108,17 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    pre-replay provider data-acquisition lane. When M06 needs local event inputs,
    scheduler may backfill bounded event feeds only after replay review exposes
    the post-replay attribution requirement.
-7. Evaluation. Evaluation consumes replay traces, replay-review rows, and attribution packets to
+7. Event-family modelability acquisition. When M06 must judge whether an event
+   family can be described by an impact probability function, it first creates a
+   `model_06_event_family_modelability_acquisition_plan`. The plan declares the
+   event-family seed, same-family sample threshold, required canonical feeds,
+   PIT window, and provider task keys. Provider calls remain in the reviewed
+   dispatcher; Codex modelability review consumes only the acquired evidence
+   packet. A single event cannot establish the family function type.
+8. Evaluation. Evaluation consumes replay traces, replay-review rows, and attribution packets to
    score the candidate component bundle against baselines, calibration,
    stability, leakage, portfolio behavior, and failure explanations.
-8. Promotion and lifecycle handoff. Promotion produces accepted/rejected/deferred
+9. Promotion and lifecycle handoff. Promotion produces accepted/rejected/deferred
    evidence for a model bundle. Management of already promoted models belongs to
    the runtime component lifecycle owner, not to manager activation.
 

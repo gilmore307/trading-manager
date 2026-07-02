@@ -42,6 +42,10 @@ from .dataset_expansion import (
     decide_dataset_expansion,
 )
 from .event_feed_dispatch import EventFeedDispatchSummary, dispatch_event_feed_backfill
+from .event_family_modelability_acquisition import (
+    EventFamilyModelabilityAcquisitionPlan,
+    plan_event_family_modelability_acquisition,
+)
 from .monthly_backfill import (
     DEFAULT_SOURCES,
     MonthlyWindow,
@@ -112,6 +116,7 @@ __all__ = [
     "DatasetExpansionPlan",
     "DatasetRoleEvidence",
     "EventFeedDispatchSummary",
+    "EventFamilyModelabilityAcquisitionPlan",
     "LayerDatasetEvidence",
     "HISTORICAL_TASK_PROGRESS_CONTRACT",
     "HistoricalSchedulerStatus",
@@ -158,6 +163,7 @@ __all__ = [
     "persist_input_bindings",
     "persist_rehearsal",
     "plan_monthly_backfill_requests",
+    "plan_event_family_modelability_acquisition",
     "rehearse_monthly_backfill_task_system",
     "ResourceSnapshot",
     "RequestHandoffValidation",
