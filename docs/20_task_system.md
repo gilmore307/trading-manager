@@ -51,6 +51,15 @@ Failures should become durable evidence, not chat-only notes. Ordinary runtime, 
 Model research tasks are grouped by data reuse and decision-cycle ownership, not
 by the retired serial loop.
 
+All model tasks share the same lifecycle stage semantics: data acquisition,
+feature or evidence generation, model generation, evaluation, promotion or
+shadow handoff, and runtime monitoring. A model group may declare domain-specific
+source contracts, label contracts, feature/evidence contracts, gate contracts,
+and not-applicable states, but it must not define a separate orchestration
+meaning for these stages. Manager owns the state machine, gap discovery,
+provider-dispatch boundary, retry/stop routing, point-in-time/leakage gates, and
+ready-state projection across all model groups.
+
 The public task list is a task-fact projection over scheduler state. It shows
 completed history, failures, and one current executable or review task. Future
 blocked stages remain internal workflow dependencies and must not appear as
@@ -108,8 +117,12 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    pre-replay provider data-acquisition lane. When M06 needs local event inputs,
    scheduler may backfill bounded event feeds only after replay review exposes
    the post-replay attribution requirement.
-7. Event-family modelability acquisition. When M06 must judge whether an event
-   family can be described by an impact probability function, it first creates a
+7. Event-family modelability acquisition and evidence generation. When M06 must
+   judge whether an event family can be described by an impact probability
+   function, it uses the shared model-task lifecycle vocabulary: acquisition
+   materializes bounded PIT event inputs, feature/evidence generation builds
+   deterministic modelability gate inputs, and semantic review runs only after
+   program gates make the packet admissible. It first creates a
    `model_06_event_family_modelability_acquisition_plan`. The plan declares the
    concrete event-family seed, same-family sample threshold, required canonical
    feeds, PIT window, and provider task keys. Source/category buckets such as
@@ -120,20 +133,21 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    `cpi_release`, or `ppi_release`. Event families are target-agnostic
    scenario/mechanism groups; tickers, issuers, sectors, and dates are
    observation labels or acquisition filters rather than family boundaries.
-   Provider calls remain in the reviewed dispatcher. After acquisition, code builds
-   `model_06_event_family_modelability_evidence_packet` from acquired
-   same-family PIT observations. The packet must pass deterministic admissibility
-   gates before Codex modelability review; mixed-family packets, packets missing
-   structured event parameters, and packets missing controls/calibration remain
-   blocked instead of being relabeled as context-only. The next-action runner
-   consumes the packet readiness state and writes the next program-owned route
-   artifact: acquisition task keys, structured evidence enrichment plan,
-   modelability-gate build plan, or semantic review handoff. Codex review
-   consumes only admissible semantic-review handoffs and performs no provider
-   calls. Program gates own coverage, dedupe, overlap/confounder checks,
-   stop/retry conditions, and review readiness; agents only perform semantic
-   review that deterministic code cannot reliably encode. A single event cannot
-   establish the family function type.
+   Provider calls remain in the reviewed dispatcher. After acquisition, code
+   builds `model_06_event_family_modelability_evidence_packet` from acquired
+   same-family PIT observations. The packet must pass deterministic
+   admissibility gates before Codex modelability review; mixed-family packets,
+   packets missing structured event parameters, and packets missing
+   controls/calibration remain blocked instead of being relabeled as
+   context-only. The next-action runner consumes the packet readiness state and
+   writes the next program-owned route artifact: acquisition task keys,
+   structured evidence enrichment plan, modelability-gate evidence-generation
+   plan, or semantic review handoff. Codex review consumes only admissible
+   semantic-review handoffs and performs no provider calls. Program gates own
+   coverage, dedupe, overlap/confounder checks, stop/retry conditions, and
+   review readiness; agents only perform semantic review that deterministic code
+   cannot reliably encode. A single event cannot establish the family function
+   type.
 8. Evaluation. Evaluation consumes replay traces, replay-review rows, and attribution packets to
    score the candidate component bundle against baselines, calibration,
    stability, leakage, portfolio behavior, and failure explanations.

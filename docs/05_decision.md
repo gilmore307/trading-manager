@@ -31,6 +31,12 @@ competing for host capacity.
 
 Manager recognizes the current M01-M06 stack: BackgroundContext, TargetState, EventState, UnifiedDecision, OptionExpression, and ResidualEventGovernance.
 
+## D006A - Model tasks share lifecycle stage semantics
+
+All model groups use the same model-task lifecycle vocabulary: data acquisition, feature or evidence generation, model generation, evaluation, promotion or shadow handoff, and runtime monitoring. Model groups may declare different domain contracts for sources, clocks, labels, features, gates, and not-applicable states, but they must not create separate orchestration semantics for the same lifecycle responsibilities.
+
+Manager owns the lifecycle state machine, gap discovery, provider-dispatch boundary, retry/stop routing, artifact references, point-in-time/leakage gates, and readiness projection. Model-group code owns domain-specific implementation behind those declared contracts. M06 is therefore an event-domain implementation of the shared lifecycle, not a special workflow class; its event acquisition and modelability evidence generation remain subject to the same stage vocabulary and control-plane routing as the other model groups.
+
 ## D007 - Reusable foundation catch-up is priority
 
 The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes M01 market/cross-asset context, M02 broad sector-anchor and crypto-context evidence, and fold-scoped global or sector-scoped M03 event-observation context. M03 event-observation substrate must be collected for each fold because the accepted event observation pool can change across folds. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
@@ -59,7 +65,7 @@ normal review and acceptance route completes.
 
 ## D010 - M06 remains post-replay residual event-risk governance
 
-M06 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It must not run as a pre-replay data-acquisition or feature-generation stage. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
+M06 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It must not run as a pre-replay attribution or trade-selection shortcut. M06 uses the shared model-task lifecycle stage vocabulary when it prepares bounded event inputs and event-family modelability evidence, but the attribution trigger remains post-replay and cannot be moved ahead of replay review. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Agent model review is advisory and blinded
 
