@@ -118,6 +118,25 @@ def _write_json_if_requested(payload: Mapping[str, Any], path: Path, *, write_fi
 
 
 def _structured_enrichment_payload(packet: EventFamilyModelabilityEvidencePacket) -> dict[str, Any]:
+    earnings_gap_counts = _earnings_structured_gap_counts(packet)
+    if earnings_gap_counts:
+        return {
+            "contract_type": "model_06_event_family_structured_evidence_gap_receipt",
+            "source_contract_type": packet.contract_type,
+            "event_family_id": packet.event_family_id,
+            "target_symbol": packet.target_symbol,
+            "target_cik": packet.target_cik,
+            "start_month": packet.start_month,
+            "end_month": packet.end_month,
+            "readiness_reasons": list(packet.readiness_reasons),
+            "program_owner": "program_enrichment",
+            "route_status": "parked_missing_earnings_release_clock_or_expectation_source",
+            "provider_dispatch_allowed": False,
+            "provider_calls": 0,
+            "codex_review_allowed": False,
+            "earnings_structured_gap_counts": earnings_gap_counts,
+            "completion_gate": "materialize timestamped earnings release clock and PIT expectation baseline source, then rebuild evidence packet",
+        }
     macro_release_result_counts = _macro_release_result_counts(packet)
     if macro_release_result_counts and macro_release_result_counts["actual_value_count"] > 0:
         return {
@@ -153,6 +172,22 @@ def _structured_enrichment_payload(packet: EventFamilyModelabilityEvidencePacket
         "provider_calls": 0,
         "codex_review_allowed": False,
         "completion_gate": packet.next_action_plan.get("completion_gate"),
+    }
+
+
+def _earnings_structured_gap_counts(packet: EventFamilyModelabilityEvidencePacket) -> dict[str, int]:
+    if packet.event_family_id != "company_earnings_or_financial_results" or not packet.observations:
+        return {}
+    date_only_count = sum(1 for observation in packet.observations if observation.pit_clock_quality == "filed_date_only")
+    expectation_count = 0
+    expectation_fields = {"consensus_eps", "consensus_revenue", "expected_eps", "expected_revenue"}
+    for observation in packet.observations:
+        if expectation_fields.intersection(observation.normalized_event_parameters):
+            expectation_count += 1
+    return {
+        "observation_count": len(packet.observations),
+        "date_only_clock_count": date_only_count,
+        "expectation_baseline_count": expectation_count,
     }
 
 
