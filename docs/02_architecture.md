@@ -2,6 +2,9 @@
 
 This file is the manager-side map of the current M01-M06 model stack. It is a routing and boundary guide, not the model-design authority.
 
+The event-impact probability-distribution contract for the M03/M06 boundary
+lives in `docs/31_event_impact_distribution.md`.
+
 ## Module Map
 
 | Docs band | Implementation surface | Purpose |

@@ -113,11 +113,13 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    `model_06_event_family_modelability_acquisition_plan`. The plan declares the
    event-family seed, same-family sample threshold, required canonical feeds,
    PIT window, and provider task keys. Provider calls remain in the reviewed
-   dispatcher; Codex modelability review consumes only the acquired evidence
-   packet. Program gates own coverage, dedupe, overlap/confounder checks,
-   stop/retry conditions, and review readiness; agents only perform semantic
-   review that deterministic code cannot reliably encode. A single event cannot
-   establish the family function type.
+   dispatcher. After acquisition, code builds
+   `model_06_event_family_modelability_evidence_packet` from acquired
+   same-family PIT observations; Codex modelability review consumes that packet
+   and performs no provider calls. Program gates own coverage, dedupe,
+   overlap/confounder checks, stop/retry conditions, and review readiness;
+   agents only perform semantic review that deterministic code cannot reliably
+   encode. A single event cannot establish the family function type.
 8. Evaluation. Evaluation consumes replay traces, replay-review rows, and attribution packets to
    score the candidate component bundle against baselines, calibration,
    stability, leakage, portfolio behavior, and failure explanations.

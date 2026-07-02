@@ -32,6 +32,7 @@ EXPECTED_DOCS = (
     "docs/28_numbering_physical_contract.md",
     "docs/29_train_replay_realtime_input_parity.md",
     "docs/30_helpers.md",
+    "docs/31_event_impact_distribution.md",
 )
 
 DOC_REF_RE = re.compile(r"docs/\d{2}_[A-Za-z0-9_.-]+\.md")

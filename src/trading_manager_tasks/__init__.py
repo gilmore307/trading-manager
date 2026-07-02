@@ -46,6 +46,10 @@ from .event_family_modelability_acquisition import (
     EventFamilyModelabilityAcquisitionPlan,
     plan_event_family_modelability_acquisition,
 )
+from .event_family_modelability_evidence import (
+    EventFamilyModelabilityEvidencePacket,
+    build_event_family_modelability_evidence_packet,
+)
 from .monthly_backfill import (
     DEFAULT_SOURCES,
     MonthlyWindow,
@@ -117,6 +121,7 @@ __all__ = [
     "DatasetRoleEvidence",
     "EventFeedDispatchSummary",
     "EventFamilyModelabilityAcquisitionPlan",
+    "EventFamilyModelabilityEvidencePacket",
     "LayerDatasetEvidence",
     "HISTORICAL_TASK_PROGRESS_CONTRACT",
     "HistoricalSchedulerStatus",
@@ -163,6 +168,7 @@ __all__ = [
     "persist_input_bindings",
     "persist_rehearsal",
     "plan_monthly_backfill_requests",
+    "build_event_family_modelability_evidence_packet",
     "plan_event_family_modelability_acquisition",
     "rehearse_monthly_backfill_task_system",
     "ResourceSnapshot",
