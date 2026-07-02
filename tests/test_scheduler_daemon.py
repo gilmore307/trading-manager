@@ -52,7 +52,7 @@ from trading_manager_tasks.scheduler_daemon import (
     _pending_replay_option_feature_backoff_decision,
     _workflow_payload_pre_replay_complete,
     _run_replay_contract_path_requirement_handoff,
-    _run_m06_event_input_requirement_handoff,
+    _run_event_impact_input_requirement_handoff,
     _run_replay_review_data_requirement_handoff,
     _emit_replay_option_feature_drain_status,
 )
@@ -585,7 +585,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         for reason_code in (
             "model_group_m06_event_evidence_missing",
             "model_group_residual_event_evidence_missing",
-            "model_group_m06_event_feed_backfill_running",
+            "model_group_m03_event_feed_backfill_running",
             "model_group_replay_after_cost_alpha_model_not_trained",
         ):
             with self.subTest(reason_code=reason_code):
@@ -804,7 +804,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertEqual(decision.provider_calls, 0)
         self.assertEqual((decision.execution_summary or {})["resume_stage_id"], "model_group.replay")
 
-    def test_m06_event_input_requirement_prepares_backfill_before_attribution(self):
+    def test_m03_event_impact_input_requirement_prepares_backfill_before_residual_audit(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
             review_rows = root / "review_rows.jsonl"
@@ -818,7 +818,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 now_et="2026-06-17T20:00:00-04:00",
                 decision_status="backoff",
                 reason_code="model_group_residual_event_evidence_missing",
-                reason="missing M06 event evidence",
+                reason="missing M06 residual-event audit evidence",
                 market_protection_active=False,
                 resource_pressure_active=False,
                 selected_work="model_group.residual_event_governance",
@@ -830,7 +830,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 },
             )
 
-            decision = _run_m06_event_input_requirement_handoff(
+            decision = _run_event_impact_input_requirement_handoff(
                 residual_decision,
                 storage_root=root / "storage" / "02_control_plane",
                 execute=True,
@@ -842,8 +842,8 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertIsNotNone(decision)
         assert decision is not None
         self.assertEqual(decision.decision_status, "backoff")
-        self.assertEqual(decision.reason_code, "model_group_m06_event_feed_provider_required")
-        self.assertEqual(decision.selected_work, "model_group.m06_event_inputs")
+        self.assertEqual(decision.reason_code, "model_group_m03_event_feed_provider_required")
+        self.assertEqual(decision.selected_work, "model_group.m03_event_impact_inputs")
         self.assertEqual(decision.provider_calls, 0)
         summary = decision.execution_summary or {}
         self.assertEqual(summary["resume_stage_id"], "model_group.residual_event_governance")
@@ -853,7 +853,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         task_key_sample = summary["event_feed_backfill_preparations"][0]["task_keys"]
         self.assertFalse(any(item["feed_id"] == "12_feed_official_calendar_discovery" for item in task_key_sample))
 
-    def test_m06_event_input_running_state_continues_handoff(self):
+    def test_m03_event_impact_input_running_state_continues_handoff(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp)
             review_rows = root / "review_rows.jsonl"
@@ -866,13 +866,13 @@ class SchedulerDaemonTests(unittest.TestCase):
                 now_utc="2026-06-18T00:00:00+00:00",
                 now_et="2026-06-17T20:00:00-04:00",
                 decision_status="backoff",
-                reason_code="model_group_m06_event_feed_backfill_running",
-                reason="M06 event feed backfill is running",
+                reason_code="model_group_m03_event_feed_backfill_running",
+                reason="M03 event feed backfill is running",
                 market_protection_active=False,
                 resource_pressure_active=False,
-                selected_work="model_group.m06_event_inputs",
+                selected_work="model_group.m03_event_impact_inputs",
                 command=[],
-                next_internal_stage="model_group.m06_event_inputs",
+                next_internal_stage="model_group.m03_event_impact_inputs",
                 execution_summary={
                     "review_rows_ref": str(review_rows),
                     "start_month": "2016-01",
@@ -880,7 +880,7 @@ class SchedulerDaemonTests(unittest.TestCase):
                 },
             )
 
-            decision = _run_m06_event_input_requirement_handoff(
+            decision = _run_event_impact_input_requirement_handoff(
                 residual_decision,
                 storage_root=root / "storage" / "02_control_plane",
                 execute=True,
@@ -891,7 +891,7 @@ class SchedulerDaemonTests(unittest.TestCase):
 
         self.assertIsNotNone(decision)
         assert decision is not None
-        self.assertEqual(decision.reason_code, "model_group_m06_event_feed_provider_required")
+        self.assertEqual(decision.reason_code, "model_group_m03_event_feed_provider_required")
         self.assertEqual((decision.execution_summary or {})["start_month"], "2016-01")
 
     def test_replay_contract_path_requirement_routes_selected_contract_paths(self):

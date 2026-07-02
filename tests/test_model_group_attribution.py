@@ -46,7 +46,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             event_pool_path.write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_model_03_event_observation_materialization",
+                        "contract_type": "manager_model_03_event_impact_input_materialization",
                         "reviewed_event_interpretations": [
                             {
                                 "contract_type": "event_interpretation",
@@ -779,7 +779,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             (observation_root / "2021-01_2021-02.json").write_text(
                 json.dumps(
                     {
-                        "contract_type": "manager_model_03_event_observation_materialization",
+                        "contract_type": "manager_model_03_event_impact_input_materialization",
                         "reviewed_event_interpretations": [
                             {
                                 "contract_type": "event_interpretation",

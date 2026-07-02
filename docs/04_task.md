@@ -14,7 +14,7 @@ The resident historical scheduler is the normal path for no-broker historical mo
    - Use runtime status scripts instead of chat/session memory.
 
 2. **Foundation catch-up**
-   - Advance targetless M01 market/cross-asset, M02 broad sector-anchor, and fold-scoped global/sector M03 event-observation substrate before ordinary target work.
+   - Advance targetless M01 market/cross-asset, M02 broad sector-anchor, and fold-scoped global/sector M03 event-impact substrate before ordinary target work.
    - Reuse point-in-time-valid provider data, cleaned data, feature-ready manifests, and coverage evidence.
    - Rebuild dependent model/evaluation/promotion artifacts when their substrate changes.
 

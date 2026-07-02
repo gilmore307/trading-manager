@@ -5646,7 +5646,7 @@ def _residual_event_governance_progress(
         "accepted_failed_count": 0,
         "can_unlock_downstream": attribution_artifacts is not None and (expected == 0 or ready >= expected),
         "progress_source": "replay_failure_attribution_units",
-        "progress_basis": "M06 event-risk attribution for replay rows where a filled decision lost money or a rejected decision missed a positive next outcome",
+        "progress_basis": "M03 event-impact attribution for replay rows where a filled decision lost money or a rejected decision missed a positive next outcome",
     }
 
 
@@ -5689,7 +5689,7 @@ def _model_group_evaluation_progress(*, status: str, complete: bool) -> dict[str
         ready_checks=set(MODEL_GROUP_EVALUATION_TESTS) if complete else set(),
         unit_label="evaluation tests",
         progress_source="model_group_evaluation_test_contract",
-        progress_basis="required replay metrics, guardrail, incumbent-comparison, M06 attribution, and event-focus proposal checks",
+        progress_basis="required replay metrics, guardrail, incumbent-comparison, residual-event audit, and event-focus proposal checks",
         can_unlock_downstream=complete,
     )
 
@@ -6285,8 +6285,7 @@ def _model_group_replay_timeline_tasks(
         end_month=training_end_month,
         selected_target_symbol=selected_target_symbol,
         replay_review_complete=replay_review_complete,
-        event_universe_acquired=attribution_rows_complete,
-        modelability_gates_complete=attribution_rows_complete,
+        event_impact_ready=True,
         residual_attribution_complete=attribution_complete,
     )
     m06_post_replay_workflow = {
@@ -6515,7 +6514,7 @@ def _model_group_replay_timeline_tasks(
         reason=(
             "Model-group evaluation evidence is complete and available for promotion."
             if evaluation_complete
-            else "Evaluation is ready to aggregate replay metrics, guardrails, incumbent comparison, M06 attribution, and event-focus proposal evidence."
+            else "Evaluation is ready to aggregate replay metrics, guardrails, incumbent comparison, residual-event audit, and event-focus proposal evidence."
             if event_focus_complete
             else "Waiting for M06 Event Risk Governor to write attribution and internal event-focus proposal evidence before evaluation can run."
         ),

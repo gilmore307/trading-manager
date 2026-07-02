@@ -1,4 +1,4 @@
-"""M06 event-feed backfill preparation helpers.
+"""M03 event feed backfill preparation helpers.
 
 This module prepares the reviewed local feed artifacts required by the M06
 `model_06_residual_event_governance_data_acquisition` coverage gate. It only writes manager task-key files;
@@ -103,7 +103,7 @@ def _base_request(feed_id: str, window: MonthlyWindow, *, target_symbol: str) ->
         "start_date": window.start_date,
         "end_date_exclusive": window.end_date_exclusive,
         "symbol": target_symbol.upper(),
-        "availability_note": "M06 event-risk source coverage repair; reviewed artifact required before downstream rebuild.",
+        "availability_note": "M03 event-impact source coverage repair; reviewed artifact required before downstream rebuild.",
     }
 
 
@@ -148,7 +148,7 @@ def _normalize_feed_ids(feed_ids: Sequence[str] = ()) -> tuple[str, ...]:
         return MONTHLY_EVENT_FEED_IDS
     unknown = sorted(set(selected) - set(MONTHLY_EVENT_FEED_IDS))
     if unknown:
-        raise TaskSystemError("unsupported M06 event feed ids: " + ",".join(unknown))
+        raise TaskSystemError("unsupported M03 event feed ids: " + ",".join(unknown))
     return selected
 
 
@@ -225,7 +225,7 @@ def write_summary(summary: EventFeedBackfillSummary, *, output: TextIO) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Prepare M06 event-feed backfill task keys without provider calls.")
+    parser = argparse.ArgumentParser(description="Prepare M03 event feed backfill task keys without provider calls.")
     parser.add_argument("--start-month", required=True)
     parser.add_argument("--end-month", required=True)
     parser.add_argument("--target-symbol", default=DEFAULT_TARGET_SYMBOL)

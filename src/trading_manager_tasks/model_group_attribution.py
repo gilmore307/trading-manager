@@ -1,10 +1,10 @@
 """Manager-owned replay review execution.
 
 Replay review is the local, replay-derived review task that runs immediately
-after model-group replay and before M06 ResidualEventGovernance attribution. It
+after model-group replay and before M06 residual-event audit. It
 converts replay failure/miss rows into durable review units and records the
 ledger contract for later hierarchical component analysis. It is deliberately
-not M06 event attribution because it does not consume point-in-time event
+not M06 residual-event audit because it does not consume point-in-time event
 observations, event candidates, controls, co-events, or confounder evidence.
 """
 

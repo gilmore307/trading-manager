@@ -645,15 +645,15 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("policy_ref", event_interpretation_policy["applies_to"])
         self.assertIn("unversioned", event_interpretation_policy["note"])
 
-        event_sql_inputs = rows["M06_EVENT_FEED_SQL_INPUTS"]
+        event_sql_inputs = rows["M03_EVENT_FEED_SQL_INPUTS"]
         self.assertIn("trading_data.feed_03_alpaca_news", event_sql_inputs["payload"])
         self.assertIn("event_sql_inputs", event_sql_inputs["applies_to"])
         self.assertIn("no provider calls", event_sql_inputs["note"])
 
-        event_row_coverage = rows["M06_EVENT_FEED_IN_WINDOW_ROW_COVERAGE"]
-        self.assertEqual(event_row_coverage["payload"], "m06_event_feed_in_window_row_coverage")
-        event_source_gate = rows["M06_EVENT_SOURCE_COVERAGE_GATE"]
-        self.assertEqual(event_source_gate["payload"], "m06_event_source_coverage_gate")
+        event_row_coverage = rows["M03_EVENT_FEED_IN_WINDOW_ROW_COVERAGE"]
+        self.assertEqual(event_row_coverage["payload"], "m03_event_feed_in_window_row_coverage")
+        event_source_gate = rows["M03_EVENT_SOURCE_COVERAGE_GATE"]
+        self.assertEqual(event_source_gate["payload"], "m03_event_source_coverage_gate")
         self.assertIn("market-session calendar", event_source_gate["note"])
 
         event_sql_field = rows["EVENT_FEED_SQL_INPUTS"]
@@ -2062,19 +2062,19 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("components to choose no target", rows["MODEL_REPLAY_CANDIDATE_SELECTION_POLICY"]["note"])
         self.assertEqual(
             rows["M06_POST_REPLAY_ATTRIBUTION_POLICY"]["payload"],
-            "m06_starts_after_concentrated_replay_not_before_replay_input_stage",
+            "m06_starts_after_concentrated_replay_review_as_residual_audit_only",
         )
-        self.assertIn("attribution trigger remains post-replay", rows["M06_POST_REPLAY_ATTRIBUTION_POLICY"]["note"])
+        self.assertIn("fixed pre-replay M03 event-impact ledger", rows["M06_POST_REPLAY_ATTRIBUTION_POLICY"]["note"])
         self.assertEqual(
             rows["M03_FOLD_EVENT_OBSERVATION_POLICY"]["payload"],
             "model_03_event_global_sector_event_observation_substrate_collected_each_fold",
         )
         self.assertIn("collected for each fold", rows["M03_FOLD_EVENT_OBSERVATION_POLICY"]["note"])
         self.assertIn(
-            "materialize_layer_four_event_observation_inputs.py",
-            rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["payload"],
+            "materialize_model_03_event_impact_inputs.py",
+            rows["MANAGER_MATERIALIZE_MODEL_03_EVENT_IMPACT_INPUTS"]["payload"],
         )
-        self.assertIn("model_training_workflow", rows["MANAGER_MATERIALIZE_LAYER_FOUR_EVENT_OBSERVATION_INPUTS"]["applies_to"])
+        self.assertIn("model_training_workflow", rows["MANAGER_MATERIALIZE_MODEL_03_EVENT_IMPACT_INPUTS"]["applies_to"])
         self.assertNotIn("MANAGER_MATERIALIZE_M06_EVENT_RISK_INPUTS", rows)
         self.assertNotIn("MANAGER_M06_EVENT_RISK_INPUT_MATERIALIZATION", rows)
         self.assertIn(
@@ -2973,7 +2973,7 @@ class RegistryHelperTests(unittest.TestCase):
             "model_06_residual_event_governance",
             "m06_residual_event_governance_fold_completion",
             "m06_residual_event_governance_fold_completion_summary",
-            "manager_residual_event_governance_input_materialization",
+            "manager_model_03_event_impact_input_materialization",
             "failure_attribution_boundary",
             "focus_pool_status",
             "model_realtime_decision_component_route_status",

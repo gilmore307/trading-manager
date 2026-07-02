@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from trading_manager_tasks.control_plane import TaskSystemError
 from trading_manager_tasks.event_feed_coverage import discover_event_feed_artifacts
-from trading_manager_tasks.residual_event_governance_inputs import materialize_residual_event_governance_inputs_inputs
+from trading_manager_tasks.model_03_event_impact_inputs import materialize_model_03_event_impact_inputs
 
 
 def _write_layer_two_bar_receipt(storage_root: Path, symbol: str, month: str, row_count: int = 1) -> None:
@@ -43,7 +43,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
 
-            summary = materialize_residual_event_governance_inputs_inputs(
+            summary = materialize_model_03_event_impact_inputs(
                 start_month="2016-01",
                 end_month="2016-01",
                 manager_storage_root=tmp / "manager-storage",
@@ -53,7 +53,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
                 write=False,
             )
 
-            self.assertEqual(summary.contract_type, "manager_residual_event_governance_input_materialization")
+            self.assertEqual(summary.contract_type, "manager_model_03_event_impact_input_materialization")
             self.assertEqual(summary.detector_run_count, 1)
             self.assertEqual(summary.provider_calls, 0)
             self.assertFalse(summary.model_activation_performed)
@@ -79,7 +79,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-02", row_count=0)
 
-            summary = materialize_residual_event_governance_inputs_inputs(
+            summary = materialize_model_03_event_impact_inputs(
                 start_month="2016-02",
                 end_month="2016-02",
                 manager_storage_root=tmp / "manager-storage",
@@ -103,7 +103,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2021-03")
 
-            summary = materialize_residual_event_governance_inputs_inputs(
+            summary = materialize_model_03_event_impact_inputs(
                 start_month="2021-03",
                 end_month="2021-03",
                 manager_storage_root=tmp / "manager-storage",
@@ -132,7 +132,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             for month in ("2016-01", "2016-02"):
                 _write_layer_two_bar_receipt(storage_root, "XLF", month)
 
-            summary = materialize_residual_event_governance_inputs_inputs(
+            summary = materialize_model_03_event_impact_inputs(
                 start_month="2016-01",
                 end_month="2016-02",
                 manager_storage_root=tmp / "manager-storage",
@@ -145,7 +145,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
 
             self.assertEqual(summary.detector_run_count, 2)
             self.assertEqual({run.month for run in summary.detector_runs}, {"2016-01", "2016-02"})
-            self.assertEqual(Path(summary.source_task_key_path).name, "m06_residual_event_governance_data_acquisition_task_key.json")
+            self.assertEqual(Path(summary.source_task_key_path).name, "model_03_event_impact_data_acquisition_task_key.json")
             self.assertEqual(task_key["params"]["start"], "2016-01-01T00:00:00-05:00")
             self.assertEqual(task_key["params"]["end"], "2016-03-01T00:00:00-05:00")
             self.assertTrue(all(Path(run.task_key_path).exists() for run in summary.detector_runs))
@@ -171,7 +171,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
 
-            summary = materialize_residual_event_governance_inputs_inputs(
+            summary = materialize_model_03_event_impact_inputs(
                 start_month="2016-01",
                 end_month="2016-01",
                 manager_storage_root=tmp / "manager-storage",
@@ -214,7 +214,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             self.assertEqual(coverage["gdelt_news"], 1)
             self.assertEqual(paths, [str(new_path)])
 
-    def test_release_calendar_sql_receipt_is_included_as_m06_event_input(self) -> None:
+    def test_release_calendar_sql_receipt_is_included_as_m03_event_input(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             trading_data_root = tmp / "trading-data"
@@ -233,7 +233,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
                 receipt.parent.mkdir(parents=True, exist_ok=True)
                 receipt.write_text(json.dumps({"runs": [{"status": "succeeded", "row_counts": row_counts}]}), encoding="utf-8")
 
-            summary = materialize_residual_event_governance_inputs_inputs(
+            summary = materialize_model_03_event_impact_inputs(
                 start_month="2016-01",
                 end_month="2016-01",
                 manager_storage_root=tmp / "manager-storage",
@@ -285,7 +285,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            summary = materialize_residual_event_governance_inputs_inputs(
+            summary = materialize_model_03_event_impact_inputs(
                 start_month="2016-01",
                 end_month="2016-01",
                 manager_storage_root=tmp / "manager-storage",
@@ -327,8 +327,8 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
                 stdout = json.dumps({"references": [], "row_counts": {"m06_residual_event_governance_data_acquisition": 0}})
                 stderr = ""
 
-            with patch("trading_manager_tasks.residual_event_governance_inputs.subprocess.run", return_value=Result()):
-                summary = materialize_residual_event_governance_inputs_inputs(
+            with patch("trading_manager_tasks.model_03_event_impact_inputs.subprocess.run", return_value=Result()):
+                summary = materialize_model_03_event_impact_inputs(
                     start_month="2016-01",
                     end_month="2016-01",
                     manager_storage_root=tmp / "manager-storage",
@@ -367,7 +367,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
                 path.write_text(content, encoding="utf-8")
 
             with self.assertRaisesRegex(TaskSystemError, "zero in-window rows.*gdelt_news"):
-                materialize_residual_event_governance_inputs_inputs(
+                materialize_model_03_event_impact_inputs(
                     start_month="2016-01",
                     end_month="2016-01",
                     manager_storage_root=tmp / "manager-storage",
@@ -386,8 +386,8 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
 
-            with self.assertRaisesRegex(TaskSystemError, "event-risk coverage is incomplete"):
-                materialize_residual_event_governance_inputs_inputs(
+            with self.assertRaisesRegex(TaskSystemError, "event-impact coverage is incomplete"):
+                materialize_model_03_event_impact_inputs(
                     start_month="2016-01",
                     end_month="2016-01",
                     manager_storage_root=tmp / "manager-storage",

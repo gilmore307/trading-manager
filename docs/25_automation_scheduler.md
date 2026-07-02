@@ -57,7 +57,7 @@ PYTHONPATH=src python3 scripts/tasks/run_automation_scheduler_daemon.py --start-
 
 ## Research-Cycle Priority
 
-The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes M01 market context, M02 sector context, and fold-scoped global or sector-scoped M03 event-observation substrate. M03 event-observation collection repeats per fold because the accepted observation pool may change between folds. These rows are shared across target research runs and must not be redownloaded merely because a new target is being studied.
+The scheduler should advance reusable foundation coverage before ordinary target substrate work. Foundation coverage includes M01 market context, M02 sector context, and fold-scoped global or sector-scoped M03 event-impact substrate. M03 event-observation collection repeats per fold because the accepted observation pool may change between folds. These rows are shared across target research runs and must not be redownloaded merely because a new target is being studied.
 
 Historical status surfaces expose one current task fact, not a future task
 scaffold. Month checkpoints, fold states, and downstream blocked stages remain
@@ -172,13 +172,15 @@ overblock/underblock, missed-event, and underlying-vs-option failure attribution
 after M04/M05 thesis formation and replay settlement. It does not appear as a
 pre-replay provider data-acquisition lane.
 
-M06 owns event-family attributes that describe where an event primarily acts,
+M03 owns event-family attributes that describe where an event primarily acts,
 including cases where option prices are affected more strongly than the
 underlying price. M03 applies those attributes point-in-time as event state and
 passes them through to M04/M05. M04 consumes the state for trade/no-trade
-utility; M05 consumes it for option-expression suitability.
+utility; M05 consumes it for option-expression suitability. M06 later audits
+whether replay residuals were explained by that fixed pre-replay event-impact
+ledger.
 
-M06 attribution must separate model failure time from impact exposure time.
+residual-event audit must separate model failure time from impact exposure time.
 Event attribution uses `impact_exposure_time`, the earliest known time the
 adverse or missed impact began to appear, as the causal cutoff; `decision_time`
 is only a marked fallback. Impact severity is target-normalized when possible

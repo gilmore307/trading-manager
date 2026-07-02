@@ -49,7 +49,7 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         self.assertTrue(steps["03_dispatch_or_verify_event_feed_artifacts"]["requires_review_before_apply"])
         self.assertEqual(steps["08_state_only_invalidation_if_old_outputs_remain"]["mutation_class"], "workflow_state_only_no_artifact_deletion")
         self.assertTrue(steps["09_revisit_storage_lifecycle_hold"]["requires_review_before_apply"])
-        self.assertIn("materialize_layer_four_event_observation_inputs.py", steps["04_materialize_model_03_event_event_observation_fold_pool"]["command_ref"])
+        self.assertIn("materialize_model_03_event_impact_inputs.py", steps["04_materialize_model_03_event_event_observation_fold_pool"]["command_ref"])
         self.assertEqual(steps["05_run_concentrated_live_flow_replay"]["status"], "blocked_until_model_03_event_event_observation_pool_ready")
         self.assertEqual(steps["06_generate_post_replay_residual_event_governance"]["status"], "blocked_until_model_group_replay_complete")
         self.assertIn("--model event_risk_governor", steps["07_evaluate_and_review_without_activation"]["command_ref"])

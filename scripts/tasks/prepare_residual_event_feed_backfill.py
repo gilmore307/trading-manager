@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare M06 event-feed backfill task keys."""
+"""Prepare M03 event feed backfill task keys."""
 from trading_manager_tasks.event_feed_backfill import main
 
 if __name__ == "__main__":

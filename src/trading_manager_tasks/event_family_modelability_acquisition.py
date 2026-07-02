@@ -1,4 +1,4 @@
-"""M06 event-family modelability evidence acquisition planning.
+"""M03 event-family modelability evidence acquisition planning.
 
 This module owns the pre-review acquisition plan for M06 modelability work. It
 may prepare bounded provider task keys through the existing event-feed backfill
@@ -243,7 +243,7 @@ def write_plan(plan: EventFamilyModelabilityAcquisitionPlan, *, output: TextIO) 
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Prepare M06 event-family modelability acquisition task keys without provider calls.")
+    parser = argparse.ArgumentParser(description="Prepare M03 event-family modelability acquisition task keys without provider calls.")
     parser.add_argument("--event-family-id", required=True)
     parser.add_argument("--start-month", required=True)
     parser.add_argument("--end-month", required=True)

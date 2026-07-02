@@ -1,6 +1,6 @@
 """Manager-owned model-group evaluation execution.
 
-The dashboard can see when replay and M06 attribution are ready, but the
+The dashboard can see when replay and residual-event audit are ready, but the
 manager must still write concrete evaluation evidence before promotion can
 inspect it. This module performs that side-effect-free evidence build over the
 local replay dataset.
@@ -249,7 +249,7 @@ def run_model_group_evaluation_if_ready(
             now=now,
             decision_status="ready",
             reason_code="model_group_evaluation_ready",
-            reason="model-group evaluation is ready to build replay metrics, guardrails, incumbent comparison, and M06 attribution checks",
+            reason="model-group evaluation is ready to build replay metrics, guardrails, incumbent comparison, and residual-event audit checks",
             selected_work="model_group.evaluation",
             command=command,
             execution_summary={
@@ -2640,7 +2640,7 @@ def _evaluation_check_summary(
         ("replay_metrics", replay_metrics_ready, f"{len(rows)} replay decision rows available"),
         ("guardrail_settlement", guardrail_ready, f"{len(rows)} replay decision rows checked against guardrails"),
         ("incumbent_comparison", comparison_ready, "incumbent comparison recorded as insufficient evidence for promotion"),
-        ("residual_event_governance", attribution_ready, f"{len(attribution_rows)} M06 attribution rows linked"),
+        ("residual_event_governance", attribution_ready, f"{len(attribution_rows)} residual-event audit rows linked"),
         ("residual_event_governance_event_focus_proposal", event_focus_ready, f"{event_focus_count} M06 event-focus proposals prepared"),
     ):
         if ready:
@@ -2866,19 +2866,19 @@ def _attribution_receipt_scope_status(
         if not observed_value:
             return {
                 "compatible": False,
-                "reason": f"M06 attribution receipt is missing {key} for replay candidate scope",
+                "reason": f"residual-event audit receipt is missing {key} for replay candidate scope",
                 "field": key,
                 "expected": expected_value,
             }
         if observed_value != expected_value:
             return {
                 "compatible": False,
-                "reason": f"M06 attribution receipt {key} does not match replay candidate scope",
+                "reason": f"residual-event audit receipt {key} does not match replay candidate scope",
                 "field": key,
                 "expected": expected_value,
                 "observed": observed_value,
             }
-    return {"compatible": True, "reason": "M06 attribution receipt scope matches replay candidate"}
+    return {"compatible": True, "reason": "residual-event audit receipt scope matches replay candidate"}
 
 
 def _replay_model_artifact_status(replay_receipt: Mapping[str, Any]) -> dict[str, Any]:

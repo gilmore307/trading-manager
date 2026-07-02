@@ -48,7 +48,7 @@ from .model_training_workflow import (
     build_model_training_workflow_plan,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .residual_event_governance_inputs import materialize_residual_event_governance_inputs_inputs
+from .model_03_event_impact_inputs import materialize_model_03_event_impact_inputs
 from .storage_paths import manager_storage_root
 from .source_existing_bootstrap import run_source_existing_bootstrap
 from .scheduler import (
@@ -91,10 +91,12 @@ REPLAY_OPTION_FEATURE_FAILURE_AGENT_REASONS = {
     "model_group_replay_option_source_acquisition_failed",
     "model_group_replay_option_feature_generation_failed",
 }
-M06_EVENT_INPUT_MISSING_REASONS = {
+RESIDUAL_EVENT_INPUT_MISSING_REASONS = {
+    # Legacy runtime states may still contain the old M06 reason code; current
+    # scheduler decisions use model_group_residual_event_evidence_missing.
     "model_group_m06_event_evidence_missing",
     "model_group_residual_event_evidence_missing",
-    "model_group_m06_event_feed_backfill_running",
+    "model_group_m03_event_feed_backfill_running",
 }
 MODEL_GROUP_REPLAY_NONPROGRESS_REASONS = {
     "model_group_replay_after_cost_alpha_model_not_trained",
@@ -917,7 +919,7 @@ def model_group_lifecycle_blocks_next_fold(
     M06 may update the event-observation pool consumed by later M03 event-state
     folds. The scheduler therefore cannot start the next fold after M01-M05
     model generation alone; the current fold must complete replay, post-replay
-    M06 attribution, evaluation, promotion, and maintenance readiness first.
+    residual-event audit, evaluation, promotion, and maintenance readiness first.
     """
 
     return _first_incomplete_model_group_lifecycle_fold(
@@ -1811,11 +1813,11 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
         "model_group_evaluation_executed",
         "model_group_m06_event_evidence_missing",
         "model_group_residual_event_evidence_missing",
-        "model_group_m06_event_feed_backfill_running",
-        "model_group_m06_event_feed_provider_required",
-        "model_group_m06_event_feed_backfill_failed",
-        "model_group_m06_event_inputs_incomplete",
-        "model_group_m06_event_inputs_required",
+        "model_group_m03_event_feed_backfill_running",
+        "model_group_m03_event_feed_provider_required",
+        "model_group_m03_event_feed_backfill_failed",
+        "model_group_m03_event_impact_inputs_incomplete",
+        "model_group_m03_event_impact_inputs_required",
         "model_group_replay_option_feature_drain_lock_active",
         *MODEL_GROUP_REPLAY_NONPROGRESS_REASONS,
     }
@@ -2067,7 +2069,7 @@ def _target_symbols_from_review_rows_ref(path_text: str, *, fallback: str | None
     return tuple(sorted(symbols))
 
 
-def _m06_event_input_decision(
+def _event_impact_input_decision(
     *,
     decision_status: str,
     reason_code: str,
@@ -2088,25 +2090,25 @@ def _m06_event_input_decision(
         reason=reason,
         market_protection_active=False,
         resource_pressure_active=False,
-        selected_work="model_group.m06_event_inputs",
+        selected_work="model_group.m03_event_impact_inputs",
         command=command,
-        next_internal_stage="model_group.m06_event_inputs",
+        next_internal_stage="model_group.m03_event_impact_inputs",
         provider_calls=provider_calls,
         dispatch_performed=dispatch_performed,
         model_activation_performed=False,
         broker_execution_performed=False,
         storage_lifecycle_mutation_performed=False,
         execution_summary=execution_summary,
-        lock_plan=scheduler_lock_plan(month=None, selected_work="model_group.m06_event_inputs", next_internal_stage="model_group.m06_event_inputs"),
+        lock_plan=scheduler_lock_plan(month=None, selected_work="model_group.m03_event_impact_inputs", next_internal_stage="model_group.m03_event_impact_inputs"),
     )
 
 
-def _m06_event_input_start_decision(
+def _event_impact_input_start_decision(
     residual_event_decision: SchedulerDecision,
     *,
     selected_target_symbol: str | None = None,
 ) -> SchedulerDecision | None:
-    if residual_event_decision.reason_code not in M06_EVENT_INPUT_MISSING_REASONS:
+    if residual_event_decision.reason_code not in RESIDUAL_EVENT_INPUT_MISSING_REASONS:
         return None
     summary = residual_event_decision.execution_summary or {}
     fold_scope = summary.get("fold_scope") if isinstance(summary.get("fold_scope"), dict) else {}
@@ -2118,18 +2120,18 @@ def _m06_event_input_start_decision(
     target_symbols = _target_symbols_from_review_rows_ref(review_rows_ref, fallback=selected_target_symbol)
     command = [
         sys.executable,
-        "scripts/tasks/materialize_residual_event_governance_inputs.py",
+        "scripts/tasks/materialize_model_03_event_impact_inputs.py",
         "--start-month",
         start_month,
         "--end-month",
         end_month,
         "--write",
     ]
-    return _m06_event_input_decision(
+    return _event_impact_input_decision(
         decision_status="backoff",
-        reason_code="model_group_m06_event_feed_backfill_running",
+        reason_code="model_group_m03_event_feed_backfill_running",
         reason=(
-            f"M06 attribution is waiting for event inputs; preparing and dispatching bounded event-feed backfill "
+            f"residual-event audit is waiting for event inputs; preparing and dispatching bounded event-feed backfill "
             f"for {len(target_symbols)} target symbol(s) from {start_month} to {end_month}"
         ),
         command=command,
@@ -2146,12 +2148,12 @@ def _m06_event_input_start_decision(
             "fold_scope": {"start_month": start_month, "end_month": end_month},
             "required_event_inputs": ["alpaca_news", "gdelt_news", "sec_company_financials", "market_session_calendar", "trading_economics_calendar_web"],
             "optional_event_inputs": ["release_calendar"],
-            "required_next_step": "prepare and dispatch bounded M06 event-feed backfill before attribution",
+            "required_next_step": "prepare and dispatch bounded M03 event feed backfill before attribution",
         },
     )
 
 
-def _run_m06_event_input_requirement_handoff(
+def _run_event_impact_input_requirement_handoff(
     residual_event_decision: SchedulerDecision,
     *,
     storage_root: Path,
@@ -2161,7 +2163,7 @@ def _run_m06_event_input_requirement_handoff(
     provider_max_workers: int,
     selected_target_symbol: str | None = None,
 ) -> SchedulerDecision | None:
-    if residual_event_decision.reason_code not in M06_EVENT_INPUT_MISSING_REASONS:
+    if residual_event_decision.reason_code not in RESIDUAL_EVENT_INPUT_MISSING_REASONS:
         return None
     summary = residual_event_decision.execution_summary or {}
     fold_scope = summary.get("fold_scope") if isinstance(summary.get("fold_scope"), dict) else {}
@@ -2195,7 +2197,7 @@ def _run_m06_event_input_requirement_handoff(
     }
     command = [
         sys.executable,
-        "scripts/tasks/materialize_residual_event_governance_inputs.py",
+        "scripts/tasks/materialize_model_03_event_impact_inputs.py",
         "--start-month",
         start_month,
         "--end-month",
@@ -2203,20 +2205,20 @@ def _run_m06_event_input_requirement_handoff(
         "--write",
     ]
     if not execute:
-        return _m06_event_input_decision(
+        return _event_impact_input_decision(
             decision_status="backoff",
-            reason_code="model_group_m06_event_input_preparation_required",
-            reason="M06 event inputs are missing; event-feed task keys must be prepared before attribution",
+            reason_code="model_group_m03_event_impact_input_preparation_required",
+            reason="M03 event-impact inputs are missing; event-feed task keys must be prepared before attribution",
             command=command,
             provider_calls=0,
             dispatch_performed=False,
             execution_summary=execution_summary,
         )
     if not execute_provider_acquisition:
-        execution_summary["required_next_step"] = "enable autonomous provider acquisition to backfill M06 event feeds before materialization"
-        return _m06_event_input_decision(
+        execution_summary["required_next_step"] = "enable autonomous provider acquisition to backfill M03 event feeds before materialization"
+        return _event_impact_input_decision(
             decision_status="backoff",
-            reason_code="model_group_m06_event_feed_provider_required",
+            reason_code="model_group_m03_event_feed_provider_required",
             reason=f"M06 needs reviewed event feed coverage for {start_month} to {end_month}; provider acquisition is disabled",
             command=command,
             provider_calls=0,
@@ -2251,17 +2253,17 @@ def _run_m06_event_input_requirement_handoff(
     execution_summary["event_feed_dispatches"] = [dispatch.summary_row() for dispatch in dispatches]
     if failed_items:
         execution_summary["failed_event_feed_requests"] = [item.summary_row() for item in failed_items[:5]]
-        return _m06_event_input_decision(
+        return _event_impact_input_decision(
             decision_status="backoff",
-            reason_code="model_group_m06_event_feed_backfill_failed",
-            reason="one or more M06 event-feed backfill requests failed; repair provider/source errors before attribution",
+            reason_code="model_group_m03_event_feed_backfill_failed",
+            reason="one or more M03 event feed backfill requests failed; repair provider/source errors before attribution",
             command=command,
             provider_calls=provider_calls,
             dispatch_performed=dispatch_performed,
             execution_summary=execution_summary,
         )
 
-    materialization_probe = materialize_residual_event_governance_inputs_inputs(
+    materialization_probe = materialize_model_03_event_impact_inputs(
         start_month=start_month,
         end_month=end_month,
         manager_storage_root=storage_root,
@@ -2275,39 +2277,39 @@ def _run_m06_event_input_requirement_handoff(
         execution_summary["missing_event_feed_coverage"] = missing_coverage
         execution_summary["missing_event_feed_rows"] = missing_rows
         if provider_calls > 0:
-            execution_summary["required_next_step"] = "continue bounded M06 event-feed backfill before materializing event inputs"
-            return _m06_event_input_decision(
+            execution_summary["required_next_step"] = "continue bounded M03 event feed backfill before materializing event inputs"
+            return _event_impact_input_decision(
                 decision_status="executed",
-                reason_code="model_group_m06_event_feed_backfill_executed",
-                reason=f"M06 event-feed backfill dispatched {provider_calls} provider request(s); more event input coverage is still required",
+                reason_code="model_group_m03_event_feed_backfill_executed",
+                reason=f"M03 event feed backfill dispatched {provider_calls} provider request(s); more event input coverage is still required",
                 command=command,
                 provider_calls=provider_calls,
                 dispatch_performed=dispatch_performed,
                 execution_summary=execution_summary,
             )
-        execution_summary["required_next_step"] = "repair zero-row or missing reviewed event-feed coverage before M06 attribution"
-        return _m06_event_input_decision(
+        execution_summary["required_next_step"] = "repair zero-row or missing reviewed event-feed coverage before residual-event audit"
+        return _event_impact_input_decision(
             decision_status="backoff",
-            reason_code="model_group_m06_event_inputs_incomplete",
-            reason="M06 event-feed receipts exist but coverage is still incomplete or zero-row for required sources",
+            reason_code="model_group_m03_event_impact_inputs_incomplete",
+            reason="M03 event feed receipts exist but coverage is still incomplete or zero-row for required sources",
             command=command,
             provider_calls=0,
             dispatch_performed=False,
             execution_summary=execution_summary,
         )
 
-    materialization = materialize_residual_event_governance_inputs_inputs(
+    materialization = materialize_model_03_event_impact_inputs(
         start_month=start_month,
         end_month=end_month,
         manager_storage_root=storage_root,
         write=True,
     )
     execution_summary["input_materialization"] = materialization.summary_row()
-    execution_summary["required_next_step"] = "resume model_group.residual_event_governance attribution"
-    return _m06_event_input_decision(
+    execution_summary["required_next_step"] = "resume post-replay residual-event audit"
+    return _event_impact_input_decision(
         decision_status="executed",
-        reason_code="model_group_m06_event_inputs_materialized",
-        reason=f"M06 event inputs are materialized for {start_month} to {end_month}; residual event attribution can resume",
+        reason_code="model_group_m03_event_impact_inputs_materialized",
+        reason=f"M03 event-impact inputs are materialized for {start_month} to {end_month}; residual event attribution can resume",
         command=command,
         provider_calls=provider_calls,
         dispatch_performed=dispatch_performed,
@@ -3158,30 +3160,30 @@ def run_daemon_loop(
                             execute=execute_model_group_attribution,
                         )
                         if residual_event_governance_decision is not None:
-                            m06_event_input_start_decision = _m06_event_input_start_decision(
+                            event_impact_input_start_decision = _event_impact_input_start_decision(
                                 residual_event_governance_decision,
                                 selected_target_symbol=lifecycle_target_symbol,
                             )
-                            if m06_event_input_start_decision is not None:
-                                append_decision_log(decision_log_path, m06_event_input_start_decision)
+                            if event_impact_input_start_decision is not None:
+                                append_decision_log(decision_log_path, event_impact_input_start_decision)
                                 completed = utc_now_iso()
-                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=m06_event_input_start_decision)
+                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=event_impact_input_start_decision)
                                 state = replace(
                                     state,
                                     start_month=active_start_month,
                                     end_month=active_end_month,
-                                    last_next_internal_stage="model_group.m06_event_inputs",
-                                    last_work_selection_reason="model_group_m06_event_inputs_required",
+                                    last_next_internal_stage="model_group.m03_event_impact_inputs",
+                                    last_work_selection_reason="model_group_m03_event_impact_inputs_required",
                                     updated_utc=completed,
                                 )
-                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(m06_event_input_start_decision, advanced_month=False)
+                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(event_impact_input_start_decision, advanced_month=False)
                                 decisions_this_cycle += 1
                                 if output is not None:
-                                    row = m06_event_input_start_decision.summary_row()
-                                    row["worker_id"] = "m06_event_input_worker_1"
+                                    row = event_impact_input_start_decision.summary_row()
+                                    row["worker_id"] = "m03_event_impact_input_worker_1"
                                     output.write(json.dumps(row, sort_keys=True) + "\n")
                                     output.flush()
-                            m06_event_input_decision = _run_m06_event_input_requirement_handoff(
+                            event_impact_input_decision = _run_event_impact_input_requirement_handoff(
                                 residual_event_governance_decision,
                                 storage_root=storage_root,
                                 execute=execute_model_group_attribution,
@@ -3190,8 +3192,8 @@ def run_daemon_loop(
                                 provider_max_workers=provider_stage_max_workers,
                                 selected_target_symbol=lifecycle_target_symbol,
                             )
-                            decision_to_record = m06_event_input_decision or (
-                                residual_event_governance_decision if m06_event_input_start_decision is None else None
+                            decision_to_record = event_impact_input_decision or (
+                                residual_event_governance_decision if event_impact_input_start_decision is None else None
                             )
                             if decision_to_record is not None:
                                 append_decision_log(decision_log_path, decision_to_record)
@@ -3202,13 +3204,13 @@ def run_daemon_loop(
                                     start_month=active_start_month,
                                     end_month=active_end_month,
                                     last_next_internal_stage=(
-                                        "model_group.m06_event_inputs"
-                                        if m06_event_input_decision is not None
+                                        "model_group.m03_event_impact_inputs"
+                                        if event_impact_input_decision is not None
                                         else "residual_event_governance"
                                     ),
                                     last_work_selection_reason=(
-                                        "model_group_m06_event_inputs_required"
-                                        if m06_event_input_decision is not None
+                                        "model_group_m03_event_impact_inputs_required"
+                                        if event_impact_input_decision is not None
                                         else "model_group_residual_event_governance_ready"
                                     ),
                                     updated_utc=completed,
@@ -3219,8 +3221,8 @@ def run_daemon_loop(
                                 if output is not None:
                                     row = decision_to_record.summary_row()
                                     row["worker_id"] = (
-                                        "m06_event_input_worker_1"
-                                        if m06_event_input_decision is not None
+                                        "m03_event_impact_input_worker_1"
+                                        if event_impact_input_decision is not None
                                         else "residual_event_governance_worker_1"
                                     )
                                     output.write(json.dumps(row, sort_keys=True) + "\n")
@@ -3508,28 +3510,28 @@ def run_daemon_loop(
                             execute=execute_model_group_attribution,
                         )
                         if residual_event_governance_decision is not None:
-                            m06_event_input_start_decision = _m06_event_input_start_decision(
+                            event_impact_input_start_decision = _event_impact_input_start_decision(
                                 residual_event_governance_decision,
                                 selected_target_symbol=selected_target_symbol,
                             )
-                            if m06_event_input_start_decision is not None:
-                                append_decision_log(decision_log_path, m06_event_input_start_decision)
+                            if event_impact_input_start_decision is not None:
+                                append_decision_log(decision_log_path, event_impact_input_start_decision)
                                 completed = utc_now_iso()
-                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=m06_event_input_start_decision)
+                                state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=event_impact_input_start_decision)
                                 state = replace(
                                     state,
-                                    last_next_internal_stage="model_group.m06_event_inputs",
-                                    last_work_selection_reason="model_group_m06_event_inputs_required",
+                                    last_next_internal_stage="model_group.m03_event_impact_inputs",
+                                    last_work_selection_reason="model_group_m03_event_impact_inputs_required",
                                     updated_utc=completed,
                                 )
-                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(m06_event_input_start_decision, advanced_month=False)
+                                should_continue_drain = should_continue_drain or _decision_should_continue_drain(event_impact_input_start_decision, advanced_month=False)
                                 decisions_this_cycle += 1
                                 if output is not None:
-                                    row = m06_event_input_start_decision.summary_row()
-                                    row["worker_id"] = "m06_event_input_worker_1"
+                                    row = event_impact_input_start_decision.summary_row()
+                                    row["worker_id"] = "m03_event_impact_input_worker_1"
                                     output.write(json.dumps(row, sort_keys=True) + "\n")
                                     output.flush()
-                            m06_event_input_decision = _run_m06_event_input_requirement_handoff(
+                            event_impact_input_decision = _run_event_impact_input_requirement_handoff(
                                 residual_event_governance_decision,
                                 storage_root=storage_root,
                                 execute=execute_model_group_attribution,
@@ -3538,18 +3540,18 @@ def run_daemon_loop(
                                 provider_max_workers=provider_stage_max_workers,
                                 selected_target_symbol=selected_target_symbol,
                             )
-                            decision_to_record = m06_event_input_decision or (
-                                residual_event_governance_decision if m06_event_input_start_decision is None else None
+                            decision_to_record = event_impact_input_decision or (
+                                residual_event_governance_decision if event_impact_input_start_decision is None else None
                             )
                             if decision_to_record is not None:
                                 append_decision_log(decision_log_path, decision_to_record)
                                 completed = utc_now_iso()
                                 state = update_state_from_decision(state, started_utc=started, completed_utc=completed, decision=decision_to_record)
-                                if m06_event_input_decision is not None:
+                                if event_impact_input_decision is not None:
                                     state = replace(
                                         state,
-                                        last_next_internal_stage="model_group.m06_event_inputs",
-                                        last_work_selection_reason="model_group_m06_event_inputs_required",
+                                        last_next_internal_stage="model_group.m03_event_impact_inputs",
+                                        last_work_selection_reason="model_group_m03_event_impact_inputs_required",
                                         updated_utc=completed,
                                     )
                                 refresh_needed = refresh_needed or decision_to_record.decision_status == "executed"
@@ -3558,8 +3560,8 @@ def run_daemon_loop(
                                 if output is not None:
                                     row = decision_to_record.summary_row()
                                     row["worker_id"] = (
-                                        "m06_event_input_worker_1"
-                                        if m06_event_input_decision is not None
+                                        "m03_event_impact_input_worker_1"
+                                        if event_impact_input_decision is not None
                                         else "residual_event_governance_worker_1"
                                     )
                                     output.write(json.dumps(row, sort_keys=True) + "\n")
@@ -3693,7 +3695,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dashboard-refresh-service-unit", default=DEFAULT_DASHBOARD_REFRESH_SERVICE_UNIT, help="systemd service unit to start for event-driven dashboard read-model refresh.")
     parser.add_argument("--disable-model-group-replay-dataset", action="store_true", help="Disable automatic model-group replay dataset preparation, acquisition, and freeze admission.")
     parser.add_argument("--disable-model-group-replay", action="store_true", help="Disable automatic side-effect-free model-group replay dispatch.")
-    parser.add_argument("--disable-model-group-attribution", action="store_true", help="Disable automatic replay review and M06 event attribution dispatch.")
+    parser.add_argument("--disable-model-group-attribution", action="store_true", help="Disable automatic replay review and M06 residual-event audit dispatch.")
     parser.add_argument("--disable-model-group-evaluation", action="store_true", help="Disable automatic side-effect-free model-group evaluation evidence build.")
     parser.add_argument("--disable-source-existing-bootstrap", action="store_true", help="Disable startup source-existing bootstrap. Default service startup inspects source tables and seeds workflow acquisition state so existing source data is reused.")
     parser.add_argument("--source-bootstrap-database-url", help="Database URL for startup source-existing bootstrap; defaults to OpenClaw database resolution.")

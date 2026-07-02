@@ -84,12 +84,12 @@ but do not open M02-M06 training folds. When no legal target is available, the
 model-worker lane has no owner instead of falling back to a targetless fold.
 
 1. Foundation substrate. Build reusable M01 background-context source/feature
-   evidence and fold-scoped M03 event-state observation inputs. M03 event
-   substrate is collected per fold from event families and event instances
-   already accepted by M06; if no accepted M06 event evidence exists, M03 emits
-   no-event-risk state rather than discovering events itself. Event-feed coverage
-   checks are shared source plumbing only; feed rows are not M03 event-state
-   evidence until accepted event-family evidence exists.
+   evidence and fold-scoped M03 event-impact inputs. M03 collects the full
+   point-in-time fold event universe, runs event-family modelability and impact
+   evidence gates, and may emit a no-event-risk state when the fold has no
+   admissible event-impact evidence. Event-feed coverage checks are shared
+   source plumbing only; feed rows are not M03 event-state evidence until they
+   pass the M03 event-impact gate.
 2. Target substrate. Ordinary replay materializes M02 target-state source and
    feature evidence from the fixed `historical_candidate_universe.csv` candidate
    pool. If a requested diagnostic target lacks reviewed target-local bar

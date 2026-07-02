@@ -224,7 +224,7 @@ class SchedulerStatusTests(unittest.TestCase):
         self.assertEqual(row["latest_workflow_transition"]["transition_id"], "hwf-current")
         self.assertEqual(row["provider_status"]["reason_code"], None)
 
-    def test_status_projects_m06_event_input_work_to_post_replay_data_acquisition(self):
+    def test_status_projects_m03_event_impact_input_work_to_event_data_acquisition(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
@@ -242,9 +242,9 @@ class SchedulerStatusTests(unittest.TestCase):
                     {
                         "contract_type": "manager_scheduler_decision",
                         "decision_status": "backoff",
-                        "reason_code": "model_group_m06_event_feed_provider_required",
-                        "selected_work": "model_group.m06_event_inputs",
-                        "next_internal_stage": "model_group.m06_event_inputs",
+                        "reason_code": "model_group_m03_event_feed_provider_required",
+                        "selected_work": "model_group.m03_event_impact_inputs",
+                        "next_internal_stage": "model_group.m03_event_impact_inputs",
                         "start_month": "2016-01",
                         "end_month": "2017-06",
                         "target_symbol": "AAPL",
@@ -265,8 +265,8 @@ class SchedulerStatusTests(unittest.TestCase):
             )
 
         row = status.summary_row()
-        self.assertEqual(row["current_stage"], "model_06_residual_event_governance.data_acquisition")
-        self.assertEqual(row["lock_plan"]["selected_work"], "model_06_residual_event_governance.data_acquisition")
+        self.assertEqual(row["current_stage"], "model_03_event_state.data_acquisition")
+        self.assertEqual(row["lock_plan"]["selected_work"], "model_03_event_state.data_acquisition")
 
     def test_status_projects_m06_attribution_work_to_post_replay_model_generation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

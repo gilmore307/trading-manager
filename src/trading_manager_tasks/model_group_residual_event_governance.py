@@ -4,7 +4,7 @@ This module is the M06 boundary after replay review and before model-group
 evaluation. It consumes replay review rows plus local point-in-time event
 observations or candidates, writes standardized event
 interpretation evidence, applies basic co-event/control/leakage checks, and
-emits a M06 attribution receipt. It performs no provider calls, no broker
+emits a residual-event audit receipt. It performs no provider calls, no broker
 mutation, and no model activation.
 """
 
@@ -173,7 +173,7 @@ def run_model_group_residual_event_governance_if_ready(
     codex_timeout_seconds: int = EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS,
     max_agent_review_packets: int = MAX_EVENT_STRATEGY_REVIEW_PACKETS,
 ) -> SchedulerDecision | None:
-    """Run M06 attribution when replay review and PIT event evidence exist."""
+    """Run residual-event audit when replay review and PIT event evidence exist."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     review_receipt_path, review_receipt = _latest_replay_review_receipt(dataset_root)
@@ -213,14 +213,14 @@ def run_model_group_residual_event_governance_if_ready(
                     "fold_scope": fold_scope,
                     "event_source_summary": event_source_summary,
                     "event_feed_backfill_preparation": None,
-                    "required_next_action": "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
+                    "required_next_action": "materialize reviewed PIT event observations/candidates before residual-event audit can complete",
                 },
             )
         return _decision(
             now=now,
             decision_status="ready",
             reason_code="model_group_residual_event_governance_ready",
-            reason="post-replay M06 event attribution is ready to run over replay-reviewed failures and PIT event candidates",
+            reason="post-replay M06 residual-event audit is ready to run over replay-reviewed failures and PIT event candidates",
             command=command,
             execution_summary={
                 "contract_id": contract_id,
@@ -257,7 +257,7 @@ def run_model_group_residual_event_governance_if_ready(
                 "fold_scope": fold_scope,
                 "event_source_summary": event_source_summary,
                 "event_feed_backfill_preparation": None,
-                "required_next_action": "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
+                "required_next_action": "materialize reviewed PIT event observations/candidates before residual-event audit can complete",
             },
         )
 
@@ -556,7 +556,7 @@ def _build_attribution_rows(
         "upstream_overlap_status": "residual_after_upstream_conditioning",
         "same_fold_model_03_event_mutation_performed": False,
         "notes": [
-            "M06 attribution consumes post-replay review rows; it does not create same-fold M03 event-state inputs.",
+            "residual-event audit consumes post-replay review rows; it does not create same-fold M03 event-state inputs.",
             "Rows with multiple matching events are marked confounded until a later promotion packet proves incremental value.",
             "M06 uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay review row provides an impact clock.",
         ],
@@ -1423,7 +1423,7 @@ def _invoke_event_strategy_review_agent(
 
 def _event_strategy_review_agent_prompt(review_packet: Mapping[str, Any]) -> str:
     return (
-        "Use the event-strategy-promotion-review skill. Review this deterministic M06 event-family packet as a final guard only.\n"
+        "Use the event-strategy-promotion-review skill. Review this deterministic residual-event family packet as a final guard only.\n"
         "Do not recompute co-event/confounder, impact-onset, impact-severity, or leakage gates; those are deterministic inputs. Pre-release and post-release evidence are lifecycle stages of the same event family. Do not require a linear up/down prediction when the packet is a phase-aware state overlay for M03 event-state.\n"
         "Do not activate models, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
         "Return strict JSON only, with exactly this contract shape and no markdown:\n"
@@ -1617,14 +1617,25 @@ def _load_event_candidates(*, storage_root: Path, fold_scope: Mapping[str, str])
     if observation_path.exists():
         payload = _load_optional_json_object(observation_path) or {}
         raw_events.extend(_events_from_observation_payload(payload, source_ref=str(observation_path)))
-    input_dir = storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month)
-    for filename in ("m06_residual_event_governance_data_acquisition_task_key.json", "source_06_task_key.json"):
-        task_key_path = input_dir / filename
-        checked_paths.append(str(task_key_path))
-        if task_key_path.exists():
+    input_dirs = (
+        storage_root / "runtime" / "model_03_event_impact" / "input_materialization" / _fold_key(start_month, end_month),
+        storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month),
+    )
+    task_key_filenames = (
+        "model_03_event_impact_data_acquisition_task_key.json",
+        "m06_residual_event_governance_data_acquisition_task_key.json",
+        "source_06_task_key.json",
+    )
+    for input_dir in input_dirs:
+        for filename in task_key_filenames:
+            task_key_path = input_dir / filename
+            checked_paths.append(str(task_key_path))
+            if not task_key_path.exists():
+                continue
             payload = _load_optional_json_object(task_key_path) or {}
             params = payload.get("params") if isinstance(payload.get("params"), Mapping) else {}
             raw_events.extend(_events_from_source_task_key(params, source_ref=str(task_key_path), materialization_receipt_path=input_dir / "materialization_receipt.json"))
+
     candidates = [_event_candidate(raw_event, index=index) for index, raw_event in enumerate(raw_events, start=1)]
     return candidates, {
         "checked_paths": checked_paths,
@@ -1682,7 +1693,10 @@ def _materialization_receipt_ready(path: Path | None) -> bool:
     payload = _load_optional_json_object(path)
     if payload is None:
         return False
-    if str(payload.get("contract_type") or "") != "manager_residual_event_governance_input_materialization":
+    if str(payload.get("contract_type") or "") not in {
+        "manager_model_03_event_impact_input_materialization",
+        "manager_residual_event_governance_input_materialization",
+    }:
         return False
     return int(payload.get("source_event_count") or 0) > 0 and bool(str(payload.get("source_receipt_path") or "").strip())
 
@@ -1815,7 +1829,7 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
             "relation_type": raw_event.get("dedup_status") or "canonical",
             "canonical_event_id": raw_event.get("canonical_event_id") or raw_event.get("event_id"),
         },
-        "rationale_summary": raw_event.get("rationale_summary") or raw_event.get("summary") or raw_event.get("title") or "Structured local event candidate standardized for M06 attribution.",
+        "rationale_summary": raw_event.get("rationale_summary") or raw_event.get("summary") or raw_event.get("title") or "Structured local event candidate standardized for residual-event audit.",
         "evidence_spans": raw_event.get("evidence_spans") or [{"source_ref": raw_event.get("reference") or raw_event.get("source_artifact_ref"), "field": "structured_event_candidate"}],
         "review_status": raw_event.get("review_status") or "candidate",
         "standardization_status": raw_event.get("standardization_status") or "standardized",
@@ -1846,7 +1860,7 @@ def _fill_interpretation_defaults(row: dict[str, Any], *, index: int) -> dict[st
     row.setdefault("source_quality_score", 0.5)
     row.setdefault("evidence_confidence_score", 0.5)
     row.setdefault("canonical_relation", {"relation_type": "canonical"})
-    row.setdefault("rationale_summary", "Structured local event candidate standardized for M06 attribution.")
+    row.setdefault("rationale_summary", "Structured local event candidate standardized for residual-event audit.")
     row.setdefault("evidence_spans", [])
     row.setdefault("review_status", "candidate")
     row.setdefault("standardization_status", "standardized")
@@ -2017,20 +2031,29 @@ def _event_candidate_readiness_summary(*, storage_root: Path, fold_scope: Mappin
     if observation_payload is not None and _observation_payload_has_event_refs(observation_payload):
         evidence_refs.append(str(observation_path))
 
-    input_dir = storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month)
-    materialization_receipt_path = input_dir / "materialization_receipt.json"
-    for filename in ("m06_residual_event_governance_data_acquisition_task_key.json", "source_06_task_key.json"):
-        task_key_path = input_dir / filename
-        checked_paths.append(str(task_key_path))
-        if not task_key_path.exists():
-            continue
-        payload = _load_optional_json_object(task_key_path) or {}
-        params = payload.get("params") if isinstance(payload.get("params"), Mapping) else {}
-        events = params.get("events") if isinstance(params, Mapping) else None
-        if isinstance(events, list) and any(isinstance(item, Mapping) for item in events):
-            evidence_refs.append(str(task_key_path))
-        elif _materialization_receipt_ready(materialization_receipt_path):
-            evidence_refs.append(str(materialization_receipt_path))
+    input_dirs = (
+        storage_root / "runtime" / "model_03_event_impact" / "input_materialization" / _fold_key(start_month, end_month),
+        storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month),
+    )
+    task_key_filenames = (
+        "model_03_event_impact_data_acquisition_task_key.json",
+        "m06_residual_event_governance_data_acquisition_task_key.json",
+        "source_06_task_key.json",
+    )
+    for input_dir in input_dirs:
+        materialization_receipt_path = input_dir / "materialization_receipt.json"
+        for filename in task_key_filenames:
+            task_key_path = input_dir / filename
+            checked_paths.append(str(task_key_path))
+            if not task_key_path.exists():
+                continue
+            payload = _load_optional_json_object(task_key_path) or {}
+            params = payload.get("params") if isinstance(payload.get("params"), Mapping) else {}
+            events = params.get("events") if isinstance(params, Mapping) else None
+            if isinstance(events, list) and any(isinstance(item, Mapping) for item in events):
+                evidence_refs.append(str(task_key_path))
+            elif _materialization_receipt_ready(materialization_receipt_path):
+                evidence_refs.append(str(materialization_receipt_path))
 
     return {
         "checked_paths": checked_paths,

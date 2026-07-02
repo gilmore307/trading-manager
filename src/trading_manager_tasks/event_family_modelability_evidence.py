@@ -1,4 +1,4 @@
-"""Build M06 event-family modelability evidence packets.
+"""Build M03 event-family modelability evidence packets.
 
 The packet builder is deterministic glue between acquired source evidence and
 Codex semantic review. It performs no provider calls, no modelability judgment,
@@ -1452,7 +1452,7 @@ def persist_packet(packet: EventFamilyModelabilityEvidencePacket, *, output_root
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build M06 event-family modelability evidence packet without provider calls or modelability review.")
+    parser = argparse.ArgumentParser(description="Build M03 event-family modelability evidence packet without provider calls or modelability review.")
     parser.add_argument("--event-family-id", default="company_earnings_or_financial_results")
     parser.add_argument("--target-symbol", default="AAPL")
     parser.add_argument("--target-cik", default="0000320193")

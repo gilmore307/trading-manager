@@ -35,37 +35,34 @@ Manager recognizes the current M01-M06 stack: BackgroundContext, TargetState, Ev
 
 All model groups use the same model-task lifecycle vocabulary: data acquisition, feature or evidence generation, model generation, evaluation, promotion or shadow handoff, and runtime monitoring. Model groups may declare different domain contracts for sources, clocks, labels, features, gates, and not-applicable states, but they must not create separate orchestration semantics for the same lifecycle responsibilities.
 
-Manager owns the lifecycle state machine, gap discovery, provider-dispatch boundary, retry/stop routing, artifact references, point-in-time/leakage gates, and readiness projection. Model-group code owns domain-specific implementation behind those declared contracts. M06 uses the same stage vocabulary and control-plane routing conventions when its post-replay lane prepares event inputs, evidence, attribution, evaluation inputs, and promotion handoff evidence; this does not move M06 into the pre-replay model-worker lane.
+Manager owns the lifecycle state machine, gap discovery, provider-dispatch boundary, retry/stop routing, artifact references, point-in-time/leakage gates, and readiness projection. Model-group code owns domain-specific implementation behind those declared contracts. M03 owns the pre-replay event-universe and event-impact lifecycle stages. M06 uses the same stage vocabulary only for the post-replay residual-event audit lane.
 
 ## D007 - Reusable foundation catch-up is priority
 
-The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes M01 market/cross-asset context, M02 broad sector-anchor and crypto-context evidence, and fold-scoped global or sector-scoped M03 event-observation context. M03 event-observation substrate must be collected for each fold because the accepted event observation pool can change across folds. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
+The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes M01 market/cross-asset context, M02 broad sector-anchor and crypto-context evidence, and fold-scoped global or sector-scoped M03 event-observation context. M03 event-impact substrate must be collected for each fold because the accepted event observation pool can change across folds. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.
 
 Historical training uses the 18-month `12+3+3` cumulative walk-forward fold as the public first-class work unit across all layers. Current fold ids use the training data source and training year, such as `fold_aapl_2016`; the window range `2016-01..2017-06` is coverage evidence, not the business fold name. Months are child partitions inside a fold for data coverage, receipts, and provider batching; they are not separate owner-facing training tasks. Dashboard task identity and stage progress must therefore present M01+ data acquisition, feature generation, model generation, evaluation, and review under the same fold period. A fold is eligible only after its final test-window calendar month is complete in `America/New_York`; the `fold_aapl_2016` window cannot open before `2017-07-01` because it needs data through 2017-06. Public task numbers are list sequence numbers assigned after chronological fold, layer, and workflow-stage sorting; `task_uid` is the durable identity for progress/evidence joins. Historical runtime advances one canonical month at a time; worker identity is internal execution detail and Tasks should not display or filter by worker. For overlapping January-June substrate months, public task ownership stays with the earliest open training-year fold that contains the month; `2024-01` through `2024-06` cannot display or run as `fold_aapl_2024` while `fold_aapl_2023` is still open. Pre-replay model work includes a fold-scoped cumulative replay-entry checkpoint. The first fold may cold start; each later fold must continue from the immediately previous fold checkpoint and add the next 12 training months before replay admission.
 
-The scheduler must finish one fold's full run cycle before opening the next fold. Completion means M01-M05 pre-replay model work, model replay, replay review, post-replay M06 residual attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. M06 can update the event-observation pool used by later M03 event-state folds, so starting the next fold after pre-replay model generation alone is still invalid.
+The scheduler must finish one fold's full run cycle before opening the next fold. Completion means M01-M05 pre-replay model work, model replay, replay review, post-replay residual-event audit, model evaluation, model promotion, and maintenance/readiness handoff are done. M03 event-impact changes can update the event-observation pool used by later folds, so starting the next fold after pre-replay model generation alone is still invalid.
 
 ## D008 - M05 is optional trading guidance/expression
 
 M05 may produce optional offline trading-guidance records and option-expression plans from the M04 direct-underlying thesis and point-in-time option context when available. It is not an event-risk governor and does not execute trades or mutate broker/account state.
 
-## D009 - M03 event-state consumes only accepted event-failure evidence
+## D009 - M03 owns pre-replay event impact
 
-M03 event-state may condition alpha only on event families and event instances that M06 has accepted as worth attention through post-replay residual-event governance. M03 uses M06 outputs to estimate the point-in-time impact state of individual accepted events; it does not search the event universe, select event families, or reinterpret raw event text. Raw anomalies and unreviewed event text cannot enter M03 event-state scoring.
+M03 event-state owns the fold-scoped point-in-time event universe before replay. It materializes reviewed event observations, deterministic calendar/session events, structured event-family evidence, modelability gates, and event-impact projection inputs for the full fold rather than waiting for later model failures. M03 trains and applies point-in-time impact-state projections for events that pass deterministic coverage, control, leakage, overlap, label, and calibration gates.
 
-When M06 has not yet produced accepted attribution or promotion evidence,
-the M03 event-observation substrate may be empty. That is a valid state:
-M03 event-state should materialize a no-event-risk input and downstream scoring should
-resolve to `no_reviewed_event_failure_risk` rather than blocking the fold.
+M03 may materialize a no-event state only when the full fold event-universe route has validly found no reviewed event observations or no admissible event-impact evidence. It must not use selected replay trades, replay failures, post-fold outcomes, or M06 residual audit rows to decide which upstream event rows exist.
 
 C07 provisional untrained-event risk estimates are not M03 event-state inputs. They may
-support live trading-review decisions and later M06/M03 event-state promotion
+support live trading-review decisions and later M03 event-state promotion
 research, but they cannot be treated as trained event-failure evidence until the
 normal review and acceptance route completes.
 
-## D010 - M06 remains post-replay residual event-risk governance
+## D010 - M06 is post-replay residual event audit
 
-M06 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It must not run as a pre-replay attribution or trade-selection shortcut. M06 uses the shared model-task lifecycle stage vocabulary when it prepares bounded event inputs and event-family modelability evidence, but the attribution trigger remains post-replay and cannot be moved ahead of replay review. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
+M06 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It consumes replay-review evidence plus the pre-replay M03 event-impact ledger to explain residual failures, missed events, overblocks, underblocks, and path deviations. M06 must not own pre-replay event-universe discovery, event-family modelability gates, or event-impact training. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Agent model review is advisory and blinded
 
@@ -121,7 +118,7 @@ Runtime promoted-model lifecycle management belongs in `trading-execution`: the 
 
 Promotion review is not triggered when one model finishes a local check or one target substrate lane completes. Model-local checks and target-substrate runs remain diagnostic until the candidate bundle has completed the same run cycle.
 
-The current run cycle is reusable foundation substrate, target substrate where needed, live-flow replay, replay review, M06 residual-event attribution, evaluation, and promotion/lifecycle handoff. Replay must simulate the frozen live component graph over the historical candidate pool with a fixed `25000.0` USD replay initial capital for equity-path diagnostics and return normalization; this is not broker/account state. Components may choose no target, one target, or a target combination. Replay review is the first post-replay task: it compares decisions against replay-derived missed/failure evidence and prepares component-funnel review rows before M06 performs event-risk attribution. Evaluation compares the pinned candidate bundle against accepted baselines after attribution evidence exists. Promotion acceptance is bundle-scoped: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently without an accepted component-local lifecycle contract.
+The current run cycle is reusable foundation substrate, target substrate where needed, live-flow replay, replay review, post-replay residual-event audit, evaluation, and promotion/lifecycle handoff. Replay must simulate the frozen live component graph over the historical candidate pool with a fixed `25000.0` USD replay initial capital for equity-path diagnostics and return normalization; this is not broker/account state. Components may choose no target, one target, or a target combination. Replay review is the first post-replay task: it compares decisions against replay-derived missed/failure evidence and prepares component-funnel review rows before residual-event audit. Evaluation compares the pinned candidate bundle against accepted baselines after attribution evidence exists. Promotion acceptance is bundle-scoped: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently without an accepted component-local lifecycle contract.
 
 Equity/options replay uses five simultaneous risk slots by default, each based on a `0.20` model-owned target allocation fraction. Replay keeps scanning after cash or slots are committed and may replace the weakest held position when the new candidate is point-in-time executable, allocation-compatible, and clears the score-scale-aware switch threshold. Receipts using the old fixed `0.05` switch threshold are stale and not current replay evidence.
 
@@ -140,8 +137,8 @@ This rule is owned by `docs/29_train_replay_realtime_input_parity.md`. It does
 not make broker/account guardrails, halt checks, restrictions, or emergency
 kill-switches trained model inputs. Untrained realtime event/calendar context
 may support advisory C07/trading-review evidence, but it cannot become M03/M04/M06
-model input or automatic live trading action until accepted through the M06/M03
-governance route.
+model input or automatic live trading action until accepted through the M03
+event-impact governance route.
 
 ## D210 - Activity bridge non-overlap is mandatory
 
@@ -166,7 +163,7 @@ microstructure_liquidity_disruption
 option_derivatives_abnormality
 ```
 
-Ordinary bar, volume, spread, liquidity, target-state, option-expression, M06 event-risk guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into M05 evidence.
+Ordinary bar, volume, spread, liquidity, target-state, option-expression, M03 event-impact guidance, strategy-failure label, post-event realized label, or uncalibrated detector payloads cannot be renamed into M05 evidence.
 
 ## D212 - M02 candidate selection is policy-based
 

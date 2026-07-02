@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize structured M06 event-family evidence from local source files."""
+"""Materialize structured M03 event-family evidence from local source files."""
 
 from trading_manager_tasks.event_family_structured_evidence_enrichment import main
 

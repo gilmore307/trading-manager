@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run model-group evaluation when replay and M06 attribution are ready."""
+"""Run model-group evaluation when replay and residual-event audit are ready."""
 
 from __future__ import annotations
 

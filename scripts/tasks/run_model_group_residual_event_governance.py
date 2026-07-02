@@ -15,7 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--storage-root", type=Path, default=Path("/root/projects/trading-storage/storage/02_control_plane"))
     parser.add_argument("--contract-id", default="promotion_replay_candidate_policy")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--force", action="store_true", help="write a fresh M06 attribution run even when one already exists for this replay")
+    parser.add_argument("--force", action="store_true", help="write a fresh residual-event audit run even when one already exists for this replay")
     parser.add_argument("--local-fallback-review", action="store_true", help="write deterministic event-family review fallbacks without invoking Codex")
     parser.add_argument("--codex-bin", default="codex")
     parser.add_argument("--codex-model")

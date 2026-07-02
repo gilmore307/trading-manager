@@ -452,7 +452,7 @@ def write_receipt(receipt: EventFamilyStructuredEvidenceEnrichmentReceipt, *, ou
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize structured M06 event-family evidence from reviewed local source files.")
+    parser = argparse.ArgumentParser(description="Materialize structured M03 event-family evidence from reviewed local source files.")
     parser.add_argument("--event-family-id", required=True, choices=sorted(MACRO_RELEASE_EVENT_TYPE_TERMS))
     parser.add_argument("--start-month", required=True)
     parser.add_argument("--end-month", required=True)

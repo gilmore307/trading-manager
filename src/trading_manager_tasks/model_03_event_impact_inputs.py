@@ -1,10 +1,13 @@
-"""Safe M06 event-risk input materialization.
+"""Safe pre-replay event-impact input materialization.
 
-This module builds ``model_06_residual_event_governance_data_acquisition`` SQL
-rows from already-reviewed local evidence: target-local bar receipts for the
+This module builds the fold-scoped event universe consumed by M03 event-impact
+work from already-reviewed local evidence: target-local bar receipts for the
 bounded abnormal-activity detector, reviewed event-feed SQL/artifact coverage,
-and generated market-session calendar context. It performs no provider calls,
-no model activation, no broker execution, and no storage lifecycle mutation.
+and generated market-session calendar context. The current physical
+``trading-data`` data-source module still uses the residual-event-governance
+source name, but the manager-owned stage is pre-replay M03 event impact. It
+performs no provider calls, no model activation, no broker execution, and no
+storage lifecycle mutation.
 """
 
 from __future__ import annotations
@@ -42,7 +45,7 @@ from .storage_paths import data_storage_root
 DEFAULT_TRADING_DATA_ROOT = Path("/root/projects/trading-data")
 DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/model_01_background_context_etf_universe.csv")
-DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_06_residual_event_governance" / "input_materialization"
+DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_03_event_impact" / "input_materialization"
 LAYER_TWO_MODEL_LAYER = "model_01_sector_context"
 DETECTOR_SOURCE = "m06_residual_event_governance_data_acquisition.equity_abnormal_activity"
 SOURCE = "m06_residual_event_governance_data_acquisition"
@@ -105,7 +108,7 @@ class DetectorRunRef:
 
 
 @dataclass(frozen=True)
-class ResidualEventGovernanceInputMaterialization:
+class Model03EventImpactInputMaterialization:
     contract_type: str
     start_month: str
     end_month: str
@@ -251,7 +254,7 @@ def _run_detector(
             "bars_sql_source": _bar_sql_source(ref),
         },
         "output_root": str(detector_output_root),
-        "manager_stage_id": "model_06_residual_event_governance.data_acquisition",
+        "manager_stage_id": "model_03_event_state.data_acquisition",
         "source_policy": "local_source_detector_over_reviewed_m02_alpaca_bar_sql_receipts_no_provider_calls",
     }
     task_key_path.parent.mkdir(parents=True, exist_ok=True)
@@ -556,7 +559,7 @@ def _market_session_calendar_events(*, start_month: str, end_month: str) -> tupl
                     "canonical_event_id": f"market_session_{day.isoformat()}_{event_kind}",
                     "dedup_status": "canonical",
                     "source_priority": "approved_calendar",
-                    "coverage_reason": "generated_market_session_calendar_for_m06_market_structure_context",
+                    "coverage_reason": "generated_market_session_calendar_for_m03_market_structure_context",
                     "fold_month": month,
                     "event_time": event_time.isoformat(),
                     "available_time": event_time.isoformat(),
@@ -593,7 +596,7 @@ def _write_source_task_key(
     start, end = range_bounds(start_month, end_month)
     fold_key = _fold_key(start_month, end_month)
     task_key = {
-        "task_id": f"model_06_residual_event_governance_{fold_key}",
+        "task_id": f"model_03_event_impact_{fold_key}",
         "source": SOURCE,
         "params": {
             "start": start,
@@ -602,16 +605,16 @@ def _write_source_task_key(
             "event_artifact_paths": list(event_artifact_paths),
             "event_sql_inputs": [dict(item) for item in event_sql_inputs],
         },
-        "output_root": str(trading_data_output_root / SOURCE / f"model_06_residual_event_governance_{fold_key}"),
-        "manager_stage_id": "model_06_residual_event_governance.data_acquisition",
+        "output_root": str(trading_data_output_root / SOURCE / f"model_03_event_impact_{fold_key}"),
+        "manager_stage_id": "model_03_event_state.data_acquisition",
         "source_policy": "local_event_index_over_reviewed_feeds_detectors_and_market_calendar_no_provider_calls",
     }
-    path = output_dir / "m06_residual_event_governance_data_acquisition_task_key.json"
+    path = output_dir / "model_03_event_impact_data_acquisition_task_key.json"
     path.write_text(json.dumps(task_key, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
 
-def materialize_residual_event_governance_inputs_inputs(
+def materialize_model_03_event_impact_inputs(
     *,
     start_month: str,
     end_month: str,
@@ -622,7 +625,7 @@ def materialize_residual_event_governance_inputs_inputs(
     output_root: Path = DEFAULT_OUTPUT_ROOT,
     run_id: str | None = None,
     write: bool = False,
-) -> ResidualEventGovernanceInputMaterialization:
+) -> Model03EventImpactInputMaterialization:
     if not manager_storage_root.is_absolute():
         manager_storage_root = Path.cwd() / manager_storage_root
     fold_key = _fold_key(start_month, end_month)
@@ -630,7 +633,7 @@ def materialize_residual_event_governance_inputs_inputs(
     output_dir = output_base / fold_key
     output_dir.mkdir(parents=True, exist_ok=True)
     trading_data_output_root = output_dir / "trading_data_outputs"
-    run_id = run_id or f"model_06_residual_event_governance_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_id = run_id or f"model_03_event_impact_{fold_key}_{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
     refs = tuple(
         ref
         for month in iter_months(start_month, end_month)
@@ -642,7 +645,7 @@ def materialize_residual_event_governance_inputs_inputs(
         )
     )
     if not refs:
-        raise TaskSystemError("no successful M02 feed artifacts are available for M06 event-risk materialization")
+        raise TaskSystemError("no successful M02 feed artifacts are available for M03 event-impact materialization")
     event_artifact_paths, artifact_coverage = discover_event_feed_artifacts(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
     artifact_row_coverage = compute_event_feed_row_coverage(event_artifact_paths, start_month=start_month, end_month=end_month)
     event_sql_inputs, sql_coverage, sql_row_coverage = _discover_event_feed_sql_inputs(trading_storage_root=trading_storage_root, start_month=start_month, end_month=end_month)
@@ -659,12 +662,12 @@ def materialize_residual_event_governance_inputs_inputs(
     missing_feed_rows = missing_event_feed_rows(event_feed_row_coverage)
     if write and missing_feed_artifacts:
         raise TaskSystemError(
-            "M06 event-risk coverage is incomplete; missing reviewed feed artifacts for "
+            "M03 event-impact coverage is incomplete; missing reviewed feed artifacts for "
             + ",".join(missing_feed_artifacts)
         )
     if write and missing_feed_rows:
         raise TaskSystemError(
-            "M06 event-risk coverage is incomplete; reviewed feed artifacts have zero in-window rows for "
+            "M03 event-impact coverage is incomplete; reviewed feed artifacts have zero in-window rows for "
             + ",".join(missing_feed_rows)
         )
     detector_runs = tuple(
@@ -681,7 +684,7 @@ def materialize_residual_event_governance_inputs_inputs(
     events = [event for detector_run in detector_runs for event in _read_detector_events(detector_run)]
     events.extend(market_session_events)
     if not events and not event_artifact_paths and not event_sql_inputs and write:
-        raise TaskSystemError("M06 event-risk materialization emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
+        raise TaskSystemError("M03 event-impact materialization emitted zero event rows and found no reviewed event feed artifacts; review no-event context policy before advancing")
     source_task_key_path = _write_source_task_key(
         output_dir=output_dir,
         trading_data_output_root=trading_data_output_root,
@@ -699,16 +702,16 @@ def materialize_residual_event_governance_inputs_inputs(
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
-        (log_dir / "m06_residual_event_governance_data_acquisition.stdout.log").write_text(result.stdout, encoding="utf-8")
-        (log_dir / "m06_residual_event_governance_data_acquisition.stderr.log").write_text(result.stderr, encoding="utf-8")
+        (log_dir / "model_03_event_impact_data_acquisition.stdout.log").write_text(result.stdout, encoding="utf-8")
+        (log_dir / "model_03_event_impact_data_acquisition.stderr.log").write_text(result.stderr, encoding="utf-8")
         if result.returncode != 0:
             raise TaskSystemError(f"{SOURCE} materialization failed: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
         references = [str(item) for item in payload.get("references") or []]
         source_receipt_path = next((item for item in references if item.endswith("completion_receipt.json")), None)
         source_event_count = int((payload.get("row_counts") or {}).get(SOURCE) or source_event_count)
-    summary = ResidualEventGovernanceInputMaterialization(
-        contract_type="manager_residual_event_governance_input_materialization",
+    summary = Model03EventImpactInputMaterialization(
+        contract_type="manager_model_03_event_impact_input_materialization",
         start_month=start_month,
         end_month=end_month,
         detector_run_count=len(detector_runs),
@@ -727,13 +730,13 @@ def materialize_residual_event_governance_inputs_inputs(
     return summary
 
 
-def write_summary(summary: ResidualEventGovernanceInputMaterialization, *, output: TextIO) -> None:
+def write_summary(summary: Model03EventImpactInputMaterialization, *, output: TextIO) -> None:
     json.dump(summary.summary_row(), output, indent=2, sort_keys=True)
     output.write("\n")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Materialize M06 model_06_residual_event_governance_data_acquisition SQL rows from local reviewed artifacts without provider calls.")
+    parser = argparse.ArgumentParser(description="Materialize pre-replay M03 event-impact input rows from local reviewed artifacts without provider calls.")
     parser.add_argument("--start-month", default="2016-01")
     parser.add_argument("--end-month", default="2016-01")
     parser.add_argument("--manager-storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
@@ -744,7 +747,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-id")
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args(argv)
-    summary = materialize_residual_event_governance_inputs_inputs(
+    summary = materialize_model_03_event_impact_inputs(
         start_month=args.start_month,
         end_month=args.end_month,
         manager_storage_root=args.manager_storage_root,
@@ -759,7 +762,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-__all__ = ["DetectorRunRef", "ResidualEventGovernanceInputMaterialization", "materialize_residual_event_governance_inputs_inputs"]
+__all__ = ["DetectorRunRef", "Model03EventImpactInputMaterialization", "materialize_model_03_event_impact_inputs"]
 
 
 if __name__ == "__main__":  # pragma: no cover

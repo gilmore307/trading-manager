@@ -125,9 +125,9 @@ class WorkflowTransitionLedgerTests(unittest.TestCase):
             transition = append_transition(
                 {
                     "decision_status": "backoff",
-                    "reason_code": "model_group_m06_event_inputs_required",
+                    "reason_code": "model_group_m03_event_impact_inputs_required",
                     "reason": "prepare event inputs before attribution",
-                    "selected_work": "model_group.m06_event_inputs",
+                    "selected_work": "model_group.m03_event_impact_inputs",
                     "start_month": "2021-01",
                     "end_month": "2025-12",
                 },

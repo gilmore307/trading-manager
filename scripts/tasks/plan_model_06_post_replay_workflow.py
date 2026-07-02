@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan the manager-owned post-replay M06 workflow lane."""
+"""Plan the manager-owned post-replay M06 residual-audit lane."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-month", default="2017-06")
     parser.add_argument("--target-symbol", help="Replay-scoped target symbol for the M06 post-replay lane.")
     parser.add_argument("--replay-review-complete", action="store_true")
+    parser.add_argument("--event-impact-ready", action="store_true")
     parser.add_argument("--event-universe-acquired", action="store_true")
     parser.add_argument("--modelability-gates-complete", action="store_true")
     parser.add_argument("--residual-attribution-complete", action="store_true")
@@ -30,6 +31,7 @@ def main(argv: list[str] | None = None) -> int:
             end_month=args.end_month,
             selected_target_symbol=args.target_symbol,
             replay_review_complete=args.replay_review_complete,
+            event_impact_ready=args.event_impact_ready,
             event_universe_acquired=args.event_universe_acquired,
             modelability_gates_complete=args.modelability_gates_complete,
             residual_attribution_complete=args.residual_attribution_complete,

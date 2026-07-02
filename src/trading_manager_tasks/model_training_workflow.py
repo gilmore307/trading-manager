@@ -1,8 +1,8 @@
-"""Historical six-model research workflow graph.
+"""Historical model research workflow graph.
 
 The manager owns orchestration across the historical-modeling service. This
-module defines reusable foundation substrate, target substrate, full-minute
-six-model generation, replay, M06 residual-event governance, evaluation,
+module defines reusable foundation substrate, target substrate, pre-replay
+M01-M05 generation, replay, post-replay residual-event audit, evaluation,
 promotion, and maintenance boundaries.
 """
 
@@ -290,8 +290,8 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "depends_on_layers": (1, 2),
         "progression_mode": "event_state_full_minute_coverage",
         "candidate_axis": "target_symbol;walk_forward_12_3_3_window;target_candidate_id;event_state_context_id",
-        "candidate_progression_policy": "apply M06-governed event-family attributes point-in-time, including no-event minutes and option-vs-underlying impact channels",
-        "data_surface": "fold-scoped event observation inputs and reviewed event_interpretation normalization; no raw event alpha requirement",
+        "candidate_progression_policy": "materialize the fold-scoped PIT event universe before replay, apply reviewed event-family modelability and impact-state evidence point-in-time, and include no-event minutes and option-vs-underlying impact channels",
+        "data_surface": "fold-scoped PIT event universe, reviewed event_interpretation normalization, event-family modelability evidence, and impact-state projection inputs; raw event text remains outside scoring",
         "input_stage": True,
         "feature_cli": None,
     },
@@ -322,10 +322,10 @@ LAYER_METADATA: tuple[dict[str, Any], ...] = (
         "slug": "residual_event_governance",
         "model_name": "ResidualEventGovernanceModel",
         "depends_on_layers": (1, 3, 4, 5),
-        "progression_mode": "residual_event_governance_after_thesis",
-        "candidate_axis": "target_symbol;walk_forward_12_3_3_window;target_candidate_id;residual_event_context_id",
-        "candidate_progression_policy": "train residual event intervention, overblock/underblock, missed-event, and underlying-vs-option failure attribution after M04/M05 thesis formation",
-        "data_surface": "M01 background, M03 event state, M04 decision, optional M05 expression, event observations, and settled replay/failure evidence",
+        "progression_mode": "post_replay_residual_event_audit",
+        "candidate_axis": "target_symbol;walk_forward_12_3_3_window;replay_failure_id;residual_event_context_id",
+        "candidate_progression_policy": "audit residual, overblock/underblock, missed-event, and underlying-vs-option failure attribution after replay using the pre-replay M03 event-impact ledger",
+        "data_surface": "settled replay/failure evidence, M03 event-impact ledger, M04 decision, optional M05 expression, and residual-event attribution outputs",
         "feature_cli": None,
     },
 )
@@ -392,7 +392,6 @@ FEATURE_MODULES: dict[str, str] = {
     "trading-data-m01-market-regime-feature-generation": "data_feature.m01_market_regime_feature_generation.from_feed_artifacts",
     "trading-data-m02-sector-context-feature-generation": "data_feature.m02_sector_context_feature_generation.from_feed_artifacts",
     "trading-data-m03-target-state-vector-feature-generation": "data_feature.m03_target_state_vector_feature_generation",
-    "trading-data-m06-residual-event-governance-feature-generation": "data_feature.m06_residual_event_governance_feature_generation",
     "trading-data-m05-option-expression-feature-generation": "data_feature.m05_option_expression_feature_generation",
 }
 
@@ -404,7 +403,7 @@ def feature_command(feature_cli: str | None, *, selected_target_symbol: str | No
         return [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/materialize_layer_four_event_observation_inputs.py",
+            "scripts/tasks/materialize_model_03_event_impact_inputs.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -436,7 +435,7 @@ def feature_command(feature_cli: str | None, *, selected_target_symbol: str | No
     command = ["PYTHONPATH=/root/projects/trading-data/src", "python3", "-m", FEATURE_MODULES[feature_cli]]
     if feature_cli in {"trading-data-m01-market-regime-feature-generation", "trading-data-m02-sector-context-feature-generation"}:
         command.extend(["--month", "${START_MONTH}"])
-    if feature_cli in {"trading-data-m03-target-state-vector-feature-generation", "trading-data-m06-residual-event-governance-feature-generation"}:
+    if feature_cli in {"trading-data-m03-target-state-vector-feature-generation"}:
         command.extend([
             "--source-start",
             "${START_MONTH_START_ET}",
@@ -537,7 +536,7 @@ def _input_dataset_unit_for_layer(
             end_month=end_month,
             target_symbol=None,
             target_required=False,
-            description="M03 input unit: fold-scoped global/sector event-observation substrate; no single target symbol applies.",
+            description="M03 input unit: fold-scoped global/sector event-impact substrate; no single target symbol applies.",
         )
     return _dataset_unit_for_layer(
         layer=layer,
@@ -557,15 +556,15 @@ def _post_replay_dataset_unit_for_layer(
     target = _normalize_selected_target_symbol(selected_target_symbol)
     target_text = target if target else "UNSELECTED_TARGET"
     return DatasetUnit(
-        unit_kind="post_replay_event_universe_walk_forward_12_3_3",
+        unit_kind="post_replay_residual_event_audit_walk_forward_12_3_3",
         unit_months=DATASET_UNIT_MONTHS,
         start_month=start_month,
         end_month=end_month,
         target_symbol=target,
         target_required=True,
         description=(
-            f"M{layer:02d} post-replay unit: full PIT event universe and event-family evidence "
-            f"for target {target_text} over one 12+3+3 replay-reviewed fold."
+            f"M{layer:02d} post-replay unit: residual event audit for target {target_text} "
+            f"over one 12+3+3 replay-reviewed fold, consuming the pre-replay M03 event-impact ledger."
         ),
     )
 
@@ -926,7 +925,7 @@ def _build_layer_workflow(
         acquisition_command = [
             "PYTHONPATH=src",
             "python3",
-            "scripts/tasks/materialize_layer_four_event_observation_inputs.py",
+            "scripts/tasks/materialize_model_03_event_impact_inputs.py",
             "--start-month",
             "${START_MONTH}",
             "--end-month",
@@ -1257,13 +1256,21 @@ def build_model_06_post_replay_workflow_plan(
     end_month: str = "2017-06",
     selected_target_symbol: str | None = None,
     replay_review_complete: bool = False,
+    event_impact_ready: bool = False,
     event_universe_acquired: bool = False,
     modelability_gates_complete: bool = False,
     residual_attribution_complete: bool = False,
     evaluation_complete: bool = False,
     promotion_review_complete: bool = False,
 ) -> ModelPostReplayWorkflowPlan:
-    """Plan the post-replay M06 lane without moving it into pre-replay training."""
+    """Plan the post-replay M06 residual audit lane.
+
+    M03 owns the pre-replay event universe and event-impact/modelability inputs.
+    M06 starts only after replay review and consumes that M03 ledger alongside
+    replay residuals. ``event_universe_acquired`` and
+    ``modelability_gates_complete`` are accepted as compatibility inputs for
+    older callers, but they now describe M03 event-impact readiness.
+    """
 
     meta = next(item for item in LAYER_METADATA if int(item["layer"]) == 6)
     layer = int(meta["layer"])
@@ -1280,39 +1287,16 @@ def build_model_06_post_replay_workflow_plan(
     replay_review_blockers = () if replay_review_complete else (MODEL_GROUP_REPLAY_REVIEW_COMPLETE_BLOCKER,)
     target_blockers = _with_target_blocker((), layer=layer, selected_target_symbol=target, stage_type="data_acquisition")
 
-    data_blockers = target_blockers + replay_review_blockers
-    feature_blockers = target_blockers + ((f"{key}.data_acquisition_complete",) if not event_universe_acquired else ())
+    event_impact_ready = event_impact_ready or (event_universe_acquired and modelability_gates_complete)
     attribution_blockers = (
         target_blockers
         + replay_review_blockers
-        + ((f"{key}.feature_generation_complete",) if not modelability_gates_complete else ())
+        + (("model_03_event_state.event_impact_complete",) if not event_impact_ready else ())
     )
     evaluation_blockers = (f"{key}.model_generation_complete",) if not residual_attribution_complete else ()
     promotion_blockers = (f"{key}.model_evaluation_complete",) if not evaluation_complete else ()
     maintenance_blockers = (f"{key}.promotion_review_complete",) if not promotion_review_complete else ()
 
-    data_command = [
-        "PYTHONPATH=src",
-        "python3",
-        "scripts/tasks/materialize_residual_event_governance_inputs.py",
-        "--start-month",
-        "${START_MONTH}",
-        "--end-month",
-        "${END_MONTH}",
-        "--write",
-    ]
-    feature_command_tokens = [
-        "PYTHONPATH=src",
-        "python3",
-        "scripts/tasks/run_event_family_modelability_next_actions.py",
-        "--start-month",
-        "${START_MONTH}",
-        "--end-month",
-        "${END_MONTH}",
-        "--write-files",
-    ]
-    if target:
-        feature_command_tokens.extend(["--target-symbol", target])
     attribution_command = [
         "PYTHONPATH=src",
         "python3",
@@ -1320,40 +1304,15 @@ def build_model_06_post_replay_workflow_plan(
         "--contract-id",
         "${CONTRACT_ID}",
     ]
+    no_pre_replay_command = ["manager-internal", "consumes-pre-replay-model-03-event-impact-ledger"]
 
     stages = (
-        WorkflowStage(
-            stage_id=f"{key}.data_acquisition",
-            layer=layer,
-            layer_key=key,
-            stage_type="data_acquisition",
-            description="Materialize the post-replay PIT event universe from reviewed local event artifacts and SQL inputs.",
-            status=_stage_status_from_gate(complete=event_universe_acquired, blockers=data_blockers),
-            command=data_command,
-            dataset_unit=dataset_unit,
-            blockers=data_blockers,
-            safe_without_provider_calls=True,
-            provider_calls_allowed=False,
-        ),
-        WorkflowStage(
-            stage_id=f"{key}.feature_generation",
-            layer=layer,
-            layer_key=key,
-            stage_type="feature_generation",
-            description="Build M06 event-family evidence packets and deterministic modelability gate next-action routes.",
-            status=_stage_status_from_gate(complete=modelability_gates_complete, blockers=feature_blockers),
-            command=feature_command_tokens,
-            dataset_unit=dataset_unit,
-            blockers=feature_blockers,
-            safe_without_provider_calls=True,
-            provider_calls_allowed=False,
-        ),
         WorkflowStage(
             stage_id=f"{key}.model_generation",
             layer=layer,
             layer_key=key,
             stage_type="model_generation",
-            description="Run post-replay residual-event attribution over replay-reviewed failures and the PIT event universe.",
+            description="Run post-replay residual-event attribution over replay-reviewed failures and the pre-replay M03 event-impact ledger.",
             status=_stage_status_from_gate(complete=residual_attribution_complete, blockers=attribution_blockers),
             command=attribution_command,
             dataset_unit=dataset_unit,
@@ -1379,7 +1338,7 @@ def build_model_06_post_replay_workflow_plan(
             layer=layer,
             layer_key=key,
             stage_type=PROMOTION_STAGE_TYPE,
-            description="Review M06 attribution and event-family promotion evidence before downstream consumption.",
+            description="Review residual-event audit and event-family promotion evidence before downstream consumption.",
             status=_stage_status_from_gate(complete=promotion_review_complete, blockers=promotion_blockers),
             command=model_script(layer, slug, "review"),
             dataset_unit=dataset_unit,
@@ -1411,7 +1370,7 @@ def build_model_06_post_replay_workflow_plan(
         candidate_progression_policy=str(meta["candidate_progression_policy"]),
         dataset_unit=dataset_unit,
         data_surface=str(meta["data_surface"]),
-        feature_command=feature_command_tokens,
+        feature_command=no_pre_replay_command,
         model_generate_command=attribution_command,
         model_evaluate_command=model_script(layer, slug, "evaluate"),
         promotion_review_command=model_script(layer, slug, "review"),

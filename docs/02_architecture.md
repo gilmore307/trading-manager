@@ -37,7 +37,7 @@ accepted event evidence packets that passed point-in-time checks, non-overlap
 checks, matched-control review, leakage review, and agent/manager acceptance.
 Shared event-feed coverage helpers are neutral source-coverage plumbing: their
 row counts can prove local evidence availability, but they do not by themselves
-complete M03 event-state substrate or perform M06 attribution.
+complete M03 event-state substrate or perform residual-event audit.
 
 M05 remains the optional option-expression layer. It should not directly absorb event anomalies as alpha or duplicate M06 residual evidence.
 
@@ -48,7 +48,7 @@ M01 owns background context over broad market, sector, and industry state; it do
 Manager may schedule target-major substrate work because routing symbols only prepare data samples. That scheduling choice does not select the replay target. Live-flow replay must run the component graph against the fixed historical candidate pool, allowing components to choose no target, one target, or a target combination. A fixed-symbol run is a diagnostic repair scenario, not ordinary promotion evidence.
 
 M03 event evidence has both reusable global/sector substrate and
-target-local slices. Global/sector event-observation substrate belongs with
+target-local slices. Global/sector event-impact substrate belongs with
 reusable foundation work, but it is still collected per fold because the
 accepted observation pool can change across folds. Target-local event evidence
 belongs with target substrate only when a downstream replay or diagnostic run

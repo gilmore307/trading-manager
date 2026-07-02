@@ -155,8 +155,8 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="04_materialize_model_03_event_event_observation_fold_pool",
                 owner_repo="trading-manager",
-                action="materialize the fold-scoped M03 event-observation substrate, allowing an explicit empty pool before M06 has accepted event attribution",
-                command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_layer_four_event_observation_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
+                action="materialize the fold-scoped M03 event-impact substrate, allowing an explicit empty pool before M06 has accepted event attribution",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_model_03_event_impact_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
                 status="ready_without_provider_calls",
                 mutation_class="local_event_observation_substrate_receipt",
                 provider_calls_allowed=False,
@@ -175,7 +175,7 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="06_generate_post_replay_residual_event_governance",
                 owner_repo="trading-model",
-                action="generate M06 attribution from replay failures, residuals, misses, path deviations, overblocks, underblocks, and option-expression drag",
+                action="generate residual-event audit from replay failures, residuals, misses, path deviations, overblocks, underblocks, and option-expression drag",
                 command_ref="python3 scripts/models/model_06_residual_event_governance/generate_post_replay_event_attribution.py",
                 status="blocked_until_model_group_replay_complete",
                 mutation_class="offline_post_replay_attribution_generation",

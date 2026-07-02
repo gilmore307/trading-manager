@@ -1,6 +1,6 @@
 # Event Impact Distribution
 
-This file owns the current M03/M06 event-model contract. It is a contract
+This file owns the current event-impact contract. It is a contract
 surface, not a training-method note.
 
 ## Core Model
@@ -36,7 +36,7 @@ do not consume raw event text.
 
 ## Projection Modes
 
-M06 assigns exactly one projection mode for an event family after deterministic
+M03 assigns exactly one projection mode for an event family after deterministic
 coverage and leakage gates are ready:
 
 | Mode | Meaning |
@@ -164,16 +164,13 @@ shock-arrival counts. They must not directly model signed impact intensity
 unless they are part of a compound model with a separate signed severity
 distribution.
 
-## M06 Responsibilities
+## M03 Responsibilities
 
-M06 owns post-replay event-universe attribution and event-family modelability
-governance:
+M03 owns pre-replay event-universe materialization, event-family modelability,
+and event-state projection:
 
-- consume replay-review failure, miss, overblock, underblock, and path-deviation
-  scopes before starting attribution;
-- acquire or materialize the point-in-time event universe for those replay
-  failure scopes;
-- identify relationships between event evidence and model failure modes;
+- acquire or materialize the full fold point-in-time event universe before
+  replay;
 - define event family and taxonomy boundaries;
 - decide whether the family can be modeled at all;
 - choose `projection_mode`;
@@ -184,24 +181,7 @@ governance:
   probability-function class;
 - verify source coverage, dedupe, matched controls, overlap/confounder status,
   and leakage gates before Codex semantic review.
-
-M06 must not:
-
-- run as a pre-replay event-discovery or trade-selection layer;
-- infer signed direction or magnitude for a specific event;
-- choose concrete function parameters;
-- train M03 parameters;
-- use selected-trade outcomes to filter earlier event-family evidence;
-- use future revisions as inference inputs;
-- perform provider calls inside Codex review.
-
-## M03 Responsibilities
-
-M03 owns event-state projection:
-
-- consume only standardized event parameters, M06-approved family specs, and
-  M06-accepted individual event-state evidence;
-- train PIT-safe mappings from M06-approved event parameters to distribution
+- train PIT-safe mappings from M03-approved event parameters to distribution
   parameters;
 - output `event_state_projection` at each replay/live decision time;
 - expose calibrated sign probabilities, quantiles, uncertainty mass, tail
@@ -209,15 +189,37 @@ M03 owns event-state projection:
 
 M03 must not:
 
-- decide event-family modelability;
-- discover the raw event universe or decide which event families are worth
-  attention;
 - consume raw news, raw filings, raw macro rows, or unreviewed event text;
-- invent a distribution class not allowed by M06;
 - train on selected trades only;
+- use selected-trade outcomes, replay failures, or post-fold residuals to decide
+  which upstream event rows exist;
 - use future news, future filings, future prices, or future volatility as
   inference inputs;
 - issue trade, order, or option-structure commands.
+
+## M06 Responsibilities
+
+M06 owns post-replay residual-event audit:
+
+- consume replay-review failure, miss, overblock, underblock, and path-deviation
+  scopes before starting attribution;
+- consume the pre-replay M03 event-impact ledger as fixed upstream evidence;
+- identify relationships between event evidence and model failure modes;
+- produce residual-event attribution rows, missed-event flags, and event-family
+  follow-up candidates for later M03 evidence generation;
+- verify that residual findings are not already explained by upstream M03 event
+  state, M04 decision evidence, or optional M05 expression evidence.
+
+M06 must not:
+
+- own pre-replay event-universe discovery;
+- choose upstream event rows by looking at selected-trade outcomes;
+- rewrite M03 event eligibility after replay;
+- infer signed direction or magnitude for a specific event as a replay shortcut;
+- choose concrete M03 function parameters;
+- train M03 parameters;
+- use future revisions as inference inputs;
+- perform provider calls inside Codex review.
 
 ## Program And Agent Boundary
 

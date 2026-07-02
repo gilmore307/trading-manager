@@ -103,16 +103,16 @@ the first-gap attribution needed for operator review:
 The `post_replay_review_receipt` embeds
 `post_replay_review_diagnostic_summary` so dashboard and operator surfaces can
 scan total regret, top regret rows, best-action counts, and first-gap
-component/mechanism counts before reruns or M06 attribution.
+component/mechanism counts before reruns or residual-event audit.
 
 Replay review is only the first post-replay diagnostic step. A
 `post_replay_review_receipt` may identify failed fills, missed winners,
-and other candidate failure rows, but it does not satisfy M06
-EventRiskGovernor attribution. M06 attribution requires a separate receipt
-produced by the event-risk route with replay-review scope, point-in-time event
+and other candidate failure rows, but it does not satisfy M06 residual-event
+audit. That audit requires a separate receipt produced by the event-risk route
+with replay-review scope, point-in-time event
 observations or candidates, event-evidence refs, and control/co-event/confounder
 analysis. Evaluation must not treat generic replay review rows as completed
-M06 event attribution.
+M06 residual-event audit.
 
 Replay review must not complete when reviewable rows lack the future outcome or
 return data needed to quantify hindsight grading. In that case it emits
@@ -314,7 +314,7 @@ underblocking, option-expression drag, alpha calibration, or drawdown.
 
 ## M06 / M03 event-state Rule
 
-M06 event-risk research may propose a promotion packet. M03 event-state may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
+M03 event-impact research may propose a promotion packet. M03 event-state may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
 
 ## Useful Commands
 

@@ -352,26 +352,26 @@ def _m06_projected_current_stage(decision: Mapping[str, Any] | None) -> str | No
     selected_work = str(decision.get("selected_work") or "").strip()
     next_internal_stage = str(decision.get("next_internal_stage") or "").strip()
     reason_code = str(decision.get("reason_code") or "").strip()
-    if selected_work not in {"model_group.residual_event_governance", "model_group.m06_event_inputs"} and next_internal_stage not in {
+    if selected_work not in {"model_group.residual_event_governance", "model_group.m03_event_impact_inputs"} and next_internal_stage not in {
         "residual_event_governance",
-        "model_group.m06_event_inputs",
+        "model_group.m03_event_impact_inputs",
     }:
         return None
+    if selected_work == "model_group.m03_event_impact_inputs" or next_internal_stage == "model_group.m03_event_impact_inputs":
+        return "model_03_event_state.data_acquisition"
     scope = _m06_scope_from_decision(decision)
     replay_review_complete = True
-    event_universe_acquired = selected_work != "model_group.m06_event_inputs" and reason_code != "model_group_residual_event_evidence_missing"
-    modelability_gates_complete = event_universe_acquired and reason_code not in {
+    event_impact_ready = reason_code not in {
         "model_group_residual_event_evidence_missing",
-        "model_group_m06_event_feed_provider_required",
-        "model_group_m06_event_feed_backfill_running",
+        "model_group_m03_event_feed_provider_required",
+        "model_group_m03_event_feed_backfill_running",
     }
     plan = build_model_06_post_replay_workflow_plan(
         start_month=scope["start_month"] or "2016-01",
         end_month=scope["end_month"] or "2017-06",
         selected_target_symbol=scope["target_symbol"],
         replay_review_complete=replay_review_complete,
-        event_universe_acquired=event_universe_acquired,
-        modelability_gates_complete=modelability_gates_complete,
+        event_impact_ready=event_impact_ready,
     )
     return plan.next_stage.stage_id if plan.next_stage is not None else selected_work
 

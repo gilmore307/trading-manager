@@ -96,7 +96,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "standardized_event_candidate_count": 0,
                     },
                     "fold_scope": {"start_month": "2021-01", "end_month": "2025-12"},
-                    "required_next_action": "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
+                    "required_next_action": "materialize reviewed PIT event observations/candidates before residual-event audit can complete",
                 },
             }
         )
@@ -111,7 +111,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(activity["reason_code"], "model_group_residual_event_evidence_missing")
         self.assertEqual(
             activity["required_next_step"],
-            "materialize reviewed PIT event observations/candidates before M06 attribution can complete",
+            "materialize reviewed PIT event observations/candidates before residual-event audit can complete",
         )
         self.assertIn("Checked 2 event input paths", activity["activity_details"])
 

@@ -207,7 +207,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "model_01_background_context.feature_or_input_ready",
             ),
         )
-        self.assertIn("scripts/tasks/materialize_layer_four_event_observation_inputs.py", stage.command)
+        self.assertIn("scripts/tasks/materialize_model_03_event_impact_inputs.py", stage.command)
 
     def test_m05_option_expression_owns_option_source_when_options_apply(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -316,12 +316,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layer_count, 1)
         layer = plan.layers[0]
         self.assertEqual(layer.layer_key, "model_06_residual_event_governance")
-        self.assertEqual(layer.dataset_unit.unit_kind, "post_replay_event_universe_walk_forward_12_3_3")
+        self.assertEqual(layer.dataset_unit.unit_kind, "post_replay_residual_event_audit_walk_forward_12_3_3")
         self.assertEqual(
             [stage.stage_type for stage in layer.stages],
             [
-                "data_acquisition",
-                "feature_generation",
                 "model_generation",
                 "model_evaluation",
                 "promotion_review",
@@ -330,9 +328,8 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         )
         self.assertIsNone(plan.next_stage)
         self.assertIn(MODEL_GROUP_REPLAY_REVIEW_COMPLETE_BLOCKER, layer.stages[0].blockers)
-        self.assertIn("scripts/tasks/materialize_residual_event_governance_inputs.py", layer.stages[0].command)
-        self.assertIn("scripts/tasks/run_event_family_modelability_next_actions.py", layer.stages[1].command)
-        self.assertIn("scripts/tasks/run_model_group_residual_event_governance.py", layer.stages[2].command)
+        self.assertIn("model_03_event_state.event_impact_complete", layer.stages[0].blockers)
+        self.assertIn("scripts/tasks/run_model_group_residual_event_governance.py", layer.stages[0].command)
         self.assertFalse(any(stage.provider_calls_allowed for stage in layer.stages))
 
     def test_m06_post_replay_plan_advances_after_each_gate(self) -> None:
@@ -342,26 +339,26 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             selected_target_symbol="AAPL",
             replay_review_complete=True,
         )
-        self.assertEqual(plan.next_stage.stage_id, "model_06_residual_event_governance.data_acquisition")
+        self.assertIsNone(plan.next_stage)
 
         plan = build_model_06_post_replay_workflow_plan(
             start_month="2016-01",
             end_month="2017-06",
             selected_target_symbol="AAPL",
             replay_review_complete=True,
-            event_universe_acquired=True,
-        )
-        self.assertEqual(plan.next_stage.stage_id, "model_06_residual_event_governance.feature_generation")
-
-        plan = build_model_06_post_replay_workflow_plan(
-            start_month="2016-01",
-            end_month="2017-06",
-            selected_target_symbol="AAPL",
-            replay_review_complete=True,
-            event_universe_acquired=True,
-            modelability_gates_complete=True,
+            event_impact_ready=True,
         )
         self.assertEqual(plan.next_stage.stage_id, "model_06_residual_event_governance.model_generation")
+
+        plan = build_model_06_post_replay_workflow_plan(
+            start_month="2016-01",
+            end_month="2017-06",
+            selected_target_symbol="AAPL",
+            replay_review_complete=True,
+            event_impact_ready=True,
+            residual_attribution_complete=True,
+        )
+        self.assertEqual(plan.next_stage.stage_id, "model_06_residual_event_governance.model_evaluation")
 
     def test_model_generation_uses_chronological_train_validation_test_split_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
