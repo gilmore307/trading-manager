@@ -740,7 +740,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         fold_state = runtime / f"model_training_fold_state_{symbol.lower()}_2016-01_2017-06.json"
         fold_state.parent.mkdir(parents=True, exist_ok=True)
         stages = []
-        for layer in range(1, 7):
+        for layer in range(1, 6):
             for split_name in ("train", "validation", "test"):
                 stages.append(
                     {
@@ -780,7 +780,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
     def _write_completed_training_fold_state(self, runtime: Path, *, start: str, end: str, symbol: str = "AAPL") -> Path:
         stages = []
-        for layer in range(1, 7):
+        for layer in range(1, 6):
             for split_name in ("train", "validation", "test"):
                 stages.append(
                     {
@@ -2525,7 +2525,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                     "target_symbol": "AAPL" if layer >= 3 else None,
                                 },
                             }
-                            for layer in range(1, 7)
+                            for layer in range(1, 6)
                         ],
                     }
                 )
@@ -2546,7 +2546,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2017-06"]
         fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2017-01..2018-06"]
-        self.assertEqual(len(fold1_tasks), 12)
+        self.assertEqual(len(fold1_tasks), 11)
         self.assertEqual(
             [task["task_label"] for task in fold1_tasks],
             [
@@ -2555,7 +2555,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "Model 03 Fixture",
                 "Model 04 Fixture",
                 "Model 05 Fixture",
-                "Model 06 Fixture",
                 "Model Replay",
                 "Replay Review",
                 "M06 Event Risk Governor",
@@ -2583,7 +2582,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             def write_completed_fold(start: str, end: str) -> None:
                 stages = []
-                for layer in range(1, 7):
+                for layer in range(1, 6):
                     for split_name in ("train", "validation", "test"):
                         stages.append(
                             {
@@ -2736,11 +2735,11 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         replay_task = next(task for task in tasks if task["task_id"] == "model_group.replay")
         self.assertEqual(replay_task["task_state"], "future")
         self.assertEqual(replay_task["status"], "blocked")
-        self.assertEqual(replay_task["detail"]["blockers"], ["fold_models_01_06_model_generation_complete"])
+        self.assertEqual(replay_task["detail"]["blockers"], ["fold_models_01_05_model_generation_complete"])
         self.assertIsNone(replay_task.get("started_at_utc"))
         self.assertNotIn("replay_month_operation", replay_task["detail"])
         self.assertNotIn("Replay month 2025-12 is incomplete", replay_task["reason"])
-        self.assertIn("Waiting for pre-replay M01-M06 model generation", replay_task["reason"])
+        self.assertIn("Waiting for pre-replay M01-M05 model generation", replay_task["reason"])
 
     def test_ready_model_group_replay_becomes_active_after_pre_replay_fold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -3097,7 +3096,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                     "target_symbol": "AAPL" if layer >= 3 else None,
                                 },
                             }
-                            for layer in range(1, 7)
+                            for layer in range(1, 6)
                         ],
                     }
                 )
@@ -5932,7 +5931,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             ],
         )
         self.assertTrue(all(task["task_state"] == "blocked" for task in lifecycle_tasks))
-        self.assertEqual(lifecycle_tasks[0]["detail"]["blockers"], ["fold_models_01_06_model_generation_complete"])
+        self.assertEqual(lifecycle_tasks[0]["detail"]["blockers"], ["fold_models_01_05_model_generation_complete"])
         fold_prep_tasks = [
             task
             for task in payload["chart_payload"]["task_timeline"]
@@ -6193,24 +6192,24 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2019-04",
                         "stages": [
                             {
-                                "stage_id": "model_06_residual_event_governance.data_acquisition",
+                                "stage_id": "model_05_option_expression.data_acquisition",
                                 "stage_type": "data_acquisition",
-                                "layer": 6,
-                                "layer_key": "model_06_residual_event_governance",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "not_applicable",
                             },
                             {
-                                "stage_id": "model_06_residual_event_governance.feature_generation",
+                                "stage_id": "model_05_option_expression.feature_generation",
                                 "stage_type": "feature_generation",
-                                "layer": 6,
-                                "layer_key": "model_06_residual_event_governance",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "not_applicable",
                             },
                             {
-                                "stage_id": "model_06_residual_event_governance.model_generation",
+                                "stage_id": "model_05_option_expression.model_generation",
                                 "stage_type": "model_generation",
-                                "layer": 6,
-                                "layer_key": "model_06_residual_event_governance",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "blocked",
                             },
                             {
@@ -6463,12 +6462,12 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "target_symbol": "AAOI",
                         "stages": [
                             {
-                                "stage_id": "model_06_residual_event_governance.model_generation",
+                                "stage_id": "model_05_option_expression.model_generation",
                                 "stage_type": "model_generation",
-                                "layer": 3,
-                                "layer_key": "model_06_residual_event_governance",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "blocked",
-                                "last_reason": "waiting for model_06_residual_event_governance.feature_or_input_ready",
+                                "last_reason": "waiting for model_05_option_expression.feature_or_input_ready",
                             }
                         ],
                     }
@@ -6517,7 +6516,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             if task["month"] == "2017-01..2018-06" and task["task_state"] == "blocked"
         ]
         self.assertTrue(fold_2017_blocked)
-        self.assertIn("fold_models_01_06_model_generation_complete", fold_2017_blocked[0]["detail"]["blockers"])
+        self.assertIn("fold_models_01_05_model_generation_complete", fold_2017_blocked[0]["detail"]["blockers"])
 
     def test_task_timeline_exposes_missing_start_month_gap_before_later_work(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

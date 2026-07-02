@@ -79,7 +79,7 @@ inputs may retain compatibility fields such as `month_ingest_workers`, but they
 must not open multiple month lanes or project parallel month work into Tasks.
 
 The service completes one fold's full run cycle before opening the next fold.
-M01-M06 generation is the pre-replay boundary; it unlocks replay, replay
+M01-M05 generation is the pre-replay boundary; it unlocks replay, replay
 review, post-replay M06 residual attribution, model evaluation, promotion
 review, and maintenance/readiness handoff. Until that lifecycle emits
 maintenance/readiness evidence, the next fold and next target stay internal

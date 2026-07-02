@@ -22,7 +22,7 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
         state_path = storage_root / "runtime" / f"model_training_fold_state_aapl_{start_month}_{end_month}.json"
         state_path.parent.mkdir(parents=True, exist_ok=True)
         stages = []
-        for layer in range(1, 7):
+        for layer in range(1, 6):
             for split_name in ("train", "validation", "test"):
                 stages.append(
                     {
@@ -69,14 +69,25 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
         artifact_path.write_text('{"artifacts_by_horizon": {}}\n', encoding="utf-8")
 
-    def _mark_m06_incomplete(self, storage_root: Path, *, start_month: str = "2016-01", end_month: str = "2016-12") -> None:
+    def _append_stale_m06_generation_fixture(self, storage_root: Path, *, start_month: str = "2016-01", end_month: str = "2016-12") -> None:
         state_path = storage_root / "runtime" / f"model_training_fold_state_aapl_{start_month}_{end_month}.json"
         payload = json.loads(state_path.read_text(encoding="utf-8"))
-        for stage in payload["stages"]:
-            if int(stage.get("layer") or 0) != 6:
-                continue
-            split_name = stage.get("dataset_split", {}).get("split_name")
-            stage["status"] = "ready" if split_name == "train" else "blocked"
+        payload["stages"].extend(
+            [
+                {
+                    "stage_id": f"layer_06_fixture.model_generation.{split_name}",
+                    "stage_type": "model_generation",
+                    "layer": 6,
+                    "layer_key": "layer_06_fixture",
+                    "status": status,
+                    "dataset_split": {
+                        "split_name": split_name,
+                        "split_policy": "chronological_rolling_fold_8_2_2",
+                    },
+                }
+                for split_name, status in (("train", "ready"), ("validation", "blocked"), ("test", "blocked"))
+            ]
+        )
         state_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
     def _write_contract(self, path: Path, *, base_context_ref: Path) -> None:
@@ -253,13 +264,13 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
             )
             self.assertIsNone(second)
 
-    def test_pre_replay_fold_blocks_dataset_before_m06_generation(self):
+    def test_pre_replay_fold_ignores_stale_m06_generation_fixture(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             self._write_completed_fold(storage_root)
-            self._mark_m06_incomplete(storage_root)
+            self._append_stale_m06_generation_fixture(storage_root)
             dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
             contract_path = tmp / "replays" / "promotion_replay_candidate_policy.json"
             self._write_contract(contract_path, base_context_ref=dataset_root / "base_context.json")
@@ -275,7 +286,9 @@ class ModelGroupReplayDatasetTests(unittest.TestCase):
                 execute=False,
             )
 
-        self.assertIsNone(decision)
+        self.assertIsNotNone(decision)
+        assert decision is not None
+        self.assertEqual(decision.reason_code, "model_group_replay_dataset_base_context_ready")
 
     def test_frozen_manifest_is_fold_agnostic_after_latest_completed_fold_changes(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

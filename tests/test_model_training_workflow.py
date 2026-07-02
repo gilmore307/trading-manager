@@ -13,7 +13,6 @@ from trading_manager_tasks.model_training_workflow import (
     MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,
     MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID,
     MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
-    MODEL_SIX_EVENT_FEED_COVERAGE_BLOCKER,
     MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
     build_model_training_workflow_plan,
@@ -71,7 +70,6 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "model_03_event_state",
                 "model_04_unified_decision",
                 "model_05_option_expression",
-                "model_06_residual_event_governance",
             ],
         )
         self.assertEqual(
@@ -82,7 +80,6 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "EventStateModel",
                 "UnifiedDecisionModel",
                 "OptionExpressionModel",
-                "ResidualEventGovernanceModel",
             ],
         )
         current_layer_keys = {layer.layer_key for layer in plan.layers}
@@ -108,7 +105,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertTrue(plan.foundation_catch_up_only)
         self.assertEqual(plan.foundation_catch_up_layers, FOUNDATION_CATCH_UP_LAYERS)
         self.assertEqual([stage.stage_type for stage in plan.layers[0].stages], ["data_acquisition", "feature_generation"])
-        for layer in (plan.layers[1], plan.layers[2], plan.layers[3], plan.layers[4], plan.layers[5]):
+        for layer in (plan.layers[1], plan.layers[2], plan.layers[3], plan.layers[4]):
             self.assertEqual(layer.stages, ())
 
     def test_m01_acquisition_waits_for_task_key_preparation_then_auto_dispatch(self) -> None:
@@ -288,7 +285,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
             all(MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER not in stage.blockers for stage in plan.layers[4].stages)
         )
 
-    def test_m06_exposes_input_feature_and_model_generation_like_other_models(self) -> None:
+    def test_m06_does_not_expose_pre_replay_input_or_feature_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
                 storage_root=Path(raw_tmp),
@@ -299,27 +296,10 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 foundation_catch_up_only=False,
             )
 
-        stages = {stage.stage_id: stage for stage in plan.layers[5].stages}
-        self.assertIn("model_06_residual_event_governance.data_acquisition", stages)
-        self.assertIn("model_06_residual_event_governance.feature_generation", stages)
-        self.assertIn("model_06_residual_event_governance.model_generation.train", stages)
-        self.assertEqual(stages["model_06_residual_event_governance.data_acquisition"].stage_type, "data_acquisition")
-        self.assertEqual(stages["model_06_residual_event_governance.feature_generation"].stage_type, "feature_generation")
-        self.assertIn("scripts/tasks/materialize_residual_event_governance_inputs.py", stages["model_06_residual_event_governance.data_acquisition"].command)
-        self.assertIn("-m", stages["model_06_residual_event_governance.feature_generation"].command)
-        self.assertIn(
-            "data_feature.m06_residual_event_governance_feature_generation",
-            stages["model_06_residual_event_governance.feature_generation"].command,
-        )
-        self.assertIn(MODEL_SIX_EVENT_FEED_COVERAGE_BLOCKER, stages["model_06_residual_event_governance.data_acquisition"].blockers)
-        self.assertIn(
-            "model_06_residual_event_governance.data_acquisition_complete",
-            stages["model_06_residual_event_governance.feature_generation"].blockers,
-        )
-        self.assertIn(
-            "model_06_residual_event_governance.feature_or_input_ready",
-            stages["model_06_residual_event_governance.model_generation.train"].blockers,
-        )
+        stage_ids = {stage.stage_id for layer in plan.layers for stage in layer.stages}
+        self.assertNotIn("model_06_residual_event_governance.data_acquisition", stage_ids)
+        self.assertNotIn("model_06_residual_event_governance.feature_generation", stage_ids)
+        self.assertFalse(any(stage_id.startswith("model_06_residual_event_governance.model_generation") for stage_id in stage_ids))
 
     def test_model_generation_uses_chronological_train_validation_test_split_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -381,7 +361,7 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual(plan.layers[0].dataset_unit.unit_kind, "walk_forward_12_3_3_panel")
         self.assertFalse(plan.layers[0].dataset_unit.target_required)
         self.assertEqual(plan.layers[2].stages[0].dataset_unit.unit_kind, "event_observation_fold_panel")
-        for layer in (plan.layers[1], plan.layers[3], plan.layers[4], plan.layers[5]):
+        for layer in (plan.layers[1], plan.layers[3], plan.layers[4]):
             self.assertEqual(layer.dataset_unit.unit_kind, "target_symbol_walk_forward_12_3_3")
             self.assertEqual(layer.dataset_unit.target_symbol, "AAPL")
             self.assertTrue(layer.dataset_unit.target_required)

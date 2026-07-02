@@ -2060,10 +2060,10 @@ class SchedulerDaemonTests(unittest.TestCase):
                         "target_symbol": "AAPL",
                         "stages": [
                             {
-                                "stage_id": "model_06_residual_event_governance.model_generation.train",
+                                "stage_id": "model_05_option_expression.model_generation.train",
                                 "stage_type": "model_generation",
-                                "layer": 6,
-                                "layer_key": "model_06_residual_event_governance",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "ready",
                             }
                         ],
@@ -2833,10 +2833,10 @@ class SchedulerDaemonTests(unittest.TestCase):
                         "target_symbol": "AAPL",
                         "stages": [
                             {
-                                "stage_id": "model_06_residual_event_governance.model_generation.train",
+                                "stage_id": "model_05_option_expression.model_generation.train",
                                 "stage_type": "model_generation",
-                                "layer": 6,
-                                "layer_key": "model_06_residual_event_governance",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
                                 "status": "ready",
                             }
                         ],

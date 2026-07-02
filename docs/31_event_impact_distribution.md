@@ -166,8 +166,14 @@ distribution.
 
 ## M06 Responsibilities
 
-M06 owns event-family modelability governance:
+M06 owns post-replay event-universe attribution and event-family modelability
+governance:
 
+- consume replay-review failure, miss, overblock, underblock, and path-deviation
+  scopes before starting attribution;
+- acquire or materialize the point-in-time event universe for those replay
+  failure scopes;
+- identify relationships between event evidence and model failure modes;
 - define event family and taxonomy boundaries;
 - decide whether the family can be modeled at all;
 - choose `projection_mode`;
@@ -181,6 +187,7 @@ M06 owns event-family modelability governance:
 
 M06 must not:
 
+- run as a pre-replay event-discovery or trade-selection layer;
 - infer signed direction or magnitude for a specific event;
 - choose concrete function parameters;
 - train M03 parameters;
@@ -192,8 +199,10 @@ M06 must not:
 
 M03 owns event-state projection:
 
-- consume standardized event parameters and M06-approved family specs;
-- train PIT-safe mappings from event parameters to distribution parameters;
+- consume only standardized event parameters, M06-approved family specs, and
+  M06-accepted individual event-state evidence;
+- train PIT-safe mappings from M06-approved event parameters to distribution
+  parameters;
 - output `event_state_projection` at each replay/live decision time;
 - expose calibrated sign probabilities, quantiles, uncertainty mass, tail
   risks, target exposure probability, and option-expression suitability deltas.
@@ -201,6 +210,9 @@ M03 owns event-state projection:
 M03 must not:
 
 - decide event-family modelability;
+- discover the raw event universe or decide which event families are worth
+  attention;
+- consume raw news, raw filings, raw macro rows, or unreviewed event text;
 - invent a distribution class not allowed by M06;
 - train on selected trades only;
 - use future news, future filings, future prices, or future volatility as

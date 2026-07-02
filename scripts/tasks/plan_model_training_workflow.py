@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan the manager-owned base M01-M06 historical model-training workflow."""
+"""Plan the manager-owned base M01-M05 pre-replay historical workflow."""
 
 from __future__ import annotations
 

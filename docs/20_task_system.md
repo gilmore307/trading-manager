@@ -58,7 +58,9 @@ source contracts, label contracts, feature/evidence contracts, gate contracts,
 and not-applicable states, but it must not define a separate orchestration
 meaning for these stages. Manager owns the state machine, gap discovery,
 provider-dispatch boundary, retry/stop routing, point-in-time/leakage gates, and
-ready-state projection across all model groups.
+ready-state projection across all model groups. M06 follows these conventions
+inside the post-replay model-group lane, not as a pre-replay model-worker input
+stage.
 
 The public task list is a task-fact projection over scheduler state. It shows
 completed history, failures, and one current executable or review task. Future
@@ -83,10 +85,11 @@ model-worker lane has no owner instead of falling back to a targetless fold.
 
 1. Foundation substrate. Build reusable M01 background-context source/feature
    evidence and fold-scoped M03 event-state observation inputs. M03 event
-   substrate is collected per fold because M06-governed event-family attributes
-   and accepted event-observation pools can change across folds. Event-feed
-   coverage checks are shared source plumbing only; feed rows are not M03
-   event-state evidence until accepted event-family evidence exists.
+   substrate is collected per fold from event families and event instances
+   already accepted by M06; if no accepted M06 event evidence exists, M03 emits
+   no-event-risk state rather than discovering events itself. Event-feed coverage
+   checks are shared source plumbing only; feed rows are not M03 event-state
+   evidence until accepted event-family evidence exists.
 2. Target substrate. Ordinary replay materializes M02 target-state source and
    feature evidence from the fixed `historical_candidate_universe.csv` candidate
    pool. If a requested diagnostic target lacks reviewed target-local bar
@@ -110,13 +113,16 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    review over missed winners, bad fills, target-selection misses,
    overblock/underblock behavior, and option-expression drag. It prepares
    replay-review rows for M06 and evaluation, but it is not event attribution.
-6. Residual event governance. M06 owns residual event intervention,
-   overblock/underblock, missed-event, and underlying-vs-option failure
-   attribution after M04/M05 thesis formation. Its event-family attributes are
-   applied by M03 and passed through to M04/M05 as state, but M06 itself is not a
-   pre-replay provider data-acquisition lane. When M06 needs local event inputs,
-   scheduler may backfill bounded event feeds only after replay review exposes
-   the post-replay attribution requirement.
+6. Residual event governance. M06 starts only after replay review has exposed
+   failures, residuals, misses, overblocks, underblocks, target-selection misses,
+   or path deviations. M06 then acquires or materializes the PIT event universe
+   for the replay failure scope, attributes relationships between events and
+   model failure modes, and decides which event families or event instances are
+   worth attention. M03 later applies those M06-accepted event-family attributes
+   and individual-event impact states, but M03 does not perform event-universe
+   discovery. When M06 needs local event inputs, scheduler may backfill bounded
+   event feeds only after replay review exposes the post-replay attribution
+   requirement.
 7. Event-family modelability acquisition and evidence generation. When M06 must
    judge whether an event family can be described by an impact probability
    function, it uses the shared model-task lifecycle vocabulary: acquisition

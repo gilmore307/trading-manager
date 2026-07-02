@@ -199,7 +199,7 @@ class ModelGroupRerunTests(unittest.TestCase):
         self.assertEqual(by_stage["model_04_unified_decision.model_generation.test"]["status"], "succeeded")
         self.assertEqual(by_stage["model_05_option_expression.feature_generation"]["status"], "succeeded")
         self.assertEqual(by_stage["model_05_option_expression.model_generation.train"]["status"], "ready")
-        self.assertEqual(by_stage["model_06_residual_event_governance.model_generation.train"]["status"], "blocked")
+        self.assertNotIn("model_06_residual_event_governance.model_generation.train", by_stage)
 
     def test_batch_receipt_summarizes_per_state_reset_receipts(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

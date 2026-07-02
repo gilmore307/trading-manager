@@ -35,7 +35,7 @@ Manager recognizes the current M01-M06 stack: BackgroundContext, TargetState, Ev
 
 All model groups use the same model-task lifecycle vocabulary: data acquisition, feature or evidence generation, model generation, evaluation, promotion or shadow handoff, and runtime monitoring. Model groups may declare different domain contracts for sources, clocks, labels, features, gates, and not-applicable states, but they must not create separate orchestration semantics for the same lifecycle responsibilities.
 
-Manager owns the lifecycle state machine, gap discovery, provider-dispatch boundary, retry/stop routing, artifact references, point-in-time/leakage gates, and readiness projection. Model-group code owns domain-specific implementation behind those declared contracts. M06 is therefore an event-domain implementation of the shared lifecycle, not a special workflow class; its event acquisition and modelability evidence generation remain subject to the same stage vocabulary and control-plane routing as the other model groups.
+Manager owns the lifecycle state machine, gap discovery, provider-dispatch boundary, retry/stop routing, artifact references, point-in-time/leakage gates, and readiness projection. Model-group code owns domain-specific implementation behind those declared contracts. M06 uses the same stage vocabulary and control-plane routing conventions when its post-replay lane prepares event inputs, evidence, attribution, evaluation inputs, and promotion handoff evidence; this does not move M06 into the pre-replay model-worker lane.
 
 ## D007 - Reusable foundation catch-up is priority
 
@@ -43,7 +43,7 @@ The scheduler should first advance reusable targetless foundation substrate befo
 
 Historical training uses the 18-month `12+3+3` cumulative walk-forward fold as the public first-class work unit across all layers. Current fold ids use the training data source and training year, such as `fold_aapl_2016`; the window range `2016-01..2017-06` is coverage evidence, not the business fold name. Months are child partitions inside a fold for data coverage, receipts, and provider batching; they are not separate owner-facing training tasks. Dashboard task identity and stage progress must therefore present M01+ data acquisition, feature generation, model generation, evaluation, and review under the same fold period. A fold is eligible only after its final test-window calendar month is complete in `America/New_York`; the `fold_aapl_2016` window cannot open before `2017-07-01` because it needs data through 2017-06. Public task numbers are list sequence numbers assigned after chronological fold, layer, and workflow-stage sorting; `task_uid` is the durable identity for progress/evidence joins. Historical runtime advances one canonical month at a time; worker identity is internal execution detail and Tasks should not display or filter by worker. For overlapping January-June substrate months, public task ownership stays with the earliest open training-year fold that contains the month; `2024-01` through `2024-06` cannot display or run as `fold_aapl_2024` while `fold_aapl_2023` is still open. Pre-replay model work includes a fold-scoped cumulative replay-entry checkpoint. The first fold may cold start; each later fold must continue from the immediately previous fold checkpoint and add the next 12 training months before replay admission.
 
-The scheduler must finish one fold's full run cycle before opening the next fold. Completion means M01-M06 pre-replay model work, model replay, replay review, post-replay M06 residual attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. M06 can update the event-observation pool used by later M03 event-state folds, so starting the next fold after M01-M06 model generation alone is still invalid.
+The scheduler must finish one fold's full run cycle before opening the next fold. Completion means M01-M05 pre-replay model work, model replay, replay review, post-replay M06 residual attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. M06 can update the event-observation pool used by later M03 event-state folds, so starting the next fold after pre-replay model generation alone is still invalid.
 
 ## D008 - M05 is optional trading guidance/expression
 
@@ -51,7 +51,7 @@ M05 may produce optional offline trading-guidance records and option-expression 
 
 ## D009 - M03 event-state consumes only accepted event-failure evidence
 
-M03 event-state may condition alpha only with evidence packets that passed source precedence, point-in-time availability, non-overlap, matched controls, leakage review, and agent/manager acceptance. Raw anomalies and unreviewed event text cannot enter M03 event-state scoring.
+M03 event-state may condition alpha only on event families and event instances that M06 has accepted as worth attention through post-replay residual-event governance. M03 uses M06 outputs to estimate the point-in-time impact state of individual accepted events; it does not search the event universe, select event families, or reinterpret raw event text. Raw anomalies and unreviewed event text cannot enter M03 event-state scoring.
 
 When M06 has not yet produced accepted attribution or promotion evidence,
 the M03 event-observation substrate may be empty. That is a valid state:

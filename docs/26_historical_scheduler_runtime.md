@@ -42,7 +42,7 @@ Stage resource guard: safe offline stage commands must be restartable and bounde
 Agent repair closure is a separate internal service. `trading-manager-agent-repair-closure.timer` runs `scripts/tasks/close_agent_repairs.py` every minute. The closure controller scans completed server-error diagnoses, refuses broker/account/order/fill/position/buying-power/funds scopes, pushes already-committed internal repo repairs, restarts internal services when the diagnosis requires it, triggers dashboard refresh, and writes `agent_repair_closure_receipt.json`. This controller is the manager-owned handoff after agent repair; agent diagnosis alone is not considered closed-loop completion.
 
 Replay dataset closure is part of the daemon lifecycle, not a manual side path.
-After a fold completes M01-M06 model generation, the daemon runs
+After a fold completes M01-M05 model generation, the daemon runs
 `model_group.replay_dataset` before `model_group.replay`. That worker writes the
 fold-bound background/target/event context when missing, calls the
 evaluation-owned dataset preparation script, runs bounded one-shot replay
@@ -177,7 +177,7 @@ task lanes; they do not force replay to trade that target.
 Fold progression is serial. Pre-replay model work includes the fold-scoped
 replay entry utility checkpoint; after the first fold, that checkpoint must be
 continued from the previous fold's checkpoint before replay can start. After a
-fold finishes M01-M06 model work, the scheduler holds the fold lane until model replay, replay review,
+fold finishes M01-M05 model work, the scheduler holds the fold lane until model replay, replay review,
 residual-event governance attribution, model evaluation, model promotion, and maintenance/readiness
 handoff complete. It must not start the next fold or rotate to another target
 while that model-group lifecycle is still open.
