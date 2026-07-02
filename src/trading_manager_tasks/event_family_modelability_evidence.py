@@ -11,6 +11,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
@@ -48,33 +49,75 @@ PRODUCT_PRICE_CHANGE_TERMS = (
     "prices",
     "pricing",
 )
-PRODUCT_PRICE_INCREASE_TERMS = (
-    "increase",
-    "increases",
-    "increased",
-    "raise",
-    "raises",
-    "raised",
-    "hike",
-    "hikes",
-    "hiked",
-    "higher",
+PRODUCT_PRICE_SUBJECT_TERMS = (
+    "iphone",
+    "ipad",
+    "mac",
+    "macbook",
+    "airpods",
+    "apple watch",
+    "app store",
+    "icloud",
+    "subscription",
+    "service",
+    "services",
+    "apple sales",
+    "device",
+    "devices",
 )
-PRODUCT_PRICE_DECREASE_TERMS = (
-    "decrease",
-    "decreases",
-    "decreased",
-    "cut",
-    "cuts",
-    "cutting",
-    "lower",
-    "lowers",
-    "lowered",
-    "reduce",
-    "reduces",
-    "reduced",
+PRODUCT_PRICE_INCREASE_PHRASES = (
+    "price hike",
+    "price hikes",
+    "price increase",
+    "price increases",
+    "prices increase",
+    "prices increased",
+    "prices rise",
+    "raises prices",
+    "raised prices",
+    "raise prices",
+    "raises price",
+    "raised price",
+    "raise price",
+    "higher prices",
+    "more expensive",
+    "get more expensive",
+    "gets more expensive",
+    "price raised",
+    "hike in prices",
+)
+PRODUCT_PRICE_DECREASE_PHRASES = (
+    "price cut",
+    "price cuts",
+    "price decrease",
+    "price decreases",
+    "prices decrease",
+    "prices decreased",
+    "prices fall",
+    "cuts prices",
+    "cut prices",
+    "cutting prices",
+    "cuts price",
+    "cut price",
+    "cutting price",
+    "lower prices",
+    "lowers prices",
+    "lowered prices",
+    "reduce prices",
+    "reduced prices",
     "discount",
     "discounts",
+)
+ANALYST_PRICE_TARGET_TERMS = (
+    "price target",
+    "analyst",
+    "maintains",
+    "rating",
+    "overweight",
+    "underweight",
+    "neutral",
+    "buy rating",
+    "sell rating",
 )
 
 MACRO_RELEASE_EVENT_TYPE_TERMS = {
@@ -235,12 +278,21 @@ def _text_contains_any(text: str, terms: Sequence[str]) -> bool:
     return any(term in lowered for term in terms)
 
 
+def _event_text_segments(text: str) -> list[str]:
+    return [segment.strip().lower() for segment in re.split(r"[\n.;,?]| - |: ", text) if segment.strip()]
+
+
 def _product_price_change_direction(text: str) -> str:
-    has_price = _text_contains_any(text, PRODUCT_PRICE_CHANGE_TERMS)
-    if not has_price:
+    if _text_contains_any(text, ANALYST_PRICE_TARGET_TERMS):
         return ""
-    has_increase = _text_contains_any(text, PRODUCT_PRICE_INCREASE_TERMS)
-    has_decrease = _text_contains_any(text, PRODUCT_PRICE_DECREASE_TERMS)
+    matching_segments = [
+        segment
+        for segment in _event_text_segments(text)
+        if _text_contains_any(segment, PRODUCT_PRICE_SUBJECT_TERMS)
+        and _text_contains_any(segment, PRODUCT_PRICE_CHANGE_TERMS)
+    ]
+    has_increase = any(_text_contains_any(segment, PRODUCT_PRICE_INCREASE_PHRASES) for segment in matching_segments)
+    has_decrease = any(_text_contains_any(segment, PRODUCT_PRICE_DECREASE_PHRASES) for segment in matching_segments)
     if has_increase and has_decrease:
         return "mixed_or_unclear"
     if has_increase:
@@ -328,20 +380,17 @@ def fetch_target_news_rows_from_database(
     pattern = f'%"{symbol}"%'
     if event_family_id != "target_product_price_change_news":
         raise TaskSystemError(f"unsupported concrete news event family: {event_family_id}")
-    price_patterns = tuple(f"%{term}%" for term in PRODUCT_PRICE_CHANGE_TERMS)
-    direction_patterns = tuple(f"%{term}%" for term in (*PRODUCT_PRICE_INCREASE_TERMS, *PRODUCT_PRICE_DECREASE_TERMS))
+    price_patterns = [f"%{term}%" for term in PRODUCT_PRICE_CHANGE_TERMS]
+    subject_patterns = [f"%{term}%" for term in PRODUCT_PRICE_SUBJECT_TERMS]
+    direction_patterns = [f"%{term}%" for term in (*PRODUCT_PRICE_INCREASE_PHRASES, *PRODUCT_PRICE_DECREASE_PHRASES)]
+    analyst_exclusion_patterns = [f"%{term}%" for term in ANALYST_PRICE_TARGET_TERMS]
     family_filter = """
-          AND (timeline_headline ILIKE ANY(%s) OR summary ILIKE ANY(%s))
-          AND (timeline_headline ILIKE ANY(%s) OR summary ILIKE ANY(%s))
+          AND (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))
+          AND (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))
+          AND (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))
+          AND NOT (COALESCE(timeline_headline, '') ILIKE ANY(%s) OR COALESCE(summary, '') ILIKE ANY(%s))
     """
-    count_query = """
-        SELECT count(*) AS row_count
-        FROM trading_data.feed_03_alpaca_news
-        WHERE created_at >= %s
-          AND created_at < %s
-          AND symbols::text ILIKE %s
-    """ + family_filter
-    sample_query = """
+    broad_query = """
         SELECT id, timeline_headline, summary, created_at, updated_at,
                symbols, event_link_url
         FROM trading_data.feed_03_alpaca_news
@@ -350,15 +399,26 @@ def fetch_target_news_rows_from_database(
           AND symbols::text ILIKE %s
     """ + family_filter + """
         ORDER BY created_at, id
-        LIMIT %s
     """
     with psycopg.connect(_database_url(database_url), row_factory=dict_row) as connection:
         with connection.cursor() as cursor:
-            filter_params = (price_patterns, price_patterns, direction_patterns, direction_patterns)
-            cursor.execute(count_query, (start, end, pattern, *filter_params))
-            row_count = int(cursor.fetchone()["row_count"])
-            cursor.execute(sample_query, (start, end, pattern, *filter_params, max(sample_limit, 0)))
-            return row_count, _normalize_fact_rows(cursor.fetchall())
+            filter_params = (
+                subject_patterns,
+                subject_patterns,
+                price_patterns,
+                price_patterns,
+                direction_patterns,
+                direction_patterns,
+                analyst_exclusion_patterns,
+                analyst_exclusion_patterns,
+            )
+            cursor.execute(broad_query, (start, end, pattern, *filter_params))
+            filtered_rows = [
+                row
+                for row in _normalize_fact_rows(cursor.fetchall())
+                if _news_row_matches_event_family(row, event_family_id=event_family_id)
+            ]
+            return len(filtered_rows), filtered_rows[: max(sample_limit, 0)]
 
 
 def fetch_market_session_rows_from_database(
@@ -422,7 +482,7 @@ def fetch_scheduled_macro_release_rows_from_database(
     terms = MACRO_RELEASE_EVENT_TYPE_TERMS.get(event_family_id)
     if not terms:
         raise TaskSystemError(f"unsupported concrete scheduled macro event family: {event_family_id}")
-    event_type_patterns = tuple(f"%{term}%" for term in terms)
+    event_type_patterns = [f"%{term}%" for term in terms]
     family_filter = """
           AND (
             event_type ILIKE ANY(%s)

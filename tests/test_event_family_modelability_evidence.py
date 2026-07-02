@@ -84,7 +84,7 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
             target_news_rows=[
                 {
                     "id": "n1",
-                    "timeline_headline": "Apple raises iPhone prices",
+                    "timeline_headline": "Apple raises prices on iPhone",
                     "summary": "AAPL product pricing increase event summary",
                     "created_at": "2024-01-03T14:30:00Z",
                     "updated_at": "2024-01-03T14:35:00Z",
@@ -117,6 +117,40 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
                 end_month="2024-12",
                 target_news_rows=[],
             )
+
+    def test_product_price_news_family_excludes_analyst_price_targets(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="target_product_price_change_news",
+            target_symbol="AAPL",
+            target_cik="0000320193",
+            start_month="2024-01",
+            end_month="2024-12",
+            target_news_rows=[
+                {
+                    "id": "n1",
+                    "timeline_headline": "Morgan Stanley raises Apple price target to $250",
+                    "summary": "",
+                    "created_at": "2024-01-03T14:30:00Z",
+                    "updated_at": "2024-01-03T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n1",
+                },
+                {
+                    "id": "n2",
+                    "timeline_headline": "Apple cuts prices on iPhone in China",
+                    "summary": "AAPL product pricing decrease event summary",
+                    "created_at": "2024-01-04T14:30:00Z",
+                    "updated_at": "2024-01-04T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n2",
+                },
+            ],
+            minimum_same_family_observations=2,
+        )
+
+        self.assertEqual(packet.observation_sample_count, 1)
+        self.assertEqual(packet.observations[0].event_ref, "alpaca-news://n2")
+        self.assertEqual(packet.observations[0].normalized_event_parameters["product_price_change_direction"], "decrease")
 
     def test_builds_market_session_calendar_packet(self):
         packet = build_event_family_modelability_evidence_packet(
