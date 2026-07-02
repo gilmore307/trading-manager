@@ -115,9 +115,12 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    feeds, PIT window, and provider task keys. Source/category buckets such as
    `news`, `target_news_or_disclosure`, `scheduled_macro_release`, and `macro`
    are not valid event families; they must be narrowed to families such as
-   `target_product_price_change_news`, `target_product_launch_news`,
+   `target_product_price_increase_news`,
+   `target_product_price_decrease_news`, `target_product_launch_news`,
    `target_supply_chain_disruption_news`, `target_regulatory_antitrust_news`,
-   `cpi_release`, or `ppi_release`.
+   `cpi_release`, or `ppi_release`. Event families are target-agnostic
+   scenario/mechanism groups; tickers, issuers, sectors, and dates are
+   observation labels or acquisition filters rather than family boundaries.
    Provider calls remain in the reviewed dispatcher. After acquisition, code builds
    `model_06_event_family_modelability_evidence_packet` from acquired
    same-family PIT observations. The packet must pass deterministic admissibility

@@ -55,6 +55,7 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.deterministic_gate_results["same_family_sample_gate"], "passed")
         self.assertEqual(packet.readiness_status, "blocked_missing_structured_evidence")
         self.assertEqual(packet.deterministic_gate_results["structured_evidence_gate"], "blocked_missing_structured_evidence")
+        self.assertIn("target-agnostic", packet.event_family_generalization_policy)
         self.assertEqual(packet.next_action_owner, "program_enrichment")
         self.assertEqual(packet.required_next_action, "prepare_structured_evidence_enrichment")
         self.assertEqual(packet.observations[0].target_symbol, "AAPL")
@@ -77,12 +78,13 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.readiness_status, "blocked_missing_same_family_evidence")
         self.assertEqual(packet.deterministic_gate_results["same_family_sample_gate"], "blocked")
         self.assertEqual(packet.next_action_owner, "program_acquisition")
-        self.assertEqual(packet.required_next_action, "prepare_and_dispatch_same_family_event_acquisition")
+        self.assertEqual(packet.required_next_action, "prepare_bounded_same_family_acquisition_or_wait")
+        self.assertEqual(packet.next_action_plan["insufficient_after_covered_sources_policy"], "wait_for_future_same_family_observations")
         self.assertTrue(packet.next_action_plan["provider_dispatch_allowed"])
 
     def test_builds_concrete_product_price_news_packet_with_truncated_observation_sample(self):
         packet = build_event_family_modelability_evidence_packet(
-            event_family_id="target_product_price_change_news",
+            event_family_id="target_product_price_increase_news",
             target_symbol="AAPL",
             target_cik="0000320193",
             start_month="2024-01",
@@ -103,7 +105,7 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
             observation_sample_limit=1,
         )
 
-        self.assertEqual(packet.event_family_id, "target_product_price_change_news")
+        self.assertEqual(packet.event_family_id, "target_product_price_increase_news")
         self.assertEqual(packet.same_family_observation_count, 12)
         self.assertEqual(packet.observation_sample_count, 1)
         self.assertTrue(packet.observation_rows_truncated)
@@ -129,9 +131,9 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
                 target_news_rows=[],
             )
 
-    def test_product_price_news_family_excludes_analyst_price_targets(self):
+    def test_product_price_decrease_news_family_excludes_analyst_price_targets(self):
         packet = build_event_family_modelability_evidence_packet(
-            event_family_id="target_product_price_change_news",
+            event_family_id="target_product_price_decrease_news",
             target_symbol="AAPL",
             target_cik="0000320193",
             start_month="2024-01",
@@ -160,49 +162,41 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         )
 
         self.assertEqual(packet.observation_sample_count, 1)
+        self.assertEqual(packet.event_family_id, "target_product_price_decrease_news")
         self.assertEqual(packet.observations[0].event_ref, "alpaca-news://n2")
         self.assertEqual(packet.observations[0].normalized_event_parameters["product_price_change_direction"], "decrease")
 
-    def test_blocks_mixed_product_price_change_family(self):
-        packet = build_event_family_modelability_evidence_packet(
-            event_family_id="target_product_price_change_news",
-            target_symbol="AAPL",
-            target_cik="0000320193",
-            start_month="2024-01",
-            end_month="2024-12",
-            target_news_rows=[
-                {
-                    "id": "n1",
-                    "timeline_headline": "Apple raises prices on iPhone",
-                    "summary": "",
-                    "created_at": "2024-01-03T14:30:00Z",
-                    "updated_at": "2024-01-03T14:35:00Z",
-                    "symbols": ["AAPL"],
-                    "event_link_url": "https://example.test/n1",
-                },
-                {
-                    "id": "n2",
-                    "timeline_headline": "Apple cuts prices on iPad",
-                    "summary": "",
-                    "created_at": "2024-01-04T14:30:00Z",
-                    "updated_at": "2024-01-04T14:35:00Z",
-                    "symbols": ["AAPL"],
-                    "event_link_url": "https://example.test/n2",
-                },
-            ],
-            same_family_observation_count=8,
-            minimum_same_family_observations=8,
-        )
-
-        self.assertEqual(packet.readiness_status, "blocked_mixed_family")
-        self.assertEqual(packet.deterministic_gate_results["family_purity_gate"], "blocked_mixed_family")
-        self.assertEqual(packet.next_action_owner, "codex_semantic_review")
-        self.assertEqual(packet.required_next_action, "refine_event_family_taxonomy_then_rebuild_packet")
-        self.assertEqual(packet.next_action_plan["required_skill"], "event-taxonomy-standard-review")
-        self.assertEqual(
-            packet.deterministic_gate_results["family_purity_detail"]["subtype_counts"],
-            {"decrease": 1, "increase": 1},
-        )
+    def test_rejects_product_price_change_direction_bucket(self):
+        with self.assertRaisesRegex(Exception, "source/category bucket"):
+            build_event_family_modelability_evidence_packet(
+                event_family_id="target_product_price_change_news",
+                target_symbol="AAPL",
+                target_cik="0000320193",
+                start_month="2024-01",
+                end_month="2024-12",
+                target_news_rows=[
+                    {
+                        "id": "n1",
+                        "timeline_headline": "Apple raises prices on iPhone",
+                        "summary": "",
+                        "created_at": "2024-01-03T14:30:00Z",
+                        "updated_at": "2024-01-03T14:35:00Z",
+                        "symbols": ["AAPL"],
+                        "event_link_url": "https://example.test/n1",
+                    },
+                    {
+                        "id": "n2",
+                        "timeline_headline": "Apple cuts prices on iPad",
+                        "summary": "",
+                        "created_at": "2024-01-04T14:30:00Z",
+                        "updated_at": "2024-01-04T14:35:00Z",
+                        "symbols": ["AAPL"],
+                        "event_link_url": "https://example.test/n2",
+                    },
+                ],
+                same_family_observation_count=8,
+                minimum_same_family_observations=8,
+            )
 
     def test_builds_target_product_launch_news_packet(self):
         packet = build_event_family_modelability_evidence_packet(
@@ -329,7 +323,7 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.event_family_id, "cpi_release")
         self.assertEqual(packet.readiness_status, "blocked_missing_same_family_evidence")
         self.assertEqual(packet.deterministic_gate_results["same_family_sample_gate"], "blocked")
-        self.assertEqual(packet.required_next_action, "prepare_and_dispatch_same_family_event_acquisition")
+        self.assertEqual(packet.required_next_action, "prepare_bounded_same_family_acquisition_or_wait")
 
     def test_builds_concrete_cpi_release_packet(self):
         packet = build_event_family_modelability_evidence_packet(

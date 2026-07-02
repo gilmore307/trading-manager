@@ -28,7 +28,11 @@ EVENT_FAMILY_FEED_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         "03_feed_alpaca_news",
         "05_feed_gdelt_news",
     ),
-    "target_product_price_change_news": (
+    "target_product_price_increase_news": (
+        "03_feed_alpaca_news",
+        "05_feed_gdelt_news",
+    ),
+    "target_product_price_decrease_news": (
         "03_feed_alpaca_news",
         "05_feed_gdelt_news",
     ),
@@ -53,13 +57,44 @@ EVENT_FAMILY_FEED_REQUIREMENTS: dict[str, tuple[str, ...]] = {
 }
 
 COARSE_EVENT_SOURCE_CATEGORIES = {
-    "news": "news is a source class; use a concrete news event family such as target_product_price_change_news",
+    "news": "news is a source class; use a concrete news event family such as target_product_price_increase_news",
     "target_news_or_disclosure": "target_news_or_disclosure is a source/category bucket; use a concrete news event family",
     "disclosure": "disclosure is a source/category bucket; use a concrete disclosure event family",
     "scheduled_macro_release": "scheduled_macro_release is a schedule/source category; use a concrete release family such as cpi_release or ppi_release",
     "macro": "macro is a domain bucket; use a concrete macro event family such as cpi_release or ppi_release",
     "macro_release": "macro_release is a release category; use a concrete macro event family such as cpi_release or ppi_release",
     "economic_release": "economic_release is a release category; use a concrete macro event family such as cpi_release or ppi_release",
+    "product_price_change": "product_price_change mixes directions; use target_product_price_increase_news or target_product_price_decrease_news",
+    "product_pricing_change": "product_pricing_change mixes directions; use target_product_price_increase_news or target_product_price_decrease_news",
+    "product_price_change_news": "product_price_change_news mixes directions; use target_product_price_increase_news or target_product_price_decrease_news",
+    "target_product_price_change_news": "target_product_price_change_news mixes directions; use target_product_price_increase_news or target_product_price_decrease_news",
+}
+
+TARGET_SPECIFIC_EVENT_FAMILY_ALIASES = {
+    "apple_product_price_change",
+    "aapl_product_price_change",
+    "nvda_product_price_change",
+    "amd_product_price_change",
+    "apple_product_price_increase",
+    "aapl_product_price_increase",
+    "nvda_product_price_increase",
+    "amd_product_price_increase",
+    "apple_product_price_decrease",
+    "aapl_product_price_decrease",
+    "nvda_product_price_decrease",
+    "amd_product_price_decrease",
+    "apple_product_launch",
+    "aapl_product_launch",
+    "nvda_product_launch",
+    "amd_product_launch",
+    "apple_supply_chain_disruption",
+    "aapl_supply_chain_disruption",
+    "nvda_supply_chain_disruption",
+    "amd_supply_chain_disruption",
+    "apple_regulatory_antitrust",
+    "aapl_regulatory_antitrust",
+    "nvda_regulatory_antitrust",
+    "amd_regulatory_antitrust",
 }
 
 EVENT_FAMILY_ALIASES = {
@@ -67,19 +102,18 @@ EVENT_FAMILY_ALIASES = {
     "earnings_release": "company_earnings_or_financial_results",
     "financial_results": "company_earnings_or_financial_results",
     "company_financials": "company_earnings_or_financial_results",
-    "product_price_change": "target_product_price_change_news",
-    "product_pricing_change": "target_product_price_change_news",
-    "product_price_change_news": "target_product_price_change_news",
-    "apple_product_price_change": "target_product_price_change_news",
+    "product_price_increase": "target_product_price_increase_news",
+    "product_price_increase_news": "target_product_price_increase_news",
+    "price_increase_news": "target_product_price_increase_news",
+    "product_price_decrease": "target_product_price_decrease_news",
+    "product_price_decrease_news": "target_product_price_decrease_news",
+    "price_decrease_news": "target_product_price_decrease_news",
     "product_launch": "target_product_launch_news",
     "product_launch_news": "target_product_launch_news",
-    "apple_product_launch": "target_product_launch_news",
     "supply_chain_disruption": "target_supply_chain_disruption_news",
     "supply_chain_disruption_news": "target_supply_chain_disruption_news",
-    "apple_supply_chain_disruption": "target_supply_chain_disruption_news",
     "regulatory_antitrust": "target_regulatory_antitrust_news",
     "regulatory_antitrust_news": "target_regulatory_antitrust_news",
-    "apple_regulatory_antitrust": "target_regulatory_antitrust_news",
     "cpi": "cpi_release",
     "consumer_price_index": "cpi_release",
     "consumer_price_index_release": "cpi_release",
@@ -109,6 +143,7 @@ class EventFamilyModelabilityAcquisitionPlan:
     candidate_seed_event_ref: str | None
     minimum_same_family_observations: int
     same_family_evidence_policy: str
+    event_family_generalization_policy: str
     single_observation_policy: str
     required_feed_ids: tuple[str, ...]
     task_key_count: int
@@ -135,6 +170,10 @@ def canonical_event_family_id(event_family_id: str) -> str:
         raise TaskSystemError(
             "event_family_id must name a concrete same-family event, not a source/category bucket: "
             + COARSE_EVENT_SOURCE_CATEGORIES[normalized]
+        )
+    if normalized in TARGET_SPECIFIC_EVENT_FAMILY_ALIASES:
+        raise TaskSystemError(
+            "event_family_id must be target-agnostic; put ticker/company identity in affected_entities, target_symbol, or acquisition filters"
         )
     return EVENT_FAMILY_ALIASES.get(normalized, normalized)
 
@@ -188,6 +227,7 @@ def plan_event_family_modelability_acquisition(
         candidate_seed_event_ref=candidate_seed_event_ref,
         minimum_same_family_observations=minimum_same_family_observations,
         same_family_evidence_policy="M06 modelability review must use multiple PIT-valid same-family observations with coverage, controls, and leakage evidence.",
+        event_family_generalization_policy="Event families are defined by scenario/mechanism, not by ticker or company identity; AAPL/NVDA/AMD are observation entities or acquisition filters.",
         single_observation_policy="A single event is only a candidate seed; it cannot establish event-family probability-function type.",
         required_feed_ids=required_feed_ids,
         task_key_count=feed_summary.task_key_count,

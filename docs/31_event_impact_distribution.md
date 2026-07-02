@@ -62,10 +62,20 @@ the event matters, not how much or in which direction.
 An event family is a concrete repeated phenomenon with comparable mechanics,
 not a data source, feed, or broad bucket.
 
+Event-family IDs must be target-agnostic. Tickers, company names, sectors,
+venues, and dates are observation labels, affected entities, context fields, or
+acquisition filters; they are not part of the family boundary. AAPL earnings,
+NVDA earnings, and AMD earnings therefore belong to the same earnings family
+when their scenario mechanics match. Likewise, Apple product price increases
+and AMD product price increases should share `target_product_price_increase_news`
+instead of creating ticker-specific families.
+
 Valid family examples:
 
-- `target_product_price_change_news`: product price increase/decrease news for
-  a target such as Apple.
+- `target_product_price_increase_news`: target product price-increase news,
+  with target identity stored on each observation.
+- `target_product_price_decrease_news`: target product price-decrease news,
+  with target identity stored on each observation.
 - `cpi_release`: CPI release events.
 - `ppi_release`: PPI release events.
 - `company_earnings_or_financial_results`: company financial results and
@@ -75,12 +85,13 @@ Invalid family examples:
 
 - `news`: source class only.
 - `target_news_or_disclosure`: source/category bucket only.
+- `target_product_price_change_news`: direction bucket only.
 - `scheduled_macro_release`: release calendar category only.
 - `macro`: domain bucket only.
 
 M06 evidence packets must reject source/category buckets before Codex review.
 Source rows may still feed a concrete family packet, for example Alpaca/GDELT
-news rows feeding `target_product_price_change_news`, or scheduled macro
+news rows feeding `target_product_price_increase_news`, or scheduled macro
 calendar rows feeding `cpi_release`.
 
 Evidence-packet readiness is a deterministic program decision, not a Codex
@@ -104,7 +115,7 @@ Every evidence packet must also publish a deterministic next-action route:
 
 | Readiness | Required next action |
 |---|---|
-| `blocked_missing_same_family_evidence` | Prepare and dispatch same-family event acquisition, then rebuild the packet. |
+| `blocked_missing_same_family_evidence` | Prepare bounded same-family event acquisition when source coverage is missing; if covered sources still do not provide enough observations, park the family and wait for future same-family events. |
 | `blocked_mixed_family` | Run event taxonomy / interpretation refinement, split concrete subfamilies, then rebuild separate packets. |
 | `blocked_missing_structured_evidence` | Enrich structured PIT fields such as release clocks, expectation/consensus, actual/surprise, subtype, and fixed horizon labels. |
 | `blocked_missing_modelability_gates` | Build deterministic modelability gates: matched controls, overlap/confounder assessment, leakage assessment, fixed horizon labels, and fold calibration. |
@@ -198,7 +209,8 @@ The first implemented trial route supports several program-built M06 evidence
 packets:
 
 - AAPL `company_earnings_or_financial_results` from SEC company financials.
-- AAPL `target_product_price_change_news` from symbol-scoped Alpaca news rows.
+- `target_product_price_increase_news` and `target_product_price_decrease_news`
+  from symbol-scoped Alpaca news rows.
 - AAPL `target_product_launch_news` from symbol-scoped Alpaca news rows.
 - AAPL `target_supply_chain_disruption_news` from symbol-scoped Alpaca news
   rows.

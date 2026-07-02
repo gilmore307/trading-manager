@@ -31,6 +31,8 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
             self.assertEqual(plan.provider_calls, 0)
             self.assertFalse(plan.modelability_review_performed)
             self.assertIn("single event is only a candidate seed", plan.single_observation_policy)
+            self.assertIn("scenario/mechanism", plan.event_family_generalization_policy)
+            self.assertIn("AAPL/NVDA/AMD", plan.event_family_generalization_policy)
             self.assertIn("Program gates own acquisition scope", plan.deterministic_control_policy)
             self.assertIn("semantic reviewers only", plan.agent_role_policy)
             self.assertEqual(
@@ -58,7 +60,8 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
     def test_family_aliases_resolve_to_canonical_routes(self):
         self.assertEqual(canonical_event_family_id("earnings-release"), "company_earnings_or_financial_results")
         self.assertEqual(canonical_event_family_id("cpi"), "cpi_release")
-        self.assertEqual(canonical_event_family_id("product-pricing-change"), "target_product_price_change_news")
+        self.assertEqual(canonical_event_family_id("product-price-increase"), "target_product_price_increase_news")
+        self.assertEqual(canonical_event_family_id("product-price-decrease"), "target_product_price_decrease_news")
         self.assertEqual(canonical_event_family_id("product-launch"), "target_product_launch_news")
         self.assertEqual(canonical_event_family_id("supply-chain-disruption"), "target_supply_chain_disruption_news")
         self.assertEqual(canonical_event_family_id("regulatory-antitrust"), "target_regulatory_antitrust_news")
@@ -72,9 +75,15 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
         )
 
     def test_rejects_source_buckets_as_event_families(self):
-        for invalid_family in ("news", "target_news_or_disclosure", "scheduled_macro_release", "macro"):
+        for invalid_family in ("news", "target_news_or_disclosure", "scheduled_macro_release", "macro", "product_price_change"):
             with self.subTest(invalid_family=invalid_family):
                 with self.assertRaisesRegex(Exception, "not a source/category bucket"):
+                    canonical_event_family_id(invalid_family)
+
+    def test_rejects_target_specific_event_family_aliases(self):
+        for invalid_family in ("apple_product_price_change", "aapl_product_launch", "nvda_regulatory_antitrust"):
+            with self.subTest(invalid_family=invalid_family):
+                with self.assertRaisesRegex(Exception, "target-agnostic"):
                     canonical_event_family_id(invalid_family)
 
 

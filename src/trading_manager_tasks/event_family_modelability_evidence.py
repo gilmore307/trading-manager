@@ -238,10 +238,15 @@ MACRO_RELEASE_EVENT_TYPE_TERMS = {
 }
 
 NEWS_EVENT_FAMILY_SQL_TERMS = {
-    "target_product_price_change_news": (
+    "target_product_price_increase_news": (
         PRODUCT_PRICE_CHANGE_TERMS,
         PRODUCT_PRICE_SUBJECT_TERMS,
-        (*PRODUCT_PRICE_INCREASE_PHRASES, *PRODUCT_PRICE_DECREASE_PHRASES),
+        PRODUCT_PRICE_INCREASE_PHRASES,
+    ),
+    "target_product_price_decrease_news": (
+        PRODUCT_PRICE_CHANGE_TERMS,
+        PRODUCT_PRICE_SUBJECT_TERMS,
+        PRODUCT_PRICE_DECREASE_PHRASES,
     ),
     "target_product_launch_news": (
         PRODUCT_LAUNCH_SUBJECT_TERMS,
@@ -302,6 +307,7 @@ class EventFamilyModelabilityEvidencePacket:
     observation_rows_truncated: bool
     deterministic_control_policy: str
     agent_role_policy: str
+    event_family_generalization_policy: str
     projection_mode_decision_performed: bool
     probability_function_class_decision_performed: bool
     provider_calls: int
@@ -474,8 +480,10 @@ def _target_regulatory_antitrust_match(text: str) -> bool:
 
 
 def _news_event_family_subtype(text: str, *, event_family_id: str) -> str:
-    if event_family_id == "target_product_price_change_news":
-        return _product_price_change_direction(text)
+    if event_family_id in {"target_product_price_increase_news", "target_product_price_decrease_news"}:
+        direction = _product_price_change_direction(text)
+        expected = "increase" if event_family_id == "target_product_price_increase_news" else "decrease"
+        return direction if direction == expected else ""
     if event_family_id == "target_product_launch_news":
         return "product_launch_or_announcement" if _target_product_launch_match(text) else ""
     if event_family_id == "target_supply_chain_disruption_news":
@@ -511,14 +519,6 @@ def _family_purity_gate(
         return "blocked_no_observations", (), {"subtype_counts": {}}
     subtype_counts = _subtype_counts(observations)
     detail = {"subtype_counts": subtype_counts}
-    if event_family_id == "target_product_price_change_news" and len(subtype_counts) > 1:
-        return (
-            "blocked_mixed_family",
-            (
-                "target_product_price_change_news mixes increase/decrease/unclear rows; split into direction-specific event families before modelability review",
-            ),
-            detail,
-        )
     if "mixed_or_unclear" in subtype_counts:
         return (
             "blocked_mixed_family",
@@ -565,16 +565,17 @@ def _structured_evidence_gate(
                 ("scheduled macro release modelability requires actual/consensus/surprise fields with timestamped release clocks",),
                 detail,
             )
-    if event_family_id == "target_product_price_change_news":
+    if event_family_id in {"target_product_price_increase_news", "target_product_price_decrease_news"}:
+        expected = "increase" if event_family_id == "target_product_price_increase_news" else "decrease"
         direction_values = {
             str(observation.normalized_event_parameters.get("product_price_change_direction") or "").strip()
             for observation in observations
         }
         detail["direction_values"] = sorted(value for value in direction_values if value)
-        if len(detail["direction_values"]) != 1 or detail["direction_values"][0] not in {"increase", "decrease"}:
+        if detail["direction_values"] != [expected]:
             return (
                 "blocked_missing_structured_evidence",
-                ("product price change modelability requires a single clean direction-specific subtype",),
+                (f"product price {expected} modelability requires a clean direction-specific subtype",),
                 detail,
             )
     if event_family_id in CONTEXT_ONLY_EVENT_FAMILIES:
@@ -638,14 +639,15 @@ def _next_action_plan_for_readiness(
     if readiness_status == "blocked_missing_same_family_evidence":
         return (
             "program_acquisition",
-            "prepare_and_dispatch_same_family_event_acquisition",
+            "prepare_bounded_same_family_acquisition_or_wait",
             {
                 **base,
                 "provider_dispatch_allowed": True,
-                "action_type": "same_family_acquisition",
+                "action_type": "same_family_acquisition_or_wait",
                 "entrypoint": "scripts/tasks/prepare_event_family_modelability_acquisition.py",
                 "dispatcher": "scripts/tasks/dispatch_event_feed_backfill.py",
-                "completion_gate": "rebuild evidence packet after acquired reviewed same-family observations meet the minimum count",
+                "insufficient_after_covered_sources_policy": "wait_for_future_same_family_observations",
+                "completion_gate": "rebuild evidence packet after acquired reviewed same-family observations meet the minimum count; if bounded source coverage is exhausted and count is still low, park the family until more events exist",
             },
         )
     if readiness_status == "blocked_mixed_family":
@@ -1055,7 +1057,7 @@ def build_target_news_observations(
             "source_url": str(row.get("event_link_url") or "").strip(),
             "raw_source_table": "trading_data.feed_03_alpaca_news",
         }
-        if event_family_id == "target_product_price_change_news":
+        if event_family_id in {"target_product_price_increase_news", "target_product_price_decrease_news"}:
             normalized_event_parameters["product_price_change_direction"] = event_subtype
         observations.append(
             EventFamilyObservation(
@@ -1299,6 +1301,7 @@ def build_event_family_modelability_evidence_packet(
         observation_rows_truncated=total_observations > len(observations),
         deterministic_control_policy="Program-built evidence packet; Codex review consumes this packet and performs no provider calls or scope expansion.",
         agent_role_policy="Codex may review taxonomy/modelability/probability-function class only; it must not train parameters or output signed impact.",
+        event_family_generalization_policy="Event families are target-agnostic scenario/mechanism groups; target_symbol and affected_entities identify observations, not the family boundary.",
         projection_mode_decision_performed=False,
         probability_function_class_decision_performed=False,
         provider_calls=0,
