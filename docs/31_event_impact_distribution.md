@@ -100,6 +100,21 @@ Blocked packets must not be interpreted as `context_only_projection`.
 that the event is useful as risk context but cannot support a quantitative
 impact function or conditional-effect mapping.
 
+Every evidence packet must also publish a deterministic next-action route:
+
+| Readiness | Required next action |
+|---|---|
+| `blocked_missing_same_family_evidence` | Prepare and dispatch same-family event acquisition, then rebuild the packet. |
+| `blocked_mixed_family` | Run event taxonomy / interpretation refinement, split concrete subfamilies, then rebuild separate packets. |
+| `blocked_missing_structured_evidence` | Enrich structured PIT fields such as release clocks, expectation/consensus, actual/surprise, subtype, and fixed horizon labels. |
+| `blocked_missing_modelability_gates` | Build deterministic modelability gates: matched controls, overlap/confounder assessment, leakage assessment, fixed horizon labels, and fold calibration. |
+| `admissible_for_context_only_review` | Run `event-context-projection-review`; do not run probability-function modelability review. |
+| `admissible_for_modelability_review` | Run `event-family-modelability-review` to judge projection mode and probability-function class. |
+
+The routing field is owned by the program. Codex may execute the named semantic
+review skill when routed there, but it must not override provider acquisition,
+gate generation, training, or model activation.
+
 ## Probability Function Classes
 
 M06 chooses the allowed probability-function class. M03 trains concrete
@@ -199,10 +214,11 @@ The route is:
 2. Dispatch bounded provider tasks through the reviewed event-feed dispatcher.
 3. Build `model_06_event_family_modelability_evidence_packet` from acquired
    same-family PIT evidence.
-4. Run `event-family-modelability-review` only for packets with
+4. Follow the packet's deterministic `required_next_action`.
+5. Run `event-family-modelability-review` only for packets with
    `admissible_for_modelability_review`; blocked packets must first be repaired
-   by data acquisition, family refinement, or deterministic gate generation.
-5. If M06 accepts a projection mode and probability-function class, train M03
+   by the program-owned route named by the packet.
+6. If M06 accepts a projection mode and probability-function class, train M03
    parameter mappings through a separate PIT-safe training path.
 
 The evidence packet is not a modelability decision. It is only the deterministic

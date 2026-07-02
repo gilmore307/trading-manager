@@ -311,6 +311,9 @@ class EventFamilyModelabilityEvidencePacket:
     readiness_status: str
     readiness_reasons: tuple[str, ...]
     deterministic_gate_results: dict[str, Any]
+    next_action_owner: str
+    required_next_action: str
+    next_action_plan: dict[str, Any]
     observations: tuple[EventFamilyObservation, ...]
 
     def summary_row(self) -> dict[str, Any]:
@@ -611,6 +614,124 @@ def _readiness_from_deterministic_gates(
             tuple(f"{gate} is required before Codex modelability review" for gate in missing_gates),
         )
     return "admissible_for_modelability_review", ()
+
+
+def _next_action_plan_for_readiness(
+    *,
+    readiness_status: str,
+    event_family_id: str,
+    target_symbol: str,
+    start_month: str,
+    end_month: str,
+    control_gate_results: Mapping[str, str],
+) -> tuple[str, str, dict[str, Any]]:
+    base: dict[str, Any] = {
+        "event_family_id": event_family_id,
+        "target_symbol": target_symbol.upper(),
+        "start_month": start_month,
+        "end_month": end_month,
+        "modelability_review_allowed": False,
+        "provider_dispatch_allowed": False,
+        "model_training_allowed": False,
+        "broker_execution_allowed": False,
+    }
+    if readiness_status == "blocked_missing_same_family_evidence":
+        return (
+            "program_acquisition",
+            "prepare_and_dispatch_same_family_event_acquisition",
+            {
+                **base,
+                "provider_dispatch_allowed": True,
+                "action_type": "same_family_acquisition",
+                "entrypoint": "scripts/tasks/prepare_event_family_modelability_acquisition.py",
+                "dispatcher": "scripts/tasks/dispatch_event_feed_backfill.py",
+                "completion_gate": "rebuild evidence packet after acquired reviewed same-family observations meet the minimum count",
+            },
+        )
+    if readiness_status == "blocked_mixed_family":
+        return (
+            "codex_semantic_review",
+            "refine_event_family_taxonomy_then_rebuild_packet",
+            {
+                **base,
+                "action_type": "semantic_family_refinement",
+                "required_skill": "event-taxonomy-standard-review",
+                "secondary_skill": "event-interpretation",
+                "completion_gate": "split mixed rows into concrete subtype event families, then rebuild separate evidence packets",
+            },
+        )
+    if readiness_status == "blocked_missing_structured_evidence":
+        return (
+            "program_enrichment",
+            "prepare_structured_evidence_enrichment",
+            {
+                **base,
+                "provider_dispatch_allowed": True,
+                "action_type": "structured_evidence_enrichment",
+                "required_outputs": (
+                    "timestamped PIT clocks",
+                    "expectation or consensus baselines when applicable",
+                    "actual/surprise fields when applicable",
+                    "clean subtype fields",
+                    "fixed horizon labels",
+                ),
+                "completion_gate": "rebuild evidence packet after required structured fields are present",
+            },
+        )
+    if readiness_status == "blocked_missing_modelability_gates":
+        missing_gates = tuple(
+            gate for gate in MODELABILITY_REQUIRED_CONTROL_GATES if control_gate_results.get(gate) != "passed"
+        )
+        return (
+            "program_modelability_gate_builder",
+            "build_modelability_control_gate_evidence",
+            {
+                **base,
+                "action_type": "modelability_gate_generation",
+                "missing_gates": missing_gates,
+                "required_outputs": (
+                    "matched controls",
+                    "overlap/confounder assessment",
+                    "PIT leakage assessment",
+                    "fixed horizon labels",
+                    "walk-forward fold calibration or ablation evidence",
+                ),
+                "completion_gate": "rebuild evidence packet with all modelability control gates passed",
+            },
+        )
+    if readiness_status == "admissible_for_context_only_review":
+        return (
+            "codex_semantic_review",
+            "run_context_projection_review",
+            {
+                **base,
+                "action_type": "context_only_review",
+                "required_skill": "event-context-projection-review",
+                "context_projection_review_allowed": True,
+                "completion_gate": "persist context-only review artifact or reject the packet",
+            },
+        )
+    if readiness_status == "admissible_for_modelability_review":
+        return (
+            "codex_semantic_review",
+            "run_event_family_modelability_review",
+            {
+                **base,
+                "modelability_review_allowed": True,
+                "action_type": "modelability_review",
+                "required_skill": "event-family-modelability-review",
+                "completion_gate": "persist projection mode and probability-function-class review artifact",
+            },
+        )
+    return (
+        "program_triage",
+        "inspect_unrecognized_readiness_status",
+        {
+            **base,
+            "action_type": "manual_contract_repair",
+            "completion_gate": "add deterministic routing for this readiness status",
+        },
+    )
 
 
 def _news_row_matches_event_family(row: Mapping[str, Any], *, event_family_id: str) -> bool:
@@ -1155,6 +1276,14 @@ def build_event_family_modelability_evidence_packet(
         control_gate_results=modelability_control_gates,
     )
     reasons.extend(readiness_gate_reasons)
+    next_action_owner, required_next_action, next_action_plan = _next_action_plan_for_readiness(
+        readiness_status=readiness_status,
+        event_family_id=canonical_family,
+        target_symbol=target_symbol,
+        start_month=start_month,
+        end_month=end_month,
+        control_gate_results=modelability_control_gates,
+    )
     return EventFamilyModelabilityEvidencePacket(
         contract_type=MODELABILITY_EVIDENCE_PACKET_CONTRACT_TYPE,
         source_contract_type=MODELABILITY_ACQUISITION_CONTRACT_TYPE,
@@ -1188,6 +1317,9 @@ def build_event_family_modelability_evidence_packet(
             "structured_evidence_detail": structured_evidence_detail,
             **modelability_control_gates,
         },
+        next_action_owner=next_action_owner,
+        required_next_action=required_next_action,
+        next_action_plan=next_action_plan,
         observations=observations,
     )
 
