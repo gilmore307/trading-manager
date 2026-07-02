@@ -68,10 +68,12 @@ selected path.
 
 Layer review denominators must not be back-filtered by downstream choices.
 M01 review rows are targetless replay-time background-context state rows and
-must not inherit target symbols from later candidate expansion. M02-M03 review
-rows are sourced from the full point-in-time model-candidate/event trace. M04-M05
-rows are sourced only from decisions that reached the underlying-action or
-option-expression layer. Future labels may score a layer only after they are
+must not inherit target symbols from later candidate expansion. M02 review rows
+are sourced from the full point-in-time target-candidate trace. M03 review rows
+are sourced from the point-in-time event observation pool, one event per row,
+and must not inherit target symbols from M02 or selected trades from M04-M05.
+M04-M05 rows are sourced only from decisions that reached the underlying-action
+or option-expression layer. Future labels may score a layer only after they are
 joined to that layer's own point-in-time row set; selected trade outcomes must
 not be copied backward to mark M01-M03 rows correct or incorrect.
 

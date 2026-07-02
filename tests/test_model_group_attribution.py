@@ -31,7 +31,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             "rationale": "Fixture review approves the deterministic temporal attention candidate.",
         }
 
-    def _write_replay_dataset(self, storage_root: Path) -> Path:
+    def _write_replay_dataset(self, storage_root: Path, *, include_event_pool: bool = False) -> Path:
         dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
         replay_run_root = dataset_root / "replay_execution_runs" / "model_group_replay_fixture"
         replay_run_root.mkdir(parents=True)
@@ -40,6 +40,54 @@ class ModelGroupAttributionTests(unittest.TestCase):
             writer.writeheader()
             writer.writerow({"month": "2021-01", "source_id": "okx_crypto_market_data", "coverage_status": "available"})
             writer.writerow({"month": "2021-02", "source_id": "okx_crypto_market_data", "coverage_status": "available"})
+        if include_event_pool:
+            event_pool_path = storage_root / "runtime" / "model_03_event_observation_inputs" / "2021-01_2021-02.json"
+            event_pool_path.parent.mkdir(parents=True, exist_ok=True)
+            event_pool_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_03_event_observation_materialization",
+                        "reviewed_event_interpretations": [
+                            {
+                                "contract_type": "event_interpretation",
+                                "schema_version": "1",
+                                "source_artifact_ref": "fixture://macro_cpi",
+                                "source_artifact_hash": "fixture_macro_cpi",
+                                "available_time": "2021-01-05T08:30:00-05:00",
+                                "normalized_event_type": "macro_inflation_release",
+                                "affected_scope": "macro",
+                                "affected_entities": ["AAPL", "MSFT"],
+                                "title": "Fixture CPI release",
+                                "uncertainty_score": 0.6,
+                                "intensity_score": 0.7,
+                                "novelty_score": 0.4,
+                                "evidence_confidence_score": 0.8,
+                                "review_status": "accepted",
+                                "standardization_status": "standardized",
+                            },
+                            {
+                                "contract_type": "event_interpretation",
+                                "schema_version": "1",
+                                "source_artifact_ref": "fixture://earnings_aapl",
+                                "source_artifact_hash": "fixture_earnings_aapl",
+                                "available_time": "2021-02-01T16:05:00-05:00",
+                                "normalized_event_type": "earnings_release",
+                                "affected_scope": "target",
+                                "affected_entities": ["AAPL"],
+                                "title": "Fixture AAPL earnings",
+                                "uncertainty_score": 0.5,
+                                "intensity_score": 0.9,
+                                "novelty_score": 0.6,
+                                "evidence_confidence_score": 0.9,
+                                "review_status": "accepted",
+                                "standardization_status": "standardized",
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
         (dataset_root / "replay_progress.jsonl").write_text(
             "\n".join(
                 [
@@ -266,7 +314,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
-            dataset_root = self._write_replay_dataset(storage_root)
+            dataset_root = self._write_replay_dataset(storage_root, include_event_pool=True)
 
             decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
 
@@ -288,7 +336,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 for line in Path(receipt["layer_review_rows_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            self.assertEqual(len(layer_review_rows), 21)
+            self.assertEqual(len(layer_review_rows), 19)
             self.assertEqual(
                 {row["layer_id"] for row in layer_review_rows},
                 {
@@ -299,7 +347,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                     "model_05_option_expression",
                 },
             )
-            self.assertEqual(receipt["layer_review_diagnostic_summary"]["row_count"], 21)
+            self.assertEqual(receipt["layer_review_diagnostic_summary"]["row_count"], 19)
             self.assertNotIn("model_06_residual_event_governance", {row["layer_id"] for row in layer_review_rows})
             first_layer_row = layer_review_rows[0]
             self.assertEqual(first_layer_row["layer_id"], "model_01_background_context")
@@ -323,6 +371,13 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 sum(1 for row in layer_review_rows if row["layer_id"] == "model_02_target_state"),
                 4,
             )
+            self.assertEqual(
+                sum(1 for row in layer_review_rows if row["layer_id"] == "model_03_event_state"),
+                2,
+            )
+            m03_rows = [row for row in layer_review_rows if row["layer_id"] == "model_03_event_state"]
+            self.assertEqual({row["source_row_kind"] for row in m03_rows}, {"model_03_event_pool_event"})
+            self.assertTrue(all(row["candidate_set_scope"] == "point_in_time_event_pool_event" for row in m03_rows))
             self.assertEqual(
                 sum(1 for row in layer_review_rows if row["layer_id"] == "model_04_unified_decision"),
                 5,
@@ -365,7 +420,11 @@ class ModelGroupAttributionTests(unittest.TestCase):
             )
             self.assertEqual(
                 performance_summary["layer_differentiation"]["model_03_event_state"]["coverage_basis"],
-                "unique_replay_time_pointer_from_model_candidate_selection_trace",
+                "model_03_event_observation_pool_event_rows",
+            )
+            self.assertEqual(
+                performance_summary["layer_differentiation"]["model_03_event_state"]["event_pool_row_count"],
+                2,
             )
             target_performance = performance_summary["summary"]["target_performance"]
             self.assertEqual(target_performance["turnover_gross_pnl_total"], 150.0)
