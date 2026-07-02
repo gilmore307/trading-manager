@@ -3023,6 +3023,20 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_review_task["detail"]["progress"]["ready_count"], 0)
         self.assertEqual(replay_review_task["detail"]["progress"]["pending_count"], 2)
         self.assertEqual(replay_review_task["detail"]["progress"]["progress_source"], "post_replay_review_rows")
+        m06_task = next(
+            task
+            for task in payload["chart_payload"]["task_timeline"]
+            if task["task_id"] == "model_group.model_06_event_risk_governor"
+        )
+        self.assertEqual(
+            m06_task["detail"]["m06_post_replay_workflow"]["contract_type"],
+            "manager_model_06_post_replay_workflow_plan",
+        )
+        self.assertIsNone(m06_task["detail"]["m06_post_replay_workflow"]["next_stage_id"])
+        self.assertEqual(
+            m06_task["detail"]["m06_post_replay_workflow"]["stage_statuses"][0]["blockers"],
+            ["model_group_replay_review_complete"],
+        )
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay_review")
         self.assertEqual(payload["chart_payload"]["blocker_category"], None)
         self.assertEqual(payload["status"], "running")
@@ -3136,6 +3150,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             ],
         )
         self.assertEqual(lifecycle_tasks[0]["status"], "blocked")
+        m06_task = next(task for task in lifecycle_tasks if task["task_id"] == "model_group.model_06_event_risk_governor")
+        self.assertIsNone(m06_task["detail"]["m06_post_replay_workflow"]["next_stage_id"])
         self.assertIn("model_group.replay", {task["task_id"] for task in lifecycle_tasks})
         self.assertNotEqual(payload["chart_payload"]["active_stage"], "model_group.model_06_event_risk_governor")
 

@@ -224,6 +224,94 @@ class SchedulerStatusTests(unittest.TestCase):
         self.assertEqual(row["latest_workflow_transition"]["transition_id"], "hwf-current")
         self.assertEqual(row["provider_status"]["reason_code"], None)
 
+    def test_status_projects_m06_event_input_work_to_post_replay_data_acquisition(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            service, env, wrapper = self._write_service_files(tmp)
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"contract_type": "manager_scheduler_daemon_state", "start_month": "2016-01", "end_month": "2017-06"})
+                + "\n",
+                encoding="utf-8",
+            )
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "backoff",
+                        "reason_code": "model_group_m06_event_feed_provider_required",
+                        "selected_work": "model_group.m06_event_inputs",
+                        "next_internal_stage": "model_group.m06_event_inputs",
+                        "start_month": "2016-01",
+                        "end_month": "2017-06",
+                        "target_symbol": "AAPL",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = collect_historical_scheduler_status(
+                storage_root=storage_root,
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+        row = status.summary_row()
+        self.assertEqual(row["current_stage"], "model_06_residual_event_governance.data_acquisition")
+        self.assertEqual(row["lock_plan"]["selected_work"], "model_06_residual_event_governance.data_acquisition")
+
+    def test_status_projects_m06_attribution_work_to_post_replay_model_generation(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            service, env, wrapper = self._write_service_files(tmp)
+            state_path = tmp / "runtime" / "historical_scheduler_state.json"
+            decision_log = tmp / "runtime" / "historical_scheduler_decisions.jsonl"
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(
+                json.dumps({"contract_type": "manager_scheduler_daemon_state", "start_month": "2016-01", "end_month": "2017-06"})
+                + "\n",
+                encoding="utf-8",
+            )
+            decision_log.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_scheduler_decision",
+                        "decision_status": "ready",
+                        "reason_code": "model_group_residual_event_governance_ready",
+                        "selected_work": "model_group.residual_event_governance",
+                        "next_internal_stage": "residual_event_governance",
+                        "start_month": "2016-01",
+                        "end_month": "2017-06",
+                        "target_symbol": "AAPL",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            status = collect_historical_scheduler_status(
+                storage_root=storage_root,
+                state_path=state_path,
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=decision_log,
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+
+        row = status.summary_row()
+        self.assertEqual(row["current_stage"], "model_06_residual_event_governance.model_generation")
+        self.assertEqual(row["lock_plan"]["selected_work"], "model_06_residual_event_governance.model_generation")
+
     def test_status_treats_foundation_complete_with_target_queue_as_model_worker_wait(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)

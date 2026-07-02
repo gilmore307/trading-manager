@@ -24,6 +24,7 @@ from .scheduler_daemon import (
     select_next_historical_work,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
+from .model_training_workflow import build_model_06_post_replay_workflow_plan
 from .scheduler_locks import inspect_scheduler_lock, scheduler_lock_plan
 from .workflow_transition_ledger import DEFAULT_LATEST_TRANSITION_PATH, read_latest_transition
 
@@ -319,6 +320,62 @@ def _provider_status(latest_decision: Mapping[str, Any] | None, daemon_state: Ma
     }
 
 
+def _m06_scope_from_decision(decision: Mapping[str, Any] | None) -> dict[str, str | None]:
+    if not isinstance(decision, Mapping):
+        return {"start_month": None, "end_month": None, "target_symbol": None}
+    execution_summary = decision.get("execution_summary")
+    execution_summary = execution_summary if isinstance(execution_summary, Mapping) else {}
+    fold_scope = execution_summary.get("fold_scope")
+    fold_scope = fold_scope if isinstance(fold_scope, Mapping) else {}
+    return {
+        "start_month": (
+            str(decision.get("start_month") or fold_scope.get("start_month") or execution_summary.get("start_month") or "") or None
+        ),
+        "end_month": (
+            str(decision.get("end_month") or fold_scope.get("end_month") or execution_summary.get("end_month") or "") or None
+        ),
+        "target_symbol": (
+            str(
+                decision.get("target_symbol")
+                or decision.get("selected_target_symbol")
+                or execution_summary.get("target_symbol")
+                or ""
+            )
+            or None
+        ),
+    }
+
+
+def _m06_projected_current_stage(decision: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(decision, Mapping):
+        return None
+    selected_work = str(decision.get("selected_work") or "").strip()
+    next_internal_stage = str(decision.get("next_internal_stage") or "").strip()
+    reason_code = str(decision.get("reason_code") or "").strip()
+    if selected_work not in {"model_group.residual_event_governance", "model_group.m06_event_inputs"} and next_internal_stage not in {
+        "residual_event_governance",
+        "model_group.m06_event_inputs",
+    }:
+        return None
+    scope = _m06_scope_from_decision(decision)
+    replay_review_complete = True
+    event_universe_acquired = selected_work != "model_group.m06_event_inputs" and reason_code != "model_group_residual_event_evidence_missing"
+    modelability_gates_complete = event_universe_acquired and reason_code not in {
+        "model_group_residual_event_evidence_missing",
+        "model_group_m06_event_feed_provider_required",
+        "model_group_m06_event_feed_backfill_running",
+    }
+    plan = build_model_06_post_replay_workflow_plan(
+        start_month=scope["start_month"] or "2016-01",
+        end_month=scope["end_month"] or "2017-06",
+        selected_target_symbol=scope["target_symbol"],
+        replay_review_complete=replay_review_complete,
+        event_universe_acquired=event_universe_acquired,
+        modelability_gates_complete=modelability_gates_complete,
+    )
+    return plan.next_stage.stage_id if plan.next_stage is not None else selected_work
+
+
 def _gated_scope_status() -> dict[str, Any]:
     return {
         "provider_acquisition": {
@@ -455,7 +512,14 @@ def collect_historical_scheduler_status(
         )
     ):
         blocked_reason = None
-    current_stage = str((transition_current or {}).get("selected_work") or "") or workflow.next_stage_id or str((current_decision or {}).get("selected_work") or "") or None
+    current_stage = (
+        _m06_projected_current_stage(transition_current)
+        or _m06_projected_current_stage(current_decision)
+        or str((transition_current or {}).get("selected_work") or "")
+        or workflow.next_stage_id
+        or str((current_decision or {}).get("selected_work") or "")
+        or None
+    )
     if lifecycle_holds_fold_lane and transition_current is None:
         current_stage = "model_group.replay"
         if blocked_reason is None:

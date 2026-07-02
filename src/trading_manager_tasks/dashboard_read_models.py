@@ -26,6 +26,7 @@ from .model_training_workflow import (
     ROLLING_FOLD_STEP_MONTHS,
     ROLLING_FOLD_SPLIT_MONTHS,
     base_stack_model_generation_splits_complete,
+    build_model_06_post_replay_workflow_plan,
     build_model_training_workflow_plan,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
@@ -6279,6 +6280,31 @@ def _model_group_replay_timeline_tasks(
             "pending_count": max(int(attribution_progress.get("pending_count") or 0), 1),
             "progress_basis": "M06 must write attribution rows and internal event-focus proposal rows in the same run.",
         }
+    m06_post_replay_plan = build_model_06_post_replay_workflow_plan(
+        start_month=training_start_month,
+        end_month=training_end_month,
+        selected_target_symbol=selected_target_symbol,
+        replay_review_complete=replay_review_complete,
+        event_universe_acquired=attribution_rows_complete,
+        modelability_gates_complete=attribution_rows_complete,
+        residual_attribution_complete=attribution_complete,
+    )
+    m06_post_replay_workflow = {
+        "contract_type": m06_post_replay_plan.contract_type,
+        "trigger_stage": m06_post_replay_plan.trigger_stage,
+        "next_stage_id": m06_post_replay_plan.next_stage.stage_id if m06_post_replay_plan.next_stage else None,
+        "next_stage_type": m06_post_replay_plan.next_stage.stage_type if m06_post_replay_plan.next_stage else None,
+        "stage_statuses": [
+            {
+                "stage_id": stage.stage_id,
+                "stage_type": stage.stage_type,
+                "status": stage.status,
+                "blockers": list(stage.blockers),
+            }
+            for layer in m06_post_replay_plan.layers
+            for stage in layer.stages
+        ],
+    }
     residual_event_governance_receipt_ref = (
         str(attribution_artifacts["receipt_refs"][0])
         if attribution_artifacts and attribution_artifacts.get("receipt_refs")
@@ -6477,6 +6503,7 @@ def _model_group_replay_timeline_tasks(
         blockers=[] if replay_review_complete else ["model_group.replay_review"],
         stage_type="model_06_event_risk_governor",
         progress=attribution_progress,
+        extra_detail={"m06_post_replay_workflow": m06_post_replay_workflow},
     )
 
     evaluation_complete = promotion_complete
