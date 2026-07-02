@@ -93,6 +93,50 @@ class EventFamilyStructuredEvidenceEnrichmentTests(unittest.TestCase):
         self.assertEqual(rows[0].result_row["consensus_payload"]["value"], 3.2)
         self.assertAlmostEqual(rows[0].result_row["surprise_payload"]["value"], 0.2)
 
+    def test_duplicate_events_prefer_structured_baseline_row(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            row = {
+                "event_time": "2024-01-11T08:30:00-05:00",
+                "country": "United States",
+                "event": "Inflation Rate YoY",
+                "source_event_type": "inflation rate",
+                "reference": "DEC",
+                "actual": "3.4%",
+                "previous": "3.1%",
+                "consensus": "",
+                "te_forecast": "",
+                "revised": "",
+                "importance": "3",
+                "symbol": "",
+            }
+            _write_te_csv(
+                root / "2024-01" / "runs" / "old-run" / "saved" / "trading_economics_calendar_event.csv",
+                [row],
+            )
+            enriched = dict(row)
+            enriched["consensus"] = "3.2%"
+            _write_te_csv(
+                root
+                / "2024-01"
+                / "runs"
+                / "te_authenticated_baseline_refresh_20260702T0645Z_2024_01"
+                / "saved"
+                / "trading_economics_calendar_event.csv",
+                [enriched],
+            )
+
+            _, _, _, _, rows = build_structured_macro_rows_from_te_source(
+                event_family_id="cpi_release",
+                start_month="2024-01",
+                end_month="2024-01",
+                source_root=root,
+            )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].result_row["consensus_payload"]["value"], 3.2)
+        self.assertAlmostEqual(rows[0].result_row["surprise_payload"]["value"], 0.2)
+
     def test_enrichment_receipt_dry_run_performs_no_provider_or_sql_calls(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "source"

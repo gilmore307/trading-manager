@@ -140,6 +140,21 @@ def _te_row_matches_event_family(row: Mapping[str, Any], *, event_family_id: str
     return _text_contains_any(text, terms)
 
 
+def _te_row_quality_score(row: Mapping[str, Any]) -> tuple[int, int, int, str]:
+    structured_count = sum(
+        1
+        for key in ("actual", "consensus", "te_forecast", "previous", "event_time", "reference")
+        if str(row.get(key) or "").strip()
+    )
+    surprise_ready = int(
+        bool(str(row.get("actual") or "").strip())
+        and bool(str(row.get("consensus") or "").strip() or str(row.get("te_forecast") or "").strip())
+    )
+    path = str(row.get("_source_file") or "")
+    authenticated_refresh = int("te_authenticated_baseline_refresh" in path)
+    return structured_count, surprise_ready, authenticated_refresh, path
+
+
 def _parse_numeric_value(raw: str) -> float | None:
     text = str(raw or "").strip()
     if not text:
@@ -221,7 +236,9 @@ def build_structured_macro_rows_from_te_source(
     unique: dict[str, Mapping[str, str]] = {}
     for row in matched_rows:
         event_id = _event_id_for_te_row(row, event_family_id=event_family_id)
-        unique.setdefault(event_id, row)
+        current = unique.get(event_id)
+        if current is None or _te_row_quality_score(row) > _te_row_quality_score(current):
+            unique[event_id] = row
 
     event_rows: list[StructuredMacroEventRows] = []
     malformed_clock_count = 0
