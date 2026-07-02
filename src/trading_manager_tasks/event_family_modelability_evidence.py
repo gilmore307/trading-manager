@@ -44,6 +44,16 @@ EARNINGS_METRIC_TAGS = {
 
 DEFAULT_OBSERVATION_SAMPLE_LIMIT = 100
 
+MODELABILITY_REQUIRED_CONTROL_GATES = (
+    "matched_control_gate",
+    "overlap_confounder_gate",
+    "leakage_gate",
+    "horizon_label_gate",
+    "fold_calibration_gate",
+)
+
+CONTEXT_ONLY_EVENT_FAMILIES = {"market_session_calendar_event"}
+
 PRODUCT_PRICE_CHANGE_TERMS = (
     "price",
     "prices",
@@ -470,6 +480,137 @@ def _news_event_family_subtype(text: str, *, event_family_id: str) -> str:
     if event_family_id == "target_regulatory_antitrust_news":
         return "regulatory_or_antitrust_action" if _target_regulatory_antitrust_match(text) else ""
     return ""
+
+
+def _observation_subtype(observation: EventFamilyObservation) -> str:
+    value = observation.normalized_event_parameters.get("event_subtype")
+    if value is None:
+        value = observation.normalized_event_parameters.get("product_price_change_direction")
+    if value is None:
+        value = observation.normalized_event_parameters.get("event_kind")
+    return str(value or "").strip()
+
+
+def _subtype_counts(observations: Sequence[EventFamilyObservation]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for observation in observations:
+        subtype = _observation_subtype(observation) or "unspecified"
+        counts[subtype] = counts.get(subtype, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _family_purity_gate(
+    *,
+    event_family_id: str,
+    observations: Sequence[EventFamilyObservation],
+) -> tuple[str, tuple[str, ...], dict[str, Any]]:
+    if not observations:
+        return "blocked_no_observations", (), {"subtype_counts": {}}
+    subtype_counts = _subtype_counts(observations)
+    detail = {"subtype_counts": subtype_counts}
+    if event_family_id == "target_product_price_change_news" and len(subtype_counts) > 1:
+        return (
+            "blocked_mixed_family",
+            (
+                "target_product_price_change_news mixes increase/decrease/unclear rows; split into direction-specific event families before modelability review",
+            ),
+            detail,
+        )
+    if "mixed_or_unclear" in subtype_counts:
+        return (
+            "blocked_mixed_family",
+            ("event family sample contains mixed_or_unclear subtype rows",),
+            detail,
+        )
+    return "passed_mechanical_subtype_check", (), detail
+
+
+def _structured_evidence_gate(
+    *,
+    event_family_id: str,
+    observations: Sequence[EventFamilyObservation],
+    pit_gate: str,
+) -> tuple[str, tuple[str, ...], dict[str, Any]]:
+    detail: dict[str, Any] = {}
+    if not observations:
+        return "blocked_no_observations", ("structured evidence cannot be checked without observations",), detail
+    if event_family_id == "company_earnings_or_financial_results":
+        expectation_fields = ("consensus_eps", "consensus_revenue", "expected_eps", "expected_revenue")
+        has_expectation_baseline = any(
+            any(field in observation.normalized_event_parameters for field in expectation_fields)
+            for observation in observations
+        )
+        detail["expectation_baseline_available"] = has_expectation_baseline
+        detail["requires_intraday_release_clock"] = True
+        if pit_gate != "passed" or not has_expectation_baseline:
+            reasons: list[str] = []
+            if pit_gate != "passed":
+                reasons.append("earnings/guidance modelability requires timestamped PIT release clocks, not date-only filing clocks")
+            if not has_expectation_baseline:
+                reasons.append("earnings/guidance modelability requires PIT expectation baseline or surprise fields")
+            return "blocked_missing_structured_evidence", tuple(reasons), detail
+    if event_family_id in MACRO_RELEASE_EVENT_TYPE_TERMS:
+        required_fields = ("actual_value", "consensus_value", "surprise_value")
+        has_release_distribution_inputs = any(
+            all(observation.normalized_event_parameters.get(field) not in (None, "") for field in required_fields)
+            for observation in observations
+        )
+        detail["actual_consensus_surprise_available"] = has_release_distribution_inputs
+        if not has_release_distribution_inputs:
+            return (
+                "blocked_missing_structured_evidence",
+                ("scheduled macro release modelability requires actual/consensus/surprise fields with timestamped release clocks",),
+                detail,
+            )
+    if event_family_id == "target_product_price_change_news":
+        direction_values = {
+            str(observation.normalized_event_parameters.get("product_price_change_direction") or "").strip()
+            for observation in observations
+        }
+        detail["direction_values"] = sorted(value for value in direction_values if value)
+        if len(detail["direction_values"]) != 1 or detail["direction_values"][0] not in {"increase", "decrease"}:
+            return (
+                "blocked_missing_structured_evidence",
+                ("product price change modelability requires a single clean direction-specific subtype",),
+                detail,
+            )
+    if event_family_id in CONTEXT_ONLY_EVENT_FAMILIES:
+        return "passed_context_only_structured_evidence", (), detail
+    return "passed_minimum_structured_evidence", (), detail
+
+
+def _modelability_control_gate_results() -> dict[str, str]:
+    return {gate: "not_performed_in_packet_builder" for gate in MODELABILITY_REQUIRED_CONTROL_GATES}
+
+
+def _readiness_from_deterministic_gates(
+    *,
+    event_family_id: str,
+    sample_gate: str,
+    pit_gate: str,
+    family_purity_gate: str,
+    structured_evidence_gate: str,
+    control_gate_results: Mapping[str, str],
+) -> tuple[str, tuple[str, ...]]:
+    if sample_gate != "passed":
+        return "blocked_missing_same_family_evidence", ()
+    if family_purity_gate.startswith("blocked_mixed_family"):
+        return "blocked_mixed_family", ()
+    if structured_evidence_gate.startswith("blocked_missing_structured_evidence"):
+        return "blocked_missing_structured_evidence", ()
+    if event_family_id in CONTEXT_ONLY_EVENT_FAMILIES:
+        return "admissible_for_context_only_review", ()
+    if pit_gate != "passed":
+        return "blocked_missing_structured_evidence", ()
+    missing_gates = tuple(
+        gate for gate in MODELABILITY_REQUIRED_CONTROL_GATES if control_gate_results.get(gate) != "passed"
+    )
+    if missing_gates:
+        return (
+            "blocked_missing_modelability_gates",
+            tuple(f"{gate} is required before Codex modelability review" for gate in missing_gates),
+        )
+    return "admissible_for_modelability_review", ()
 
 
 def _news_row_matches_event_family(row: Mapping[str, Any], *, event_family_id: str) -> bool:
@@ -993,9 +1134,27 @@ def build_event_family_modelability_evidence_packet(
         reasons.append("PIT clocks are date-only filing clocks; intraday release timing is not available in this packet")
     elif pit_gate != "passed":
         reasons.append("PIT clocks are usable for sequencing but lack precise intraday filing/release time")
-    readiness_status = "ready_for_codex_modelability_review" if sample_gate == "passed" and observations else "blocked_missing_same_family_evidence"
-    if readiness_status == "ready_for_codex_modelability_review" and pit_gate != "passed":
-        readiness_status = "ready_with_pit_clock_limitations"
+    family_purity_gate, family_purity_reasons, family_purity_detail = _family_purity_gate(
+        event_family_id=canonical_family,
+        observations=observations,
+    )
+    reasons.extend(family_purity_reasons)
+    structured_evidence_gate, structured_evidence_reasons, structured_evidence_detail = _structured_evidence_gate(
+        event_family_id=canonical_family,
+        observations=observations,
+        pit_gate=pit_gate,
+    )
+    reasons.extend(structured_evidence_reasons)
+    modelability_control_gates = _modelability_control_gate_results()
+    readiness_status, readiness_gate_reasons = _readiness_from_deterministic_gates(
+        event_family_id=canonical_family,
+        sample_gate=sample_gate,
+        pit_gate=pit_gate,
+        family_purity_gate=family_purity_gate,
+        structured_evidence_gate=structured_evidence_gate,
+        control_gate_results=modelability_control_gates,
+    )
+    reasons.extend(readiness_gate_reasons)
     return EventFamilyModelabilityEvidencePacket(
         contract_type=MODELABILITY_EVIDENCE_PACKET_CONTRACT_TYPE,
         source_contract_type=MODELABILITY_ACQUISITION_CONTRACT_TYPE,
@@ -1023,10 +1182,11 @@ def build_event_family_modelability_evidence_packet(
             "same_family_sample_gate": sample_gate,
             "pit_clock_gate": pit_gate,
             "source_family_gate": source_family_gate,
-            "overlap_confounder_gate": "not_performed_in_packet_builder",
-            "leakage_gate": "not_performed_in_packet_builder",
-            "matched_control_gate": "not_performed_in_packet_builder",
-            "fold_calibration_gate": "not_performed_in_packet_builder",
+            "family_purity_gate": family_purity_gate,
+            "family_purity_detail": family_purity_detail,
+            "structured_evidence_gate": structured_evidence_gate,
+            "structured_evidence_detail": structured_evidence_detail,
+            **modelability_control_gates,
         },
         observations=observations,
     )

@@ -53,7 +53,8 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertFalse(packet.probability_function_class_decision_performed)
         self.assertFalse(packet.model_training_performed)
         self.assertEqual(packet.deterministic_gate_results["same_family_sample_gate"], "passed")
-        self.assertEqual(packet.readiness_status, "ready_with_pit_clock_limitations")
+        self.assertEqual(packet.readiness_status, "blocked_missing_structured_evidence")
+        self.assertEqual(packet.deterministic_gate_results["structured_evidence_gate"], "blocked_missing_structured_evidence")
         self.assertEqual(packet.observations[0].target_symbol, "AAPL")
         self.assertEqual(packet.observations[0].normalized_event_parameters["metrics"]["revenue"], 119575000000)
 
@@ -101,7 +102,9 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.same_family_observation_count, 12)
         self.assertEqual(packet.observation_sample_count, 1)
         self.assertTrue(packet.observation_rows_truncated)
-        self.assertEqual(packet.readiness_status, "ready_for_codex_modelability_review")
+        self.assertEqual(packet.readiness_status, "blocked_missing_modelability_gates")
+        self.assertEqual(packet.deterministic_gate_results["family_purity_gate"], "passed_mechanical_subtype_check")
+        self.assertEqual(packet.deterministic_gate_results["structured_evidence_gate"], "passed_minimum_structured_evidence")
         self.assertEqual(packet.observations[0].affected_scope, "target")
         self.assertEqual(packet.observations[0].affected_entities, ("AAPL",))
         self.assertEqual(packet.observations[0].normalized_event_parameters["source_category"], "news")
@@ -152,6 +155,44 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.observations[0].event_ref, "alpaca-news://n2")
         self.assertEqual(packet.observations[0].normalized_event_parameters["product_price_change_direction"], "decrease")
 
+    def test_blocks_mixed_product_price_change_family(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="target_product_price_change_news",
+            target_symbol="AAPL",
+            target_cik="0000320193",
+            start_month="2024-01",
+            end_month="2024-12",
+            target_news_rows=[
+                {
+                    "id": "n1",
+                    "timeline_headline": "Apple raises prices on iPhone",
+                    "summary": "",
+                    "created_at": "2024-01-03T14:30:00Z",
+                    "updated_at": "2024-01-03T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n1",
+                },
+                {
+                    "id": "n2",
+                    "timeline_headline": "Apple cuts prices on iPad",
+                    "summary": "",
+                    "created_at": "2024-01-04T14:30:00Z",
+                    "updated_at": "2024-01-04T14:35:00Z",
+                    "symbols": ["AAPL"],
+                    "event_link_url": "https://example.test/n2",
+                },
+            ],
+            same_family_observation_count=8,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.readiness_status, "blocked_mixed_family")
+        self.assertEqual(packet.deterministic_gate_results["family_purity_gate"], "blocked_mixed_family")
+        self.assertEqual(
+            packet.deterministic_gate_results["family_purity_detail"]["subtype_counts"],
+            {"decrease": 1, "increase": 1},
+        )
+
     def test_builds_target_product_launch_news_packet(self):
         packet = build_event_family_modelability_evidence_packet(
             event_family_id="product_launch_news",
@@ -175,7 +216,7 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         )
 
         self.assertEqual(packet.event_family_id, "target_product_launch_news")
-        self.assertEqual(packet.readiness_status, "ready_for_codex_modelability_review")
+        self.assertEqual(packet.readiness_status, "blocked_missing_modelability_gates")
         self.assertEqual(packet.observations[0].normalized_event_parameters["event_subtype"], "product_launch_or_announcement")
 
     def test_builds_target_supply_chain_disruption_news_packet(self):
@@ -254,6 +295,7 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         )
 
         self.assertEqual(packet.event_family_id, "market_session_calendar_event")
+        self.assertEqual(packet.readiness_status, "admissible_for_context_only_review")
         self.assertEqual(packet.deterministic_gate_results["pit_clock_gate"], "passed")
         self.assertEqual(packet.observations[0].affected_scope, "market")
         self.assertEqual(packet.observations[0].source_name, "calendar_market_session")
@@ -300,7 +342,8 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         )
 
         self.assertEqual(packet.event_family_id, "cpi_release")
-        self.assertEqual(packet.readiness_status, "ready_for_codex_modelability_review")
+        self.assertEqual(packet.readiness_status, "blocked_missing_structured_evidence")
+        self.assertEqual(packet.deterministic_gate_results["structured_evidence_gate"], "blocked_missing_structured_evidence")
         self.assertEqual(packet.observations[0].normalized_event_parameters["source_category"], "scheduled_macro_release")
         self.assertEqual(packet.observations[0].normalized_event_parameters["event_kind"], "cpi_release")
 

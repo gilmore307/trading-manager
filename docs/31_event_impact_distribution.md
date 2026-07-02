@@ -83,6 +83,23 @@ Source rows may still feed a concrete family packet, for example Alpaca/GDELT
 news rows feeding `target_product_price_change_news`, or scheduled macro
 calendar rows feeding `cpi_release`.
 
+Evidence-packet readiness is a deterministic program decision, not a Codex
+semantic decision:
+
+| Readiness | Meaning |
+|---|---|
+| `admissible_for_modelability_review` | Mechanical gates passed; Codex may judge projection mode and probability-function class. |
+| `admissible_for_context_only_review` | The packet is deterministic risk context, not a quantitative impact-family candidate. |
+| `blocked_missing_same_family_evidence` | Same-family count is below the required threshold. |
+| `blocked_mixed_family` | The sample contains multiple incompatible subtypes, such as product price increases and decreases in one packet. |
+| `blocked_missing_structured_evidence` | Required structured inputs, clocks, expectations, surprise fields, or clean subtype fields are missing. |
+| `blocked_missing_modelability_gates` | The family is mechanically coherent, but controls, overlap/confounder, leakage, horizon labels, or fold calibration are not ready. |
+
+Blocked packets must not be interpreted as `context_only_projection`.
+`context_only_projection` is assigned only after an admissible review decides
+that the event is useful as risk context but cannot support a quantitative
+impact function or conditional-effect mapping.
+
 ## Probability Function Classes
 
 M06 chooses the allowed probability-function class. M03 trains concrete
@@ -182,7 +199,9 @@ The route is:
 2. Dispatch bounded provider tasks through the reviewed event-feed dispatcher.
 3. Build `model_06_event_family_modelability_evidence_packet` from acquired
    same-family PIT evidence.
-4. Run `event-family-modelability-review`.
+4. Run `event-family-modelability-review` only for packets with
+   `admissible_for_modelability_review`; blocked packets must first be repaired
+   by data acquisition, family refinement, or deterministic gate generation.
 5. If M06 accepts a projection mode and probability-function class, train M03
    parameter mappings through a separate PIT-safe training path.
 

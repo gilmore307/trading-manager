@@ -120,9 +120,12 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    `cpi_release`, or `ppi_release`.
    Provider calls remain in the reviewed dispatcher. After acquisition, code builds
    `model_06_event_family_modelability_evidence_packet` from acquired
-   same-family PIT observations; Codex modelability review consumes that packet
-   and performs no provider calls. Program gates own coverage, dedupe,
-   overlap/confounder checks, stop/retry conditions, and review readiness;
+   same-family PIT observations. The packet must pass deterministic admissibility
+   gates before Codex modelability review; mixed-family packets, packets missing
+   structured event parameters, and packets missing controls/calibration remain
+   blocked instead of being relabeled as context-only. Codex review consumes an
+   admissible packet and performs no provider calls. Program gates own coverage,
+   dedupe, overlap/confounder checks, stop/retry conditions, and review readiness;
    agents only perform semantic review that deterministic code cannot reliably
    encode. A single event cannot establish the family function type.
 8. Evaluation. Evaluation consumes replay traces, replay-review rows, and attribution packets to
