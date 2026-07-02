@@ -57,10 +57,18 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
 
     def test_family_aliases_resolve_to_canonical_routes(self):
         self.assertEqual(canonical_event_family_id("earnings-release"), "company_earnings_or_financial_results")
+        self.assertEqual(canonical_event_family_id("cpi"), "cpi_release")
+        self.assertEqual(canonical_event_family_id("product-pricing-change"), "target_product_price_change_news")
         self.assertEqual(
             required_feeds_for_event_family("financial_results"),
             ("08_feed_sec_company_financials", "03_feed_alpaca_news", "05_feed_gdelt_news"),
         )
+
+    def test_rejects_source_buckets_as_event_families(self):
+        for invalid_family in ("news", "target_news_or_disclosure", "scheduled_macro_release", "macro"):
+            with self.subTest(invalid_family=invalid_family):
+                with self.assertRaisesRegex(Exception, "not a source/category bucket"):
+                    canonical_event_family_id(invalid_family)
 
 
 if __name__ == "__main__":

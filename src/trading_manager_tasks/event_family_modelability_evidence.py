@@ -43,6 +43,45 @@ EARNINGS_METRIC_TAGS = {
 
 DEFAULT_OBSERVATION_SAMPLE_LIMIT = 100
 
+PRODUCT_PRICE_CHANGE_TERMS = (
+    "price",
+    "prices",
+    "pricing",
+)
+PRODUCT_PRICE_INCREASE_TERMS = (
+    "increase",
+    "increases",
+    "increased",
+    "raise",
+    "raises",
+    "raised",
+    "hike",
+    "hikes",
+    "hiked",
+    "higher",
+)
+PRODUCT_PRICE_DECREASE_TERMS = (
+    "decrease",
+    "decreases",
+    "decreased",
+    "cut",
+    "cuts",
+    "cutting",
+    "lower",
+    "lowers",
+    "lowered",
+    "reduce",
+    "reduces",
+    "reduced",
+    "discount",
+    "discounts",
+)
+
+MACRO_RELEASE_EVENT_TYPE_TERMS = {
+    "cpi_release": ("cpi", "consumer price index"),
+    "ppi_release": ("ppi", "producer price index"),
+}
+
 
 @dataclass(frozen=True)
 class EventFamilyObservation:
@@ -191,6 +230,46 @@ def _bounded_rows(rows: Sequence[Mapping[str, Any]], *, limit: int) -> list[Mapp
     return [*rows[:head_count], *rows[-tail_count:]]
 
 
+def _text_contains_any(text: str, terms: Sequence[str]) -> bool:
+    lowered = text.lower()
+    return any(term in lowered for term in terms)
+
+
+def _product_price_change_direction(text: str) -> str:
+    has_price = _text_contains_any(text, PRODUCT_PRICE_CHANGE_TERMS)
+    if not has_price:
+        return ""
+    has_increase = _text_contains_any(text, PRODUCT_PRICE_INCREASE_TERMS)
+    has_decrease = _text_contains_any(text, PRODUCT_PRICE_DECREASE_TERMS)
+    if has_increase and has_decrease:
+        return "mixed_or_unclear"
+    if has_increase:
+        return "increase"
+    if has_decrease:
+        return "decrease"
+    return ""
+
+
+def _news_row_matches_event_family(row: Mapping[str, Any], *, event_family_id: str) -> bool:
+    headline = str(row.get("timeline_headline") or "").strip()
+    summary = str(row.get("summary") or "").strip()
+    text = f"{headline}\n{summary}"
+    if event_family_id == "target_product_price_change_news":
+        return bool(_product_price_change_direction(text))
+    return False
+
+
+def _scheduled_macro_release_matches_event_family(row: Mapping[str, Any], *, event_family_id: str) -> bool:
+    terms = MACRO_RELEASE_EVENT_TYPE_TERMS.get(event_family_id)
+    if not terms:
+        return False
+    text = " ".join(
+        str(row.get(key) or "")
+        for key in ("event_type", "event_name", "title", "description", "symbol", "raw_artifact_ref")
+    )
+    return _text_contains_any(text, terms)
+
+
 def read_sec_company_fact_csv(path: Path) -> list[dict[str, Any]]:
     with path.open(newline="", encoding="utf-8") as handle:
         return _normalize_fact_rows(csv.DictReader(handle))
@@ -231,6 +310,7 @@ def fetch_sec_company_fact_rows_from_database(
 def fetch_target_news_rows_from_database(
     *,
     target_symbol: str,
+    event_family_id: str,
     start_month: str,
     end_month: str,
     database_url: str | None = None,
@@ -246,13 +326,21 @@ def fetch_target_news_rows_from_database(
     start = _month_start(start_month)
     end = _month_end_exclusive(end_month)
     pattern = f'%"{symbol}"%'
+    if event_family_id != "target_product_price_change_news":
+        raise TaskSystemError(f"unsupported concrete news event family: {event_family_id}")
+    price_patterns = tuple(f"%{term}%" for term in PRODUCT_PRICE_CHANGE_TERMS)
+    direction_patterns = tuple(f"%{term}%" for term in (*PRODUCT_PRICE_INCREASE_TERMS, *PRODUCT_PRICE_DECREASE_TERMS))
+    family_filter = """
+          AND (timeline_headline ILIKE ANY(%s) OR summary ILIKE ANY(%s))
+          AND (timeline_headline ILIKE ANY(%s) OR summary ILIKE ANY(%s))
+    """
     count_query = """
         SELECT count(*) AS row_count
         FROM trading_data.feed_03_alpaca_news
         WHERE created_at >= %s
           AND created_at < %s
           AND symbols::text ILIKE %s
-    """
+    """ + family_filter
     sample_query = """
         SELECT id, timeline_headline, summary, created_at, updated_at,
                symbols, event_link_url
@@ -260,14 +348,16 @@ def fetch_target_news_rows_from_database(
         WHERE created_at >= %s
           AND created_at < %s
           AND symbols::text ILIKE %s
+    """ + family_filter + """
         ORDER BY created_at, id
         LIMIT %s
     """
     with psycopg.connect(_database_url(database_url), row_factory=dict_row) as connection:
         with connection.cursor() as cursor:
-            cursor.execute(count_query, (start, end, pattern))
+            filter_params = (price_patterns, price_patterns, direction_patterns, direction_patterns)
+            cursor.execute(count_query, (start, end, pattern, *filter_params))
             row_count = int(cursor.fetchone()["row_count"])
-            cursor.execute(sample_query, (start, end, pattern, max(sample_limit, 0)))
+            cursor.execute(sample_query, (start, end, pattern, *filter_params, max(sample_limit, 0)))
             return row_count, _normalize_fact_rows(cursor.fetchall())
 
 
@@ -315,6 +405,7 @@ def fetch_market_session_rows_from_database(
 
 def fetch_scheduled_macro_release_rows_from_database(
     *,
+    event_family_id: str,
     start_month: str,
     end_month: str,
     database_url: str | None = None,
@@ -328,25 +419,38 @@ def fetch_scheduled_macro_release_rows_from_database(
 
     start = _month_start(start_month)
     end = _month_end_exclusive(end_month)
+    terms = MACRO_RELEASE_EVENT_TYPE_TERMS.get(event_family_id)
+    if not terms:
+        raise TaskSystemError(f"unsupported concrete scheduled macro event family: {event_family_id}")
+    event_type_patterns = tuple(f"%{term}%" for term in terms)
+    family_filter = """
+          AND (
+            event_type ILIKE ANY(%s)
+            OR COALESCE(symbol, '') ILIKE ANY(%s)
+            OR COALESCE(raw_artifact_ref, '') ILIKE ANY(%s)
+          )
+    """
     count_query = """
         SELECT count(*) AS row_count
         FROM trading_data.calendar_scheduled_event
         WHERE event_time >= %s
           AND event_time < %s
-    """
+    """ + family_filter
     sample_query = """
         SELECT *
         FROM trading_data.calendar_scheduled_event
         WHERE event_time >= %s
           AND event_time < %s
+    """ + family_filter + """
         ORDER BY event_time
         LIMIT %s
     """
     with psycopg.connect(_database_url(database_url), row_factory=dict_row) as connection:
         with connection.cursor() as cursor:
-            cursor.execute(count_query, (start, end))
+            filter_params = (event_type_patterns, event_type_patterns, event_type_patterns)
+            cursor.execute(count_query, (start, end, *filter_params))
             row_count = int(cursor.fetchone()["row_count"])
-            cursor.execute(sample_query, (start, end, max(sample_limit, 0)))
+            cursor.execute(sample_query, (start, end, *filter_params, max(sample_limit, 0)))
             return row_count, _normalize_fact_rows(cursor.fetchall())
 
 
@@ -439,11 +543,14 @@ def build_target_news_observations(
 ) -> tuple[EventFamilyObservation, ...]:
     observations: list[EventFamilyObservation] = []
     for row in rows:
+        if not _news_row_matches_event_family(row, event_family_id=event_family_id):
+            continue
         row_id = str(row.get("id") or "").strip()
         created_at = _stringify_time(row.get("created_at"))
         updated_at = _stringify_time(row.get("updated_at"))
         headline = str(row.get("timeline_headline") or "").strip()
         summary = str(row.get("summary") or "").strip()
+        price_change_direction = _product_price_change_direction(f"{headline}\n{summary}")
         symbols = row.get("symbols")
         if isinstance(symbols, str):
             affected_entities = (target_symbol.upper(),)
@@ -452,9 +559,11 @@ def build_target_news_observations(
         else:
             affected_entities = _target_entities(target_symbol)
         normalized_event_parameters = {
-            "event_kind": "target_news_or_disclosure",
+            "event_kind": "target_product_price_change_news",
+            "source_category": "news",
             "headline": headline,
             "summary_available": bool(summary),
+            "product_price_change_direction": price_change_direction,
             "updated_at": updated_at,
             "symbols": list(affected_entities),
             "source_url": str(row.get("event_link_url") or "").strip(),
@@ -548,13 +657,16 @@ def build_scheduled_macro_release_observations(
 ) -> tuple[EventFamilyObservation, ...]:
     observations: list[EventFamilyObservation] = []
     for row in rows:
+        if not _scheduled_macro_release_matches_event_family(row, event_family_id=event_family_id):
+            continue
         event_id = str(row.get("event_id") or "").strip()
         event_time = _stringify_time(row.get("event_time"))
         known_at = _stringify_time(row.get("scheduled_known_at"))
         event_type = str(row.get("event_type") or "").strip()
         country = str(row.get("country") or "").strip()
         normalized_event_parameters = {
-            "event_kind": "scheduled_macro_release",
+            "event_kind": event_family_id,
+            "source_category": "scheduled_macro_release",
             "event_type": event_type,
             "event_scope": str(row.get("event_scope") or "").strip(),
             "country": country,
@@ -618,7 +730,7 @@ def build_event_family_modelability_evidence_packet(
             event_family_id=canonical_family,
         )
         source_family_gate = "sec_company_financials_grouped_by_accession"
-    elif canonical_family == "target_news_or_disclosure":
+    elif canonical_family == "target_product_price_change_news":
         sample_rows = _bounded_rows(target_news_rows, limit=observation_sample_limit)
         observations = build_target_news_observations(
             rows=sample_rows,
@@ -626,15 +738,15 @@ def build_event_family_modelability_evidence_packet(
             target_cik=target_cik,
             event_family_id=canonical_family,
         )
-        source_family_gate = "alpaca_news_symbol_scoped_rows"
+        source_family_gate = "alpaca_news_product_price_change_rows"
     elif canonical_family == "market_session_calendar_event":
         sample_rows = _bounded_rows(market_session_rows, limit=observation_sample_limit)
         observations = build_market_session_observations(rows=sample_rows, event_family_id=canonical_family)
         source_family_gate = "calendar_market_session_holiday_or_early_close_rows"
-    elif canonical_family == "scheduled_macro_release":
+    elif canonical_family in MACRO_RELEASE_EVENT_TYPE_TERMS:
         sample_rows = _bounded_rows(scheduled_macro_release_rows, limit=observation_sample_limit)
         observations = build_scheduled_macro_release_observations(rows=sample_rows, event_family_id=canonical_family)
-        source_family_gate = "calendar_scheduled_event_rows"
+        source_family_gate = f"calendar_scheduled_event_{canonical_family}_rows"
     else:
         raise TaskSystemError(f"unsupported evidence packet builder route: {event_family_id}")
     total_observations = len(observations) if same_family_observation_count is None else same_family_observation_count
@@ -723,9 +835,10 @@ def build_packet_from_database(
             minimum_same_family_observations=minimum_same_family_observations,
             observation_sample_limit=observation_sample_limit,
         )
-    if canonical_family == "target_news_or_disclosure":
+    if canonical_family == "target_product_price_change_news":
         row_count, rows = fetch_target_news_rows_from_database(
             target_symbol=target_symbol,
+            event_family_id=canonical_family,
             start_month=start_month,
             end_month=end_month,
             database_url=database_url,
@@ -760,8 +873,9 @@ def build_packet_from_database(
             minimum_same_family_observations=minimum_same_family_observations,
             observation_sample_limit=observation_sample_limit,
         )
-    if canonical_family == "scheduled_macro_release":
+    if canonical_family in MACRO_RELEASE_EVENT_TYPE_TERMS:
         row_count, rows = fetch_scheduled_macro_release_rows_from_database(
+            event_family_id=canonical_family,
             start_month=start_month,
             end_month=end_month,
             database_url=database_url,
@@ -812,31 +926,35 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--write-file", action="store_true")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_PACKET_ROOT)
     args = parser.parse_args(argv)
-    if args.sec_company_fact_csv:
-        rows: list[dict[str, Any]] = []
-        for path in args.sec_company_fact_csv:
-            rows.extend(read_sec_company_fact_csv(path))
-        packet = build_event_family_modelability_evidence_packet(
-            event_family_id=args.event_family_id,
-            target_symbol=args.target_symbol,
-            target_cik=args.target_cik,
-            start_month=args.start_month,
-            end_month=args.end_month,
-            sec_company_fact_rows=rows,
-            minimum_same_family_observations=args.minimum_same_family_observations,
-            observation_sample_limit=args.observation_sample_limit,
-        )
-    else:
-        packet = build_packet_from_database(
-            event_family_id=args.event_family_id,
-            target_symbol=args.target_symbol,
-            target_cik=args.target_cik,
-            start_month=args.start_month,
-            end_month=args.end_month,
-            minimum_same_family_observations=args.minimum_same_family_observations,
-            observation_sample_limit=args.observation_sample_limit,
-            database_url=args.database_url,
-        )
+    try:
+        if args.sec_company_fact_csv:
+            rows: list[dict[str, Any]] = []
+            for path in args.sec_company_fact_csv:
+                rows.extend(read_sec_company_fact_csv(path))
+            packet = build_event_family_modelability_evidence_packet(
+                event_family_id=args.event_family_id,
+                target_symbol=args.target_symbol,
+                target_cik=args.target_cik,
+                start_month=args.start_month,
+                end_month=args.end_month,
+                sec_company_fact_rows=rows,
+                minimum_same_family_observations=args.minimum_same_family_observations,
+                observation_sample_limit=args.observation_sample_limit,
+            )
+        else:
+            packet = build_packet_from_database(
+                event_family_id=args.event_family_id,
+                target_symbol=args.target_symbol,
+                target_cik=args.target_cik,
+                start_month=args.start_month,
+                end_month=args.end_month,
+                minimum_same_family_observations=args.minimum_same_family_observations,
+                observation_sample_limit=args.observation_sample_limit,
+                database_url=args.database_url,
+            )
+    except TaskSystemError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     if args.write_file:
         path = persist_packet(packet, output_root=args.output_root)
         print(str(path))

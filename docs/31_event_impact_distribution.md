@@ -41,14 +41,47 @@ coverage and leakage gates are ready:
 
 | Mode | Meaning |
 |---|---|
-| `impact_function_projection` | The event family has a stable enough lifecycle to be described by a time-indexed impact distribution function. |
-| `conditional_effect_projection` | A pure impact function is not identifiable, but PIT event parameters have a stable conditional association with later outcomes. |
-| `context_only_projection` | Signed impact is not reliable; the event can only widen uncertainty, caution, or review context. |
+| `impact_function_projection` | Tier 1. The core event model. The event family has a stable enough lifecycle to be described by a time-indexed impact distribution/state function. |
+| `conditional_effect_projection` | Tier 2. The internal state function is not identifiable, but PIT event parameters have a stable validated input-output association with later outcomes. |
+| `context_only_projection` | Tier 3. Direct quantitative impact analysis is not reliable, but the event is known to make market, sector, target, option, or execution risk larger. |
 | `do_not_model` | The event family should not enter M03 event-state projection. |
 
 `context_only_projection` is not a prediction. It may produce downstream
 uncertainty or caution context, but it must not output direction, magnitude,
 half-life, utility delta, or option structure advice.
+
+The ordering is intentional. `impact_function_projection` is the preferred
+model when the event family has stable shape, clocks, and distribution class.
+`conditional_effect_projection` is a fallback for families where the middle
+state process cannot be separated but the standardized input-to-outcome mapping
+is validated. `context_only_projection` is a risk-control output only: it says
+the event matters, not how much or in which direction.
+
+## Event Family Boundary
+
+An event family is a concrete repeated phenomenon with comparable mechanics,
+not a data source, feed, or broad bucket.
+
+Valid family examples:
+
+- `target_product_price_change_news`: product price increase/decrease news for
+  a target such as Apple.
+- `cpi_release`: CPI release events.
+- `ppi_release`: PPI release events.
+- `company_earnings_or_financial_results`: company financial results and
+  earnings/report filings.
+
+Invalid family examples:
+
+- `news`: source class only.
+- `target_news_or_disclosure`: source/category bucket only.
+- `scheduled_macro_release`: release calendar category only.
+- `macro`: domain bucket only.
+
+M06 evidence packets must reject source/category buckets before Codex review.
+Source rows may still feed a concrete family packet, for example Alpaca/GDELT
+news rows feeding `target_product_price_change_news`, or scheduled macro
+calendar rows feeding `cpi_release`.
 
 ## Probability Function Classes
 
@@ -133,10 +166,11 @@ The first implemented trial route supports several program-built M06 evidence
 packets:
 
 - AAPL `company_earnings_or_financial_results` from SEC company financials.
-- AAPL `target_news_or_disclosure` from symbol-scoped Alpaca news rows.
+- AAPL `target_product_price_change_news` from symbol-scoped Alpaca news rows.
 - `market_session_calendar_event` from deterministic non-weekend market
   holiday / early-close calendar rows.
-- `scheduled_macro_release` from structured scheduled macro calendar rows.
+- `cpi_release` and `ppi_release` from structured scheduled macro calendar
+  rows.
 
 The route is:
 

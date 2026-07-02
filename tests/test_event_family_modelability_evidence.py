@@ -74,9 +74,9 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.readiness_status, "blocked_missing_same_family_evidence")
         self.assertEqual(packet.deterministic_gate_results["same_family_sample_gate"], "blocked")
 
-    def test_builds_target_news_packet_with_truncated_observation_sample(self):
+    def test_builds_concrete_product_price_news_packet_with_truncated_observation_sample(self):
         packet = build_event_family_modelability_evidence_packet(
-            event_family_id="target_news_or_disclosure",
+            event_family_id="target_product_price_change_news",
             target_symbol="AAPL",
             target_cik="0000320193",
             start_month="2024-01",
@@ -84,8 +84,8 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
             target_news_rows=[
                 {
                     "id": "n1",
-                    "timeline_headline": "Apple announces product update",
-                    "summary": "AAPL event summary",
+                    "timeline_headline": "Apple raises iPhone prices",
+                    "summary": "AAPL product pricing increase event summary",
                     "created_at": "2024-01-03T14:30:00Z",
                     "updated_at": "2024-01-03T14:35:00Z",
                     "symbols": ["AAPL"],
@@ -97,13 +97,26 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
             observation_sample_limit=1,
         )
 
-        self.assertEqual(packet.event_family_id, "target_news_or_disclosure")
+        self.assertEqual(packet.event_family_id, "target_product_price_change_news")
         self.assertEqual(packet.same_family_observation_count, 12)
         self.assertEqual(packet.observation_sample_count, 1)
         self.assertTrue(packet.observation_rows_truncated)
         self.assertEqual(packet.readiness_status, "ready_for_codex_modelability_review")
         self.assertEqual(packet.observations[0].affected_scope, "target")
         self.assertEqual(packet.observations[0].affected_entities, ("AAPL",))
+        self.assertEqual(packet.observations[0].normalized_event_parameters["source_category"], "news")
+        self.assertEqual(packet.observations[0].normalized_event_parameters["product_price_change_direction"], "increase")
+
+    def test_rejects_news_source_bucket_as_event_family(self):
+        with self.assertRaisesRegex(Exception, "not a source/category bucket"):
+            build_event_family_modelability_evidence_packet(
+                event_family_id="news",
+                target_symbol="AAPL",
+                target_cik="0000320193",
+                start_month="2024-01",
+                end_month="2024-12",
+                target_news_rows=[],
+            )
 
     def test_builds_market_session_calendar_packet(self):
         packet = build_event_family_modelability_evidence_packet(
@@ -135,9 +148,9 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
         self.assertEqual(packet.observations[0].affected_scope, "market")
         self.assertEqual(packet.observations[0].source_name, "calendar_market_session")
 
-    def test_blocks_empty_scheduled_macro_release_packet(self):
+    def test_blocks_empty_cpi_release_packet(self):
         packet = build_event_family_modelability_evidence_packet(
-            event_family_id="scheduled_macro_release",
+            event_family_id="cpi_release",
             target_symbol="",
             target_cik="",
             start_month="2024-01",
@@ -147,9 +160,39 @@ class EventFamilyModelabilityEvidenceTests(unittest.TestCase):
             minimum_same_family_observations=8,
         )
 
-        self.assertEqual(packet.event_family_id, "scheduled_macro_release")
+        self.assertEqual(packet.event_family_id, "cpi_release")
         self.assertEqual(packet.readiness_status, "blocked_missing_same_family_evidence")
         self.assertEqual(packet.deterministic_gate_results["same_family_sample_gate"], "blocked")
+
+    def test_builds_concrete_cpi_release_packet(self):
+        packet = build_event_family_modelability_evidence_packet(
+            event_family_id="consumer_price_index",
+            target_symbol="",
+            target_cik="",
+            start_month="2024-01",
+            end_month="2024-12",
+            scheduled_macro_release_rows=[
+                {
+                    "event_id": "cpi-2024-01",
+                    "event_time": "2024-01-11T08:30:00-05:00",
+                    "scheduled_known_at": "2024-01-01T00:00:00-05:00",
+                    "event_type": "CPI Release",
+                    "event_scope": "macro",
+                    "country": "US",
+                    "symbol": "CPI",
+                    "source_priority": "approved_calendar",
+                    "source_url": "https://example.test/cpi",
+                    "raw_artifact_ref": "calendar/cpi-2024-01",
+                }
+            ],
+            same_family_observation_count=8,
+            minimum_same_family_observations=8,
+        )
+
+        self.assertEqual(packet.event_family_id, "cpi_release")
+        self.assertEqual(packet.readiness_status, "ready_for_codex_modelability_review")
+        self.assertEqual(packet.observations[0].normalized_event_parameters["source_category"], "scheduled_macro_release")
+        self.assertEqual(packet.observations[0].normalized_event_parameters["event_kind"], "cpi_release")
 
 
 if __name__ == "__main__":

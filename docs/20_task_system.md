@@ -111,9 +111,12 @@ model-worker lane has no owner instead of falling back to a targetless fold.
 7. Event-family modelability acquisition. When M06 must judge whether an event
    family can be described by an impact probability function, it first creates a
    `model_06_event_family_modelability_acquisition_plan`. The plan declares the
-   event-family seed, same-family sample threshold, required canonical feeds,
-   PIT window, and provider task keys. Provider calls remain in the reviewed
-   dispatcher. After acquisition, code builds
+   concrete event-family seed, same-family sample threshold, required canonical
+   feeds, PIT window, and provider task keys. Source/category buckets such as
+   `news`, `target_news_or_disclosure`, `scheduled_macro_release`, and `macro`
+   are not valid event families; they must be narrowed to families such as
+   `target_product_price_change_news`, `cpi_release`, or `ppi_release`.
+   Provider calls remain in the reviewed dispatcher. After acquisition, code builds
    `model_06_event_family_modelability_evidence_packet` from acquired
    same-family PIT observations; Codex modelability review consumes that packet
    and performs no provider calls. Program gates own coverage, dedupe,

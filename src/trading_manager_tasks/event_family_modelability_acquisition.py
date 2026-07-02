@@ -28,14 +28,26 @@ EVENT_FAMILY_FEED_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         "03_feed_alpaca_news",
         "05_feed_gdelt_news",
     ),
-    "scheduled_macro_release": (
-        "05_feed_gdelt_news",
-    ),
-    "target_news_or_disclosure": (
+    "target_product_price_change_news": (
         "03_feed_alpaca_news",
         "05_feed_gdelt_news",
-        "08_feed_sec_company_financials",
     ),
+    "cpi_release": (
+        "05_feed_gdelt_news",
+    ),
+    "ppi_release": (
+        "05_feed_gdelt_news",
+    ),
+}
+
+COARSE_EVENT_SOURCE_CATEGORIES = {
+    "news": "news is a source class; use a concrete news event family such as target_product_price_change_news",
+    "target_news_or_disclosure": "target_news_or_disclosure is a source/category bucket; use a concrete news event family",
+    "disclosure": "disclosure is a source/category bucket; use a concrete disclosure event family",
+    "scheduled_macro_release": "scheduled_macro_release is a schedule/source category; use a concrete release family such as cpi_release or ppi_release",
+    "macro": "macro is a domain bucket; use a concrete macro event family such as cpi_release or ppi_release",
+    "macro_release": "macro_release is a release category; use a concrete macro event family such as cpi_release or ppi_release",
+    "economic_release": "economic_release is a release category; use a concrete macro event family such as cpi_release or ppi_release",
 }
 
 EVENT_FAMILY_ALIASES = {
@@ -43,11 +55,16 @@ EVENT_FAMILY_ALIASES = {
     "earnings_release": "company_earnings_or_financial_results",
     "financial_results": "company_earnings_or_financial_results",
     "company_financials": "company_earnings_or_financial_results",
-    "macro": "scheduled_macro_release",
-    "macro_release": "scheduled_macro_release",
-    "economic_release": "scheduled_macro_release",
-    "news": "target_news_or_disclosure",
-    "disclosure": "target_news_or_disclosure",
+    "product_price_change": "target_product_price_change_news",
+    "product_pricing_change": "target_product_price_change_news",
+    "product_price_change_news": "target_product_price_change_news",
+    "apple_product_price_change": "target_product_price_change_news",
+    "cpi": "cpi_release",
+    "consumer_price_index": "cpi_release",
+    "consumer_price_index_release": "cpi_release",
+    "ppi": "ppi_release",
+    "producer_price_index": "ppi_release",
+    "producer_price_index_release": "ppi_release",
     "market_session": "market_session_calendar_event",
     "market_calendar": "market_session_calendar_event",
     "exchange_calendar": "market_session_calendar_event",
@@ -93,6 +110,11 @@ def canonical_event_family_id(event_family_id: str) -> str:
     normalized = event_family_id.strip().lower().replace("-", "_").replace(" ", "_")
     if not normalized:
         raise TaskSystemError("event_family_id is required")
+    if normalized in COARSE_EVENT_SOURCE_CATEGORIES:
+        raise TaskSystemError(
+            "event_family_id must name a concrete same-family event, not a source/category bucket: "
+            + COARSE_EVENT_SOURCE_CATEGORIES[normalized]
+        )
     return EVENT_FAMILY_ALIASES.get(normalized, normalized)
 
 
@@ -176,17 +198,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--storage-root", type=Path, default=DEFAULT_STORAGE_ROOT)
     parser.add_argument("--write-files", action="store_true")
     args = parser.parse_args(argv)
-    plan = plan_event_family_modelability_acquisition(
-        event_family_id=args.event_family_id,
-        start_month=args.start_month,
-        end_month=args.end_month,
-        target_symbol=args.target_symbol,
-        target_cik=args.target_cik,
-        candidate_seed_event_ref=args.candidate_seed_event_ref,
-        minimum_same_family_observations=args.minimum_same_family_observations,
-        storage_root=args.storage_root,
-        write_files=args.write_files,
-    )
+    try:
+        plan = plan_event_family_modelability_acquisition(
+            event_family_id=args.event_family_id,
+            start_month=args.start_month,
+            end_month=args.end_month,
+            target_symbol=args.target_symbol,
+            target_cik=args.target_cik,
+            candidate_seed_event_ref=args.candidate_seed_event_ref,
+            minimum_same_family_observations=args.minimum_same_family_observations,
+            storage_root=args.storage_root,
+            write_files=args.write_files,
+        )
+    except TaskSystemError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     write_plan(plan, output=sys.stdout)
     return 0
 
