@@ -31,8 +31,10 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
             self.assertEqual(plan.provider_calls, 0)
             self.assertFalse(plan.modelability_review_performed)
             self.assertIn("single event is only a candidate seed", plan.single_observation_policy)
-            self.assertIn("scenario/mechanism", plan.event_family_generalization_policy)
-            self.assertIn("AAPL/NVDA/AMD", plan.event_family_generalization_policy)
+            self.assertIn("reusable mechanism", plan.event_family_generalization_policy)
+            self.assertIn("child families or specific dossiers", plan.event_family_generalization_policy)
+            self.assertIn("hierarchical event ontology", plan.event_ontology_policy)
+            self.assertIn("specific_event_dossier", plan.specific_event_dossier_policy)
             self.assertIn("Program gates own acquisition scope", plan.deterministic_control_policy)
             self.assertIn("semantic reviewers only", plan.agent_role_policy)
             self.assertEqual(
@@ -84,7 +86,7 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
     def test_rejects_target_specific_event_family_aliases(self):
         for invalid_family in ("apple_product_price_change", "aapl_product_launch", "nvda_regulatory_antitrust"):
             with self.subTest(invalid_family=invalid_family):
-                with self.assertRaisesRegex(Exception, "target-agnostic"):
+                with self.assertRaisesRegex(Exception, "specific_event_dossier"):
                     canonical_event_family_id(invalid_family)
 
 

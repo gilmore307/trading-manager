@@ -128,9 +128,12 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    are not valid event families; they must be narrowed to families such as
    `target_product_price_change_news`, `target_product_launch_news`,
    `target_supply_chain_disruption_news`, `target_regulatory_antitrust_news`,
-   `cpi_release`, or `ppi_release`. Event families are target-agnostic
-   scenario/mechanism groups; tickers, issuers, sectors, and dates are
-   observation labels or acquisition filters rather than family boundaries.
+   `cpi_release`, or `ppi_release`. M03 uses a hierarchical event ontology:
+   source/category and domain nodes support routing and priors, mechanism
+   families are the default modelability unit, and reviewed child families or
+   specific dossiers can specialize recurring entity/theme behavior. Tickers,
+   issuers, sectors, and dates are observation labels, acquisition filters, or
+   dossier refs until reviewed evidence promotes a narrower child/dossier.
    Provider calls remain in the reviewed dispatcher. After acquisition, code
    builds `model_06_event_family_modelability_evidence_packet` from acquired
    same-family PIT observations. The packet must pass deterministic

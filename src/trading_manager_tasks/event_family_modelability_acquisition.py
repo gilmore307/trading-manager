@@ -21,6 +21,16 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 MODELABILITY_ACQUISITION_CONTRACT_TYPE = "model_06_event_family_modelability_acquisition_plan"
 DEFAULT_MINIMUM_SAME_FAMILY_OBSERVATIONS = 8
+EVENT_ONTOLOGY_POLICY = (
+    "M03 uses a hierarchical event ontology: source/category and domain nodes support routing and priors; "
+    "mechanism families are the default modelability unit; evidence-gated child families or specific dossiers "
+    "may override ancestor priors while preserving taxonomy version, lineage, and fallback behavior."
+)
+SPECIFIC_EVENT_DOSSIER_POLICY = (
+    "Ticker/company/theme-specific behavior belongs in a reviewed specific_event_dossier or child-family profile, "
+    "not in an ad hoc family id. A dossier must be PIT-definable from mechanism, scope, and risk-channel evidence "
+    "rather than hindsight market reaction."
+)
 
 EVENT_FAMILY_FEED_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "company_earnings_or_financial_results": (
@@ -139,6 +149,8 @@ class EventFamilyModelabilityAcquisitionPlan:
     minimum_same_family_observations: int
     same_family_evidence_policy: str
     event_family_generalization_policy: str
+    event_ontology_policy: str
+    specific_event_dossier_policy: str
     single_observation_policy: str
     required_feed_ids: tuple[str, ...]
     task_key_count: int
@@ -168,7 +180,8 @@ def canonical_event_family_id(event_family_id: str) -> str:
         )
     if normalized in TARGET_SPECIFIC_EVENT_FAMILY_ALIASES:
         raise TaskSystemError(
-            "event_family_id must be target-agnostic; put ticker/company identity in affected_entities, target_symbol, or acquisition filters"
+            "target-specific behavior must be represented by an evidence-gated specific_event_dossier or child-family profile; "
+            "use the accepted ancestor event_family_id for acquisition/modelability packets"
         )
     return EVENT_FAMILY_ALIASES.get(normalized, normalized)
 
@@ -221,8 +234,10 @@ def plan_event_family_modelability_acquisition(
         target_cik=str(target_cik).zfill(10),
         candidate_seed_event_ref=candidate_seed_event_ref,
         minimum_same_family_observations=minimum_same_family_observations,
-        same_family_evidence_policy="M03 event-family modelability review must use multiple PIT-valid same-family observations with coverage, controls, and leakage evidence.",
-        event_family_generalization_policy="Event families are defined by scenario/mechanism, not by ticker or company identity; AAPL/NVDA/AMD are observation entities or acquisition filters.",
+        same_family_evidence_policy="M03 event-family modelability review must use multiple PIT-valid same-family or same-dossier observations with coverage, controls, and leakage evidence.",
+        event_family_generalization_policy="Event families are defined by reusable mechanism first; low-evidence events inherit ancestor families, while reviewed child families or specific dossiers can specialize recurring entity/theme behavior.",
+        event_ontology_policy=EVENT_ONTOLOGY_POLICY,
+        specific_event_dossier_policy=SPECIFIC_EVENT_DOSSIER_POLICY,
         single_observation_policy="A single event is only a candidate seed; it cannot establish event-family probability-function type.",
         required_feed_ids=required_feed_ids,
         task_key_count=feed_summary.task_key_count,

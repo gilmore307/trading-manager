@@ -22,6 +22,8 @@ from zoneinfo import ZoneInfo
 from .control_plane import TaskSystemError
 from .event_family_modelability_acquisition import (
     DEFAULT_MINIMUM_SAME_FAMILY_OBSERVATIONS,
+    EVENT_ONTOLOGY_POLICY,
+    SPECIFIC_EVENT_DOSSIER_POLICY,
     MODELABILITY_ACQUISITION_CONTRACT_TYPE,
     canonical_event_family_id,
 )
@@ -303,6 +305,8 @@ class EventFamilyModelabilityEvidencePacket:
     deterministic_control_policy: str
     agent_role_policy: str
     event_family_generalization_policy: str
+    event_ontology_policy: str
+    specific_event_dossier_policy: str
     projection_mode_decision_performed: bool
     probability_function_class_decision_performed: bool
     provider_calls: int
@@ -652,7 +656,7 @@ def _next_action_plan_for_readiness(
                 "action_type": "semantic_family_refinement",
                 "required_skill": "event-taxonomy-standard-review",
                 "secondary_skill": "event-interpretation",
-                "completion_gate": "split mixed rows into concrete subtype event families, then rebuild separate evidence packets",
+                "completion_gate": "split mixed rows into concrete child families or specific dossier candidates, preserve ancestor/fallback lineage, then rebuild separate evidence packets",
             },
         )
     if readiness_status == "blocked_missing_structured_evidence":
@@ -1319,7 +1323,9 @@ def build_event_family_modelability_evidence_packet(
         observation_rows_truncated=total_observations > len(observations),
         deterministic_control_policy="Program-built evidence packet; Codex review consumes this packet and performs no provider calls or scope expansion.",
         agent_role_policy="Codex may review taxonomy/modelability/probability-function class only; it must not train parameters or output signed impact.",
-        event_family_generalization_policy="Event families are target-agnostic scenario/mechanism groups; target_symbol and affected_entities identify observations, not the family boundary.",
+        event_family_generalization_policy="Event families are reusable mechanism groups; target_symbol and affected_entities identify observations, while reviewed child families or specific dossiers can specialize recurring entity/theme behavior.",
+        event_ontology_policy=EVENT_ONTOLOGY_POLICY,
+        specific_event_dossier_policy=SPECIFIC_EVENT_DOSSIER_POLICY,
         projection_mode_decision_performed=False,
         probability_function_class_decision_performed=False,
         provider_calls=0,

@@ -53,6 +53,14 @@ M05 may produce optional offline trading-guidance records and option-expression 
 
 M03 event-state owns the fold-scoped point-in-time event universe before replay. It materializes reviewed event observations, deterministic calendar/session events, structured event-family evidence, modelability gates, and event-impact projection inputs for the full fold rather than waiting for later model failures. M03 trains and applies point-in-time impact-state projections for events that pass deterministic coverage, control, leakage, overlap, label, and calibration gates.
 
+M03 event taxonomy is hierarchical. Coarse source/category and domain nodes may
+support routing and priors for first-seen or low-evidence events, but
+modelability packets use the narrowest accepted PIT-definable mechanism family,
+child family, or specific event dossier. Fine dossiers such as entity/theme
+earnings profiles may override ancestor priors only after reviewed evidence
+establishes reusable inclusion/exclusion rules, controls, lineage, and fallback
+behavior; hindsight market reaction alone cannot create a taxonomy split.
+
 M03 may materialize a no-event state only when the full fold event-universe route has validly found no reviewed event observations or no admissible event-impact evidence. It must not use selected replay trades, replay failures, post-fold outcomes, or replay-review attribution rows to decide which upstream event rows exist.
 
 C07 provisional untrained-event risk estimates are not M03 event-state inputs. They may

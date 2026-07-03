@@ -57,21 +57,44 @@ state process cannot be separated but the standardized input-to-outcome mapping
 is validated. `context_only_projection` is a risk-control output only: it says
 the event matters, not how much or in which direction.
 
-## Event Family Boundary
+## Event Ontology Boundary
 
-An event family is a concrete repeated phenomenon with comparable mechanics,
-not a data source, feed, or broad bucket.
+M03 classifies events through a hierarchical event ontology, not a flat
+single-level family list. The purpose of the hierarchy is to let low-evidence or
+first-seen events inherit a coarse prior while preserving a path to finer,
+mechanism-specific analysis once enough point-in-time evidence exists.
 
-Event-family IDs must be target-agnostic. Tickers, company names, sectors,
-venues, and dates are observation labels, affected entities, context fields, or
-acquisition filters; they are not part of the family boundary. AAPL earnings,
-NVDA earnings, and AMD earnings therefore belong to the same earnings family
-when their scenario mechanics match. Likewise, Apple product price changes and
-AMD product price changes should share `target_product_price_change_news`
-instead of creating ticker-specific families. Direction is a signed event
-parameter, not a separate family boundary.
+The ontology separates these concepts:
 
-Valid family examples:
+| Concept | Role |
+|---|---|
+| `source_category` | How the evidence arrived, such as news, report, SEC filing, official disclosure, or macro calendar. It supports routing and source precedence, but is not a modelable family by itself. |
+| `domain_node` | Broad topic or venue, such as corporate, macro, political, regulatory, technology, financial-system, or market-structure. It is a coarse prior and acquisition guide. |
+| `mechanism_family` | Repeated scenario with comparable mechanics, clocks, required fields, and risk channels. This is the default M03 modelability unit. |
+| `submechanism_family` | A narrower child with stricter inclusion/exclusion rules, such as guidance reset, AI capex repricing, customer concentration, dilution, or policy repricing. |
+| `specific_event_dossier` | Evidence-gated entity/theme/profile record for a recurring high-impact pattern such as NVDA earnings sector read-through. It can override ancestor priors for account-risk state, but must preserve fallback lineage. |
+
+Coarse nodes are useful when the system has not studied an event deeply enough.
+For example, the first AAOI earnings event may inherit from
+`company_earnings_or_financial_results`. If later evidence shows AAOI earnings
+have a stable small-cap supplier/customer-concentration profile while NVDA
+earnings have a stable mega-cap technology/AI-sector read-through profile, M03
+should split or attach specific dossiers instead of forcing both into one
+undifferentiated earnings pattern.
+
+The hierarchy is not a strict exclusive tree. An event may carry multiple
+mechanism tags and risk channels. The primary mechanism family owns the packet
+and default gates, while additional tags describe scope, theme, channel, and
+uncertainty. Source/category and domain labels may be ancestors, but they are
+not sufficient for modelability review.
+
+Event-family IDs used for modelability packets should name the currently
+accepted mechanism family or submechanism family. Tickers, company names,
+sectors, venues, and dates are observation labels, affected entities, scope
+fields, acquisition filters, or dossier refs until a specific dossier has passed
+review. Direction is an event parameter, not a separate family boundary.
+
+Valid mechanism-family examples:
 
 - `target_product_price_change_news`: target product price increase/decrease
   news, with target identity stored on each observation and direction stored as
@@ -81,17 +104,65 @@ Valid family examples:
 - `company_earnings_or_financial_results`: company financial results and
   earnings/report filings.
 
-Invalid family examples:
+Valid child/dossier examples:
+
+- `company_earnings_or_financial_results` ancestor plus a reviewed
+  `nvda_earnings_sector_readthrough` dossier.
+- `company_earnings_or_financial_results` ancestor plus a reviewed
+  `small_cap_supplier_customer_concentration_earnings` submechanism.
+- `cpi_release` ancestor plus a reviewed inflation-regime-specific dossier when
+  PIT rules, sample coverage, and controls support it.
+
+Invalid modelability-family examples:
 
 - `news`: source class only.
+- `report`: source/category bucket only.
 - `target_news_or_disclosure`: source/category bucket only.
 - `scheduled_macro_release`: release calendar category only.
 - `macro`: domain bucket only.
+- `nvda_earnings_went_up`: hindsight outcome label.
+- `aaoi_earnings_crashed`: target-specific outcome label.
 
-M03 event-family evidence packets must reject source/category buckets before Codex review.
-Source rows may still feed a concrete family packet, for example Alpaca/GDELT
-news rows feeding `target_product_price_change_news`, or scheduled macro
-calendar rows feeding `cpi_release`.
+M03 event-family evidence packets must reject raw source/category buckets and
+hindsight outcome labels before Codex review. Source rows may still feed a
+concrete family packet, for example Alpaca/GDELT news rows feeding
+`target_product_price_change_news`, or scheduled macro calendar rows feeding
+`cpi_release`.
+
+## Taxonomy Promotion And Lineage
+
+Taxonomy depth is evidence-gated. M03 starts with the narrowest accepted node
+whose rules are point-in-time definable. It may promote a child family or
+specific dossier only when the split is reusable, operationally useful, and
+defined without post-event returns.
+
+A child family or dossier proposal must include:
+
+- parent and fallback ancestor refs;
+- definition, inclusion criteria, exclusion criteria, and near-misses;
+- source/category and canonical source precedence;
+- lifecycle class and clock rules;
+- required interpretation fields and structured parameters;
+- affected scope defaults and risk-channel defaults;
+- minimum same-family coverage and cross-fold stability expectations;
+- matched-control, leakage, overlap/confounder, label, and calibration gates;
+- evidence that the finer node improves risk/tradability context or replay
+  attribution beyond the ancestor;
+- a rule for falling back to the ancestor when evidence is weak.
+
+Historical ledgers must not silently move events between families. Each event
+row must preserve the taxonomy version, original accepted classification,
+current reviewed classification, ancestor chain, active modelability node, and
+fallback node. Replay review consumes the fixed M03 ledger that existed for the
+fold; later taxonomy promotion can only affect future folds or explicitly
+rerun-managed artifacts.
+
+Fine classification must not be outcome-driven. A split such as
+`nvda_earnings_sector_readthrough` is only admissible if it can be identified
+from PIT-visible facts such as market-cap/weight, sector/theme centrality,
+option liquidity/IV profile, analyst/market attention, supply-chain role,
+guidance/capex fields, and historical fold-separated behavior. It is not
+admissible merely because a past NVDA earnings event moved the market.
 
 Evidence-packet readiness is a deterministic program decision, not a Codex
 semantic decision:
@@ -101,7 +172,7 @@ semantic decision:
 | `admissible_for_modelability_review` | Mechanical gates passed; Codex may judge projection mode and probability-function class. |
 | `admissible_for_context_only_review` | The packet is deterministic risk context, not a quantitative impact-family candidate. |
 | `blocked_missing_same_family_evidence` | Same-family count is below the required threshold. |
-| `blocked_mixed_family` | The sample contains multiple incompatible mechanisms in one packet. Signed parameters such as product-price increase versus decrease stay inside one price-change family. |
+| `blocked_mixed_family` | The sample contains multiple incompatible mechanisms or unresolved child/dossier candidates in one packet. Signed parameters such as product-price increase versus decrease stay inside one price-change family. |
 | `blocked_missing_structured_evidence` | Required structured inputs, clocks, expectations, surprise fields, or clean subtype fields are missing. |
 | `blocked_missing_modelability_gates` | The family is mechanically coherent, but controls, overlap/confounder, leakage, horizon labels, or fold calibration are not ready. |
 
@@ -115,7 +186,7 @@ Every evidence packet must also publish a deterministic next-action route:
 | Readiness | Required next action |
 |---|---|
 | `blocked_missing_same_family_evidence` | Prepare bounded same-family event acquisition when source coverage is missing; if covered sources still do not provide enough observations, park the family and wait for future same-family events. |
-| `blocked_mixed_family` | Run event taxonomy / interpretation refinement, split concrete subfamilies, then rebuild separate packets. |
+| `blocked_mixed_family` | Run event taxonomy / interpretation refinement, split concrete child families or dossier candidates, then rebuild separate packets with ancestor/fallback lineage. |
 | `blocked_missing_structured_evidence` | Run the program enrichment route for structured PIT fields such as release clocks, expectation/consensus, actual/surprise, subtype, and fixed horizon labels. |
 | `blocked_missing_modelability_gates` | Run the shared model-task feature/evidence-generation stage for deterministic modelability gates: matched controls, overlap/confounder assessment, leakage assessment, fixed horizon labels, and fold calibration. |
 | `admissible_for_context_only_review` | Run `event-context-projection-review`; do not run probability-function modelability review. |
@@ -166,19 +237,20 @@ distribution.
 
 ## M03 Responsibilities
 
-M03 owns pre-replay event-universe materialization, event-family modelability,
-and event-state projection:
+M03 owns pre-replay event-universe materialization, event ontology governance,
+event-family/dossier modelability, and event-state projection:
 
 - acquire or materialize the full fold point-in-time event universe before
   replay;
-- define event family and taxonomy boundaries;
+- define event ontology, event-family, child-family, and dossier boundaries;
+- preserve taxonomy version, ancestor chain, active node, and fallback lineage;
 - decide whether the family can be modeled at all;
 - choose `projection_mode`;
 - choose allowed `probability_function_class`;
 - define required clocks, scales, phase vocabulary, scope vocabulary, and
   channel vocabulary;
-- require multiple PIT-valid same-family observations before assigning a
-  probability-function class;
+- require multiple PIT-valid same-family or same-dossier observations before
+  assigning a probability-function class;
 - verify source coverage, dedupe, matched controls, overlap/confounder status,
   and leakage gates before Codex semantic review.
 - train PIT-safe mappings from M03-approved event parameters to distribution
