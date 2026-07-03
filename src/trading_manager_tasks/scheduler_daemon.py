@@ -1877,7 +1877,11 @@ def handle_scheduler_progress_stall(
         default_start_month=state.start_month,
         default_end_month=state.end_month,
     )
-    if refreshed_state is not state and _scheduler_waiting_for_known_nonprogress_boundary(refreshed_state):
+    refreshed_selection_reason = refreshed_state.last_work_selection_reason
+    if refreshed_state is not state and (
+        _scheduler_waiting_for_known_nonprogress_boundary(refreshed_state)
+        or refreshed_selection_reason not in {None, "no_prior_workflow_state"}
+    ):
         return refreshed_state
     if state.last_stall_agent_error_ref:
         return state
