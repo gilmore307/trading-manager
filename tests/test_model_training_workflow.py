@@ -13,6 +13,7 @@ from trading_manager_tasks.model_training_workflow import (
     MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,
     MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID,
     MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
+    MODEL_THREE_EVENT_OBSERVATION_COVERAGE_BLOCKER,
     MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
     build_model_training_workflow_plan,
@@ -45,6 +46,35 @@ def _write_target_feed_artifact(root: Path, *, symbol: str = "AAPL", month: str 
                 ]
             }
         ),
+        encoding="utf-8",
+    )
+
+
+def _write_event_feed_receipt(root: Path, *, source_id: str, month: str = "2016-01") -> None:
+    receipt_path = root / "monthly_backfill" / source_id / month / "completion_receipt.json"
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "runs": [
+                    {
+                        "run_id": f"{source_id}_run_001",
+                        "status": "succeeded",
+                        "row_counts": {"event_row": 1},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_trading_economics_artifact(root: Path, *, month: str = "2016-01") -> None:
+    path = root / "monthly_backfill" / "trading_economics_calendar_web" / month / "runs" / "run_001" / "saved" / "trading_economics_calendar_event.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "event_time,country,event,source_event_type,reference,actual,previous,consensus,te_forecast,revised,importance,symbol\n"
+        "2016-01-08T08:30:00-05:00,United States,Non Farm Payrolls,employment,te:nfp,200K,180K,190K,,,3,\n",
         encoding="utf-8",
     )
 
@@ -203,9 +233,28 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "upstream_model_01_model_generation_complete",
                 "upstream_model_02_model_generation_complete",
                 "model_01_background_context.feature_or_input_ready",
+                MODEL_THREE_EVENT_OBSERVATION_COVERAGE_BLOCKER,
             ),
         )
         self.assertIn("scripts/tasks/materialize_model_03_event_impact_inputs.py", stage.command)
+
+    def test_m03_event_state_input_allows_complete_event_feed_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            root = Path(raw_tmp)
+            for source_id in ("alpaca_news", "gdelt_news", "sec_company_financials"):
+                _write_event_feed_receipt(root, source_id=source_id)
+            _write_trading_economics_artifact(root)
+            plan = build_model_training_workflow_plan(
+                storage_root=root,
+                trading_storage_root=root,
+                start_month="2016-01",
+                end_month="2016-01",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        stage = {stage.stage_id: stage for stage in plan.layers[2].stages}["model_03_event_state.data_acquisition"]
+        self.assertNotIn(MODEL_THREE_EVENT_OBSERVATION_COVERAGE_BLOCKER, stage.blockers)
 
     def test_m05_option_expression_owns_option_source_when_options_apply(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
