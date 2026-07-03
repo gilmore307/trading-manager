@@ -251,29 +251,10 @@ Fold maintenance classifies data by reuse and evidence value before storage
 lifecycle handling. It must not treat every file written during a fold as part
 of that fold's disposable workspace.
 
-M01 background/context data is reusable foundation substrate. Valid M01 source
-data, features, manifests, and model artifacts remain protected across target
-folds because later targets reuse the same market/background state. M01
-artifacts may be superseded by a current contract or model rerun, but they are
-not deleted merely because an individual target fold ended.
-
-Progress-monitoring side products are temporary. Stage heartbeats, row-progress
-snapshots, local scheduler progress files, transient debug traces, and repeated
-operation manifests exist to resume and observe a running task. After the fold
-settles, maintenance keeps only the minimal completion receipt, transition
-summary, counters, hashes, and error references needed for audit and repair.
-The remaining progress side products enter direct cleanup or rolling-retention
-cleanup according to the accepted storage lifecycle policy.
-
-Branch files acquired only to complete one fold are disposable after their
-consumer evidence is retained. For example, if an AAPL fold temporarily acquired
-NVDA market data only as a same-fold event-scope, peer-control, or replay
-diagnostic dependency, and that partition was not promoted into canonical
-shared source coverage, maintenance may delete the fold-scoped NVDA copy after
-it retains the dependency reason, source refs, coverage summary, hashes, and
-derived result references. If the same NVDA data is saved as canonical reusable
-market data under the shared source layout, it is protected and future folds
-reuse it instead of deleting or redownloading it.
+Disposition is not a fold-close judgment call. Every fold artifact writer must
+emit or imply one of the accepted disposition classes when the artifact is
+created. Maintenance applies the class; it does not rediscover the artifact's
+business purpose from path names.
 
 The disposition classes are:
 
@@ -283,11 +264,58 @@ protected_canonical_source
 protected_long_term_knowledge
 retained_evidence_summary
 retained_manifest_only
+retained_candidate_model
 compress_or_archive_candidate
 delete_after_fold_settlement
 rolling_retention_side_product
 blocked_pending_storage_lifecycle_review
 ```
+
+Each fold-scoped artifact classification must record:
+
+```text
+disposition_class
+reuse_scope = foundation | canonical_source | long_term_knowledge | fold | target_fold | replay_run | side_product
+producer_stage_id
+fold_id or global_scope_ref
+source_refs or parent_artifact_refs
+retained_summary_refs
+cleanup_candidate_refs
+protection_reason
+```
+
+At fold settlement, maintenance writes a `fold_maintenance_manifest` with every
+artifact family below grouped by disposition class. Missing classification is a
+blocker: unclassified artifacts enter `blocked_pending_storage_lifecycle_review`
+and must not be deleted by default.
+
+The fixed fold disposition matrix is:
+
+| Artifact family | Examples | Disposition after fold settlement |
+|---|---|---|
+| M01 reusable foundation source | Broad market bars, cross-asset controls, macro/calendar source partitions used by M01 background/context | `protected_foundation_reusable`; keep for future targets and folds. |
+| M01 reusable foundation features and manifests | M01 market/background feature rows, feature-ready manifests, source coverage evidence, training-problem identity | `protected_foundation_reusable`; keep unless superseded by a rerun or accepted contract retirement. |
+| Canonical shared source data | Reusable provider/source partitions under the shared source layout, including reusable target bars, ETF controls, peer bars, option source partitions, SEC/news/calendar source, and canonical market-data dependency fetches | `protected_canonical_source`; future folds reuse it instead of redownloading. |
+| Non-reacquirable or long-term event knowledge | Trading Economics protected source, accepted M03 event ontology, event-family/dossier lineage, reviewed event-modelability packets, accepted temporal/event-focus evidence | `protected_long_term_knowledge`; keep concise provenance and current canonical evidence. |
+| Fold-scoped branch downloads | AAPL fold temporarily fetched NVDA/QQQ/SMH/peer data for event-scope controls, label settlement, replay diagnostics, or repair, where the partition was not promoted to canonical source coverage | `delete_after_fold_settlement` after retaining dependency reason, source refs, coverage summary, hashes, and consumer result refs. |
+| Provider dispatch side products | Prepared task keys, consumed runtime task-key copies, repeated request manifests, provider subprocess scratch, retry-local payload copies | `rolling_retention_side_product`; keep terminal request/receipt refs and counters, remove consumed live runtime copies, roll older duplicates. |
+| Progress-monitoring side products | Stage heartbeats, row-progress snapshots, local scheduler progress files, detailed run-step progress, transient debug traces | `rolling_retention_side_product`; keep final completion receipt, transition summary, counters, and error refs only. |
+| Temporary scratch and repair diagnostics | One-off scratch CSV/JSON, investigation dumps, failed-run copied context, non-promoted repair artifacts | `delete_after_fold_settlement` or `rolling_retention_side_product` after the repair receipt cites the durable evidence. |
+| Data-acquisition receipts and coverage summaries | Source refs, coverage summary rows, provider run receipts, hashes, source quality summaries | `retained_evidence_summary`; keep compact evidence, not duplicate source payloads. |
+| Deterministic feature-generation intermediates | Rebuildable feature tables/files, intermediate joins, temporary vectorization outputs, split-local feature caches | `retained_manifest_only` when source refs, code/schema refs, hashes, row counts, and quality summaries can reproduce them; otherwise `compress_or_archive_candidate` until reproducibility is proven. |
+| Label-settlement artifacts | Label horizon manifests, label availability clocks, forward-outcome summaries, eligibility rows, leakage audit summaries | `retained_evidence_summary`; large rebuildable label tables may be `compress_or_archive_candidate` after fixed summaries and hashes remain. |
+| M03 event ledger and target/scope projections | Fold PIT event ledger, event-risk state for M04, market/sector/symbol residual scope projections, target exposure projections | Shared ledger and accepted ontology are protected; fold/target projections keep summaries/manifests and may compress large rebuildable projection tables. |
+| Model training manifests | Training-problem manifest, feature/label refs, code/data versions, cutoff, row counts, objective, sampling, weighting, calibration input refs | `retained_evidence_summary`; mandatory for retrain/skip decisions across targets. |
+| Candidate model artifacts | Final fold candidate model, selected checkpoint, calibration layer, model config used by replay/evaluation | `retained_candidate_model` through replay, evaluation, promotion, and any accepted shadow-readiness handoff; non-selected checkpoints become `compress_or_archive_candidate` or `delete_after_fold_settlement`. |
+| Non-selected checkpoint clutter | Epoch checkpoints, local early-stopping candidates, duplicate model binaries, abandoned search outputs | `delete_after_fold_settlement` after selected/final checkpoint refs and training summary remain. |
+| Replay dataset freeze artifacts | Replay dataset manifest, freeze receipt, replay window manifest, source contract refs, coverage summary | `retained_evidence_summary`; required for replay reproducibility. |
+| Replay execution outputs | Replay receipts, decision rows, monthly summaries, equity path metrics, selected contract path refs, execution component graph refs | `retained_evidence_summary`; large step traces compress or roll unless needed for a failure row. |
+| Model-specific replay downloads | One-off option snapshots or other replay-only downloads that cannot become canonical reusable source partitions | `delete_after_fold_settlement` after replay close and retained summaries, manifests, hashes, and consumer refs. |
+| Replay review and attribution outputs | Failure rows, first-gap summaries, regret rows, event-attribution suboutput against the fixed M03 ledger | `retained_evidence_summary`; detailed debug traces are side products. |
+| Evaluation and promotion evidence | Benchmark metrics, incumbent comparison, uncertainty/guardrail evidence, promotion eligibility decision, promotion-readiness record, advisory agent decisions | `retained_evidence_summary`; keep because fold settlement and promotion audit depend on it. |
+| Dashboard/read-model cache | Latest read model, generated UI cache, historical dashboard snapshots | latest/current is retained for display; old snapshots are `rolling_retention_side_product` unless cited by an evidence receipt. |
+| Workflow and scheduler state | Fold completion state, current transition ledger, lock/daemon state, decision logs, detailed checkpoint files | keep fold completion and current transition summaries; detailed checkpoint/progress files are `rolling_retention_side_product` after settlement. |
+| Error-agent request/repair artifacts | Error request, diagnosis, repair receipt, verification refs, retry decision | `retained_evidence_summary` for terminal repair evidence; copied context and scratch are side products. |
 
 Physical deletion remains storage-owned. Manager maintenance may write the
 classification, protected refs, retained refs, and deletion-candidate refs, but

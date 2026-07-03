@@ -163,6 +163,12 @@ model-worker lane has no owner instead of falling back to a targetless fold.
 9. Promotion and lifecycle handoff. Promotion produces accepted/rejected/deferred
    evidence for a model bundle. Management of already promoted models belongs to
    the runtime component lifecycle owner, not to manager activation.
+10. Fold maintenance. Maintenance applies the fixed fold data-disposition
+   matrix from `docs/03_contracts.md`. Artifact writers classify outputs when
+   they create them; maintenance preserves reusable foundation/source/knowledge
+   artifacts, keeps compact evidence summaries, and hands side products or
+   fold-scoped branch files to storage lifecycle under their declared class. It
+   must not infer cleanup eligibility ad hoc from path names at fold close.
 
 The manager schedules and records these tasks. It does not turn a historical
 target-substrate request into a fixed-target strategy claim, and it does not

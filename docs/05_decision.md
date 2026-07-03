@@ -218,10 +218,14 @@ boundary.
 
 ## D216 - Fold maintenance keeps reusable foundation data and removes side products
 
-Fold maintenance classifies artifacts by reuse before cleanup. M01
-background/context source, feature, manifest, and model artifacts are reusable
-foundation substrate for future targets and must not be deleted merely because a
-target fold completed. Canonical shared source data is likewise protected.
+Fold maintenance must use the fixed data-disposition matrix in
+`docs/03_contracts.md`. Artifact disposition is assigned when an artifact is
+created, not guessed at fold close from path names.
+
+M01 background/context source, feature, manifest, and model artifacts are
+reusable foundation substrate for future targets and must not be deleted merely
+because a target fold completed. Canonical shared source data is likewise
+protected.
 
 Progress-monitoring side products are not durable evidence. After fold
 settlement, manager/storage retain only the minimum receipts, transition
