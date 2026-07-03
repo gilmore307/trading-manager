@@ -45,6 +45,13 @@ availability rule match the declared model input contract.
 | Replay | Frozen replay snapshot plus bounded on-demand replay cache | Replay must consume the same semantic families under a historical clock; missing on-demand data must be represented with the same missing/degraded states used by training or explicitly marked replay-only stress. |
 | Realtime | Current provider observations, realtime context refs, active model/config refs | Realtime may resolve current refs instead of historical artifacts, but the refs must map to the same semantic families and governance status before they can affect model decisions. |
 
+Replay frozen snapshots are manifests over canonical source and model-input
+refs, not duplicate source bundles. The 2021-2026 replay input substrate
+reuses shared background, event, calendar/session, market-control, target,
+sector, peer, and option source partitions wherever the payload is identical.
+Fold maintenance must retain any canonical ref still cited by replay, even when
+the fold that originally acquired the partition has settled.
+
 Promotion readiness is the handoff point into realtime/shadow execution. A
 promotion-readiness record must carry `model_input_context_bundle` with
 `historical_dataset_snapshot_ref`, `frozen_model_config_ref`, M02-M05 upstream

@@ -278,6 +278,7 @@ disposition_class
 reuse_scope = foundation | canonical_source | long_term_knowledge | fold | target_fold | replay_run | side_product
 producer_stage_id
 fold_id or global_scope_ref
+consumer_refs
 source_refs or parent_artifact_refs
 retained_summary_refs
 cleanup_candidate_refs
@@ -289,6 +290,20 @@ artifact family below grouped by disposition class. Missing classification is a
 blocker: unclassified artifacts enter `blocked_pending_storage_lifecycle_review`
 and must not be deleted by default.
 
+Deletion eligibility is consumer-aware. If an artifact is referenced by any
+open or future fold, replay dataset, replay run, evaluation, promotion,
+dashboard, repair, or accepted source/knowledge contract, maintenance must keep
+the canonical artifact and mark the fold-local cleanup request as retained due
+to active consumers. A fold may not delete data needed by the 2021-2026 replay
+window just because that fold has settled.
+
+The 2021-2026 replay input substrate is shared, protected data. Background
+market data, M01 reusable context inputs, M03 event data, calendar/session data,
+market-control data, and other model-input source partitions used by replay are
+stored once in canonical shared/source locations and reused by every fold's
+replay. Fold-specific replay manifests may cite those refs, but they must not
+create duplicate private copies of identical source payloads.
+
 The fixed fold disposition matrix is:
 
 | Artifact family | Examples | Disposition after fold settlement |
@@ -296,8 +311,9 @@ The fixed fold disposition matrix is:
 | M01 reusable foundation source | Broad market bars, cross-asset controls, macro/calendar source partitions used by M01 background/context | `protected_foundation_reusable`; keep for future targets and folds. |
 | M01 reusable foundation features and manifests | M01 market/background feature rows, feature-ready manifests, source coverage evidence, training-problem identity | `protected_foundation_reusable`; keep unless superseded by a rerun or accepted contract retirement. |
 | Canonical shared source data | Reusable provider/source partitions under the shared source layout, including reusable target bars, ETF controls, peer bars, option source partitions, SEC/news/calendar source, and canonical market-data dependency fetches | `protected_canonical_source`; future folds reuse it instead of redownloading. |
+| Replay shared input substrate | 2021-2026 replay background/context inputs, M01/M03 replay-consumed source refs, canonical event/calendar/session source, reusable market/sector/peer controls, fixed replay candidate-universe source refs | `protected_canonical_source` or `protected_foundation_reusable`; keep while any replay dataset/run/evaluation/promotion can cite it, and store it once rather than duplicating per fold. |
 | Non-reacquirable or long-term event knowledge | Trading Economics protected source, accepted M03 event ontology, event-family/dossier lineage, reviewed event-modelability packets, accepted temporal/event-focus evidence | `protected_long_term_knowledge`; keep concise provenance and current canonical evidence. |
-| Fold-scoped branch downloads | AAPL fold temporarily fetched NVDA/QQQ/SMH/peer data for event-scope controls, label settlement, replay diagnostics, or repair, where the partition was not promoted to canonical source coverage | `delete_after_fold_settlement` after retaining dependency reason, source refs, coverage summary, hashes, and consumer result refs. |
+| Fold-scoped branch downloads | AAPL fold temporarily fetched NVDA/QQQ/SMH/peer data for event-scope controls, label settlement, replay diagnostics, or repair, where the partition was not promoted to canonical source coverage and has no other consumer | `delete_after_fold_settlement` after retaining dependency reason, source refs, coverage summary, hashes, and consumer result refs. If replay or another fold still needs it, keep or promote the canonical partition and delete only duplicate fold-local copies. |
 | Provider dispatch side products | Prepared task keys, consumed runtime task-key copies, repeated request manifests, provider subprocess scratch, retry-local payload copies | `rolling_retention_side_product`; keep terminal request/receipt refs and counters, remove consumed live runtime copies, roll older duplicates. |
 | Progress-monitoring side products | Stage heartbeats, row-progress snapshots, local scheduler progress files, detailed run-step progress, transient debug traces | `rolling_retention_side_product`; keep final completion receipt, transition summary, counters, and error refs only. |
 | Temporary scratch and repair diagnostics | One-off scratch CSV/JSON, investigation dumps, failed-run copied context, non-promoted repair artifacts | `delete_after_fold_settlement` or `rolling_retention_side_product` after the repair receipt cites the durable evidence. |

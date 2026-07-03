@@ -227,6 +227,14 @@ reusable foundation substrate for future targets and must not be deleted merely
 because a target fold completed. Canonical shared source data is likewise
 protected.
 
+Replay input data is also shared substrate. The 2021-2026 replay window uses
+background/context, event, calendar/session, market-control, and candidate
+universe source refs across every fold's replay. These inputs must be stored
+once in canonical shared/source locations and referenced by fold replay
+manifests rather than duplicated per fold. If a completed fold's cleanup pass
+finds data that replay or another fold still cites, maintenance must retain the
+canonical copy and delete only duplicate fold-local copies.
+
 Progress-monitoring side products are not durable evidence. After fold
 settlement, manager/storage retain only the minimum receipts, transition
 summaries, counters, hashes, and error refs needed for audit and repair; the
@@ -234,9 +242,10 @@ remaining stage heartbeats, row-progress snapshots, transient debug traces, and
 repeated operation manifests enter direct cleanup or rolling retention.
 
 Fold-scoped branch files acquired only to complete a task are disposable once
-their consumer evidence is retained. For example, NVDA data temporarily fetched
-inside an AAPL fold for event-scope controls, peer comparison, or replay
-diagnostics may be deleted after provenance, dependency reason, coverage
-summary, hashes, and result refs are retained. If that NVDA partition has been
-promoted into canonical shared source coverage, it is protected and reused
-instead of being deleted.
+their consumer evidence is retained and no active consumer still needs the
+payload. For example, NVDA data temporarily fetched inside an AAPL fold for
+event-scope controls, peer comparison, or replay diagnostics may be deleted
+after provenance, dependency reason, coverage summary, hashes, and result refs
+are retained only if it was not promoted into canonical shared source coverage
+and is not cited by replay or another fold. If that NVDA partition is canonical
+or replay-consumed, it is protected and reused instead of being deleted.
