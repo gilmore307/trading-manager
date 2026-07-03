@@ -215,3 +215,24 @@ when `label_available_at` is on or before that run's `training_cutoff`. Leakage
 checks must audit `feature_available_at` and `label_available_at`; they must not
 replace this timing evidence with a blanket ban on labels that cross a split
 boundary.
+
+## D216 - Fold maintenance keeps reusable foundation data and removes side products
+
+Fold maintenance classifies artifacts by reuse before cleanup. M01
+background/context source, feature, manifest, and model artifacts are reusable
+foundation substrate for future targets and must not be deleted merely because a
+target fold completed. Canonical shared source data is likewise protected.
+
+Progress-monitoring side products are not durable evidence. After fold
+settlement, manager/storage retain only the minimum receipts, transition
+summaries, counters, hashes, and error refs needed for audit and repair; the
+remaining stage heartbeats, row-progress snapshots, transient debug traces, and
+repeated operation manifests enter direct cleanup or rolling retention.
+
+Fold-scoped branch files acquired only to complete a task are disposable once
+their consumer evidence is retained. For example, NVDA data temporarily fetched
+inside an AAPL fold for event-scope controls, peer comparison, or replay
+diagnostics may be deleted after provenance, dependency reason, coverage
+summary, hashes, and result refs are retained. If that NVDA partition has been
+promoted into canonical shared source coverage, it is protected and reused
+instead of being deleted.

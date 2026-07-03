@@ -245,6 +245,55 @@ Candidate scope must be the smallest affected scope: provider/source, target sym
 
 Execution order is lifecycle classification request first, bounded workflow-state invalidation second, durable reset receipt third, then scheduler reentry from the cutpoint through the current model-group lifecycle. Physical file deletion is a later storage lifecycle action after artifact index, protected-set clearance, quarantine/recheck, reviewed decision, and deletion receipt. Only one scheduler daemon may own a rerun scope at a time.
 
+## Fold Maintenance Data Disposition
+
+Fold maintenance classifies data by reuse and evidence value before storage
+lifecycle handling. It must not treat every file written during a fold as part
+of that fold's disposable workspace.
+
+M01 background/context data is reusable foundation substrate. Valid M01 source
+data, features, manifests, and model artifacts remain protected across target
+folds because later targets reuse the same market/background state. M01
+artifacts may be superseded by a current contract or model rerun, but they are
+not deleted merely because an individual target fold ended.
+
+Progress-monitoring side products are temporary. Stage heartbeats, row-progress
+snapshots, local scheduler progress files, transient debug traces, and repeated
+operation manifests exist to resume and observe a running task. After the fold
+settles, maintenance keeps only the minimal completion receipt, transition
+summary, counters, hashes, and error references needed for audit and repair.
+The remaining progress side products enter direct cleanup or rolling-retention
+cleanup according to the accepted storage lifecycle policy.
+
+Branch files acquired only to complete one fold are disposable after their
+consumer evidence is retained. For example, if an AAPL fold temporarily acquired
+NVDA market data only as a same-fold event-scope, peer-control, or replay
+diagnostic dependency, and that partition was not promoted into canonical
+shared source coverage, maintenance may delete the fold-scoped NVDA copy after
+it retains the dependency reason, source refs, coverage summary, hashes, and
+derived result references. If the same NVDA data is saved as canonical reusable
+market data under the shared source layout, it is protected and future folds
+reuse it instead of deleting or redownloading it.
+
+The disposition classes are:
+
+```text
+protected_foundation_reusable
+protected_canonical_source
+protected_long_term_knowledge
+retained_evidence_summary
+retained_manifest_only
+compress_or_archive_candidate
+delete_after_fold_settlement
+rolling_retention_side_product
+blocked_pending_storage_lifecycle_review
+```
+
+Physical deletion remains storage-owned. Manager maintenance may write the
+classification, protected refs, retained refs, and deletion-candidate refs, but
+storage lifecycle performs protected-set checks, receipt writing, and any
+mutation.
+
 ## Review and Promotion Contracts
 
 - `manager_dataset_evidence` summarizes snapshot/split/label/eval/control-plane coverage.
