@@ -304,6 +304,14 @@ stored once in canonical shared/source locations and reused by every fold's
 replay. Fold-specific replay manifests may cite those refs, but they must not
 create duplicate private copies of identical source payloads.
 
+For market bars, the canonical storage unit is the shared bars store, not a
+separate artifact per fold, consumer, or bar flavor. Differences such as
+provider, symbol, frequency/granularity, adjustment policy, point-in-time
+availability clock, cleaning status, and calendar partition are columns,
+partition keys, or query/view constraints inside that shared store. Consumers
+record refs to the selected rows or partitions; maintenance removes duplicate
+fold-local extracts, not the shared rows that replay or future folds may need.
+
 The fixed fold disposition matrix is:
 
 | Artifact family | Examples | Disposition after fold settlement |

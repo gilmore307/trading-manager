@@ -235,6 +235,12 @@ manifests rather than duplicated per fold. If a completed fold's cleanup pass
 finds data that replay or another fold still cites, maintenance must retain the
 canonical copy and delete only duplicate fold-local copies.
 
+Market bars use one shared canonical bars store. Granularity, provider, symbol,
+adjustment policy, PIT clock, cleaning status, and calendar window are fields or
+partition/query constraints in that store, not separate per-fold payloads. A fold
+or replay consumer should store refs to the rows/partitions it used rather than
+private copies of the same bars.
+
 Progress-monitoring side products are not durable evidence. After fold
 settlement, manager/storage retain only the minimum receipts, transition
 summaries, counters, hashes, and error refs needed for audit and repair; the
