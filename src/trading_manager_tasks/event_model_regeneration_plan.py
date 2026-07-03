@@ -112,13 +112,13 @@ def build_event_model_regeneration_plan(
             "storage_artifacts_and_dashboard_snapshots_until_regeneration_review_completes",
         ),
         superseded_surfaces=(
-            "pre_replay_residual_event_governance_data_or_feature_outputs",
-            "event_risk_governor_outputs_built_before_concentrated_replay_failure_attribution",
-            "promotion_review_artifacts_claiming_event_alpha_without_model_03_event_acceptance_and_replay_attribution_evidence",
+            "pre_replay_event_state_outputs_built_from_non_current_event_sources",
+            "event_attribution_outputs_built_before_concentrated_replay_failure_attribution",
+            "promotion_review_artifacts_claiming_event_alpha_without_model_03_event_acceptance_and_replay_review_attribution_evidence",
             "model_run_metadata_that_depends_on_non_current_event_observation_or_replay_attribution_after_reviewed_rebuild_exists",
         ),
         invalidation_scope=(
-            "state_only_post_replay_residual_event_governance_and_event_adjusted_outputs; base-stack and replay outputs remain reusable "
+            "state_only_m03_event_state_and_event_adjusted_outputs; base-stack and replay outputs remain reusable "
             "unless a specific artifact consumed non-current event observations, non-current replay traces, or violates the rolling-fold policy"
         ),
         regeneration_steps=(
@@ -155,7 +155,7 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="04_materialize_model_03_event_event_observation_fold_pool",
                 owner_repo="trading-manager",
-                action="materialize the fold-scoped M03 event-impact substrate, allowing an explicit empty pool before M06 has accepted event attribution",
+                action="materialize the fold-scoped M03 event-impact substrate, allowing an explicit empty pool before replay review event attribution",
                 command_ref="PYTHONPATH=src python3 scripts/tasks/materialize_model_03_event_impact_inputs.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write",
                 status="ready_without_provider_calls",
                 mutation_class="local_event_observation_substrate_receipt",
@@ -173,10 +173,10 @@ def build_event_model_regeneration_plan(
                 requires_review_before_apply=False,
             ),
             RegenerationStep(
-                step_id="06_generate_post_replay_residual_event_governance",
-                owner_repo="trading-model",
-                action="generate residual-event audit from replay failures, residuals, misses, path deviations, overblocks, underblocks, and option-expression drag",
-                command_ref="python3 scripts/models/model_06_residual_event_governance/generate_post_replay_event_attribution.py",
+                step_id="06_run_replay_review_event_attribution",
+                owner_repo="trading-manager",
+                action="run replay review and embedded event attribution from replay failures, residuals, misses, path deviations, overblocks, underblocks, and option-expression drag",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/run_model_group_replay_review.py --contract-id ${CONTRACT_ID}",
                 status="blocked_until_model_group_replay_complete",
                 mutation_class="offline_post_replay_attribution_generation",
                 provider_calls_allowed=False,
@@ -185,9 +185,9 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="07_evaluate_and_review_without_activation",
                 owner_repo="trading-model;trading-manager",
-                action="evaluate post-replay EventRiskGovernor attribution quality, then submit conservative manager promotion review",
-                command_ref="python3 scripts/models/model_06_residual_event_governance/evaluate_model_06_residual_event_governance.py; PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model event_risk_governor",
-                status="blocked_until_post_replay_event_attribution_ready",
+                action="evaluate replay and replay-review event-attribution quality, then submit conservative manager promotion review",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/run_model_group_evaluation.py --contract-id ${CONTRACT_ID}; PYTHONPATH=src python3 scripts/tasks/plan_model_promotion_review.py --model model_group",
+                status="blocked_until_replay_review_event_attribution_ready",
                 mutation_class="promotion_evidence_and_review_request_only",
                 provider_calls_allowed=False,
                 requires_review_before_apply=False,
@@ -195,7 +195,7 @@ def build_event_model_regeneration_plan(
             RegenerationStep(
                 step_id="08_state_only_invalidation_if_old_outputs_remain",
                 owner_repo="trading-manager",
-                action="mark stale pre-replay M06 or event-adjusted workflow stages rebuild-required without deleting artifacts",
+                action="mark stale M03 event-state or event-adjusted workflow stages rebuild-required without deleting artifacts",
                 command_ref="PYTHONPATH=src python3 scripts/tasks/invalidate_residual_event_downstream_outputs.py --write",
                 status="review_before_write",
                 mutation_class="workflow_state_only_no_artifact_deletion",
@@ -215,12 +215,12 @@ def build_event_model_regeneration_plan(
         ),
         storage_cleanup_gate=(
             "Do not delete dashboard snapshots, model-run metadata, or event diagnostic artifacts until the regenerated "
-            "EventRiskGovernor fold has acceptance/evaluation/review evidence and Chentong approves a storage lifecycle apply step."
+            "event-state/replay-review attribution fold has acceptance/evaluation/review evidence and Chentong approves a storage lifecycle apply step."
         ),
         notes=(
             "M01 and M02 data are persistent foundations: compress/archive only, never auto-delete.",
             "M03 event-state event observations are collected for each fold before replay, even for global/sector events, because the accepted observation pool can change by fold.",
-            "M06 starts after concentrated replay and learns attribution from replay failures/residuals; it is not a pre-replay data-acquisition lane.",
+            "Replay review event attribution starts after concentrated replay and compares failures/residuals against the fixed M03 event ledger; it is not a separate model lane.",
             "Current earnings/guidance route remains blocked for signed claims by missing comparable current guidance and PIT expectation baselines.",
             "This plan is non-mutating; executable steps remain separate reviewed tools.",
         ),

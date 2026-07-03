@@ -58,9 +58,9 @@ source contracts, label contracts, feature/evidence contracts, gate contracts,
 and not-applicable states, but it must not define a separate orchestration
 meaning for these stages. Manager owns the state machine, gap discovery,
 provider-dispatch boundary, retry/stop routing, point-in-time/leakage gates, and
-ready-state projection across all model groups. M06 follows these conventions
-inside the post-replay model-group lane, not as a pre-replay model-worker input
-stage.
+ready-state projection across all model groups. Event-family modelability follows
+these conventions inside M03 event-state generation, while replay review owns
+post-replay event attribution as an embedded diagnostic surface.
 
 The public task list is a task-fact projection over scheduler state. It shows
 completed history, failures, and one current executable or review task. Future
@@ -80,7 +80,7 @@ Checkpoint files own stage detail, but they do not own the current task.
 Autonomous model-worker training is target-scoped. It may select only reviewed
 optionable equity targets from the runtime target queue; structurally
 non-optionable assets such as crypto spot may remain in replay/context universes
-but do not open M02-M06 training folds. When no legal target is available, the
+but do not open M02-M05 training folds. When no legal target is available, the
 model-worker lane has no owner instead of falling back to a targetless fold.
 
 1. Foundation substrate. Build reusable M01 background-context source/feature
@@ -111,19 +111,11 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    unless the request is an explicit diagnostic repair scenario.
 5. Replay review. Replay review owns the first post-replay component-funnel
    review over missed winners, bad fills, target-selection misses,
-   overblock/underblock behavior, and option-expression drag. It prepares
-   replay-review rows for M06 and evaluation, but it is not event attribution.
-6. Residual event governance. M06 starts only after replay review has exposed
-   failures, residuals, misses, overblocks, underblocks, target-selection misses,
-   or path deviations. M06 then acquires or materializes the PIT event universe
-   for the replay failure scope, attributes relationships between events and
-   model failure modes, and decides which event families or event instances are
-   worth attention. M03 later applies those M06-accepted event-family attributes
-   and individual-event impact states, but M03 does not perform event-universe
-   discovery. When M06 needs local event inputs, scheduler may backfill bounded
-   event feeds only after replay review exposes the post-replay attribution
-   requirement.
-7. Event-family modelability acquisition and evidence generation. When M06 must
+   overblock/underblock behavior, option-expression drag, and event attribution.
+   It consumes the fixed pre-replay M03 event ledger and writes event-attribution
+   subartifacts inside the replay review run. It must not acquire provider data,
+   mutate the M03 ledger, or open a separate M06 scheduler stage.
+6. Event-family modelability acquisition and evidence generation. When M03 must
    judge whether an event family can be described by an impact probability
    function, it uses the shared model-task lifecycle vocabulary: acquisition
    materializes bounded PIT event inputs, feature/evidence generation builds
@@ -170,9 +162,9 @@ activate promoted models directly.
 Trading Economics calendar handling has one accepted source route:
 
 1. Canonical source: reviewed TE calendar CSV/JSONL rows under `trading-storage/storage/01_source_data/monthly_backfill/trading_economics_calendar_web/YYYY-MM/runs/<run_id>/`. These files are append-only protected and Git-recoverable.
-2. Derived materializations: SQL rows, control-plane filtered artifacts, and dashboard read models are rebuildable operational/materialized state, not the source of truth. TE macro rows should stay out of residual-event governance materializations and dashboard event markers until the accepted M06/event-governance route promotes macro events into the event-risk/attention pool.
+2. Derived materializations: SQL rows, control-plane filtered artifacts, and dashboard read models are rebuildable operational/materialized state, not the source of truth. TE macro rows should stay out of dashboard event markers and replay-review attribution until the accepted M03 event-state route admits the macro event family into the event-risk/attention pool.
 
-Manager workflows may schedule the bounded recent/future Trading Economics calendar refresh into canonical storage source rows. They must not record TE website URLs as source references, write TE receipts/manifests/diagnostics/schemas into source storage, write TE macro rows into `model_06_residual_event_governance_data_acquisition`, or silently merge public web-search fallback rows into TE-origin source data.
+Manager workflows may schedule the bounded recent/future Trading Economics calendar refresh into canonical storage source rows. They must not record TE website URLs as source references, write TE receipts/manifests/diagnostics/schemas into source storage, write TE macro rows into residual-event compatibility materializations, or silently merge public web-search fallback rows into TE-origin source data.
 
 TE refresh creates normal daily Git changes in the canonical source-data tree. Maintenance commits should include those changed/new TE source files with the code or docs batch when they are relevant to the same acceptance window; their presence in `git status` is not a cleanup problem. Rerun resets must preserve these files, record the TE root in `protected_set`/`retained_set`, and never delete TE canonical source data.
 

@@ -88,7 +88,7 @@ Invalid family examples:
 - `scheduled_macro_release`: release calendar category only.
 - `macro`: domain bucket only.
 
-M06 evidence packets must reject source/category buckets before Codex review.
+M03 event-family evidence packets must reject source/category buckets before Codex review.
 Source rows may still feed a concrete family packet, for example Alpaca/GDELT
 news rows feeding `target_product_price_change_news`, or scheduled macro
 calendar rows feeding `cpi_release`.
@@ -143,8 +143,8 @@ modelability review.
 
 ## Probability Function Classes
 
-M06 chooses the allowed probability-function class. M03 trains concrete
-parameters within that allowed class.
+M03 event-family modelability chooses the allowed probability-function class and
+trains concrete parameters within that allowed class.
 
 Allowed classes are:
 
@@ -197,20 +197,20 @@ M03 must not:
   inference inputs;
 - issue trade, order, or option-structure commands.
 
-## M06 Responsibilities
+## Replay Review Event-Attribution Responsibilities
 
-M06 owns post-replay residual-event audit:
+Replay review owns post-replay residual-event attribution:
 
 - consume replay-review failure, miss, overblock, underblock, and path-deviation
   scopes before starting attribution;
 - consume the pre-replay M03 event-impact ledger as fixed upstream evidence;
 - identify relationships between event evidence and model failure modes;
-- produce residual-event attribution rows, missed-event flags, and event-family
+- produce event-attribution rows, missed-event flags, and event-family
   follow-up candidates for later M03 evidence generation;
 - verify that residual findings are not already explained by upstream M03 event
   state, M04 decision evidence, or optional M05 expression evidence.
 
-M06 must not:
+Replay review event attribution must not:
 
 - own pre-replay event-universe discovery;
 - choose upstream event rows by looking at selected-trade outcomes;
@@ -234,7 +234,7 @@ train parameters, or replace deterministic gates.
 
 ## Modelability Trial Route
 
-The first implemented trial route supports several program-built M06 evidence
+The first implemented trial route supports several program-built event-family evidence
 packets:
 
 - AAPL `company_earnings_or_financial_results` from SEC company financials.
@@ -262,12 +262,12 @@ The route is:
 5. Run `event-family-modelability-review` only for packets with
    `admissible_for_modelability_review`; blocked packets must first be repaired
    by the program-owned route named by the packet.
-6. If M06 accepts a projection mode and probability-function class, train M03
+6. If M03 accepts a projection mode and probability-function class, train M03
    parameter mappings through a separate PIT-safe training path.
 
 The evidence packet is not a modelability decision and is not a special M06-only
-workflow stage. It is the M06 event-domain feature/evidence bundle inside the
-shared model-task lifecycle. Current trial reviews show that sample count alone
+workflow stage. Current artifact names may retain `model_06_event_family_*`
+compatibility tokens, but the lifecycle owner is M03 event impact. Current trial reviews show that sample count alone
 is not enough: impact-function or conditional-effect approval still requires
 subtype homogeneity, matched controls, leakage/overlap checks, and fold-frozen
 calibration/ablation evidence.

@@ -268,7 +268,7 @@ class SchedulerStatusTests(unittest.TestCase):
         self.assertEqual(row["current_stage"], "model_03_event_state.data_acquisition")
         self.assertEqual(row["lock_plan"]["selected_work"], "model_03_event_state.data_acquisition")
 
-    def test_status_projects_m06_attribution_work_to_post_replay_model_generation(self):
+    def test_status_reports_replay_review_work_without_m06_projection(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage"
@@ -286,9 +286,9 @@ class SchedulerStatusTests(unittest.TestCase):
                     {
                         "contract_type": "manager_scheduler_decision",
                         "decision_status": "ready",
-                        "reason_code": "model_group_residual_event_governance_ready",
-                        "selected_work": "model_group.residual_event_governance",
-                        "next_internal_stage": "residual_event_governance",
+                        "reason_code": "model_group_replay_review_ready",
+                        "selected_work": "model_group.replay_review",
+                        "next_internal_stage": "replay_review",
                         "start_month": "2016-01",
                         "end_month": "2017-06",
                         "target_symbol": "AAPL",
@@ -309,8 +309,8 @@ class SchedulerStatusTests(unittest.TestCase):
             )
 
         row = status.summary_row()
-        self.assertEqual(row["current_stage"], "model_06_residual_event_governance.model_generation")
-        self.assertEqual(row["lock_plan"]["selected_work"], "model_06_residual_event_governance.model_generation")
+        self.assertEqual(row["current_stage"], "model_group.replay_review")
+        self.assertEqual(row["lock_plan"]["selected_work"], "model_group.replay_review")
 
     def test_status_treats_foundation_complete_with_target_queue_as_model_worker_wait(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

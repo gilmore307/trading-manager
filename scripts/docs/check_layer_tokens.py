@@ -21,7 +21,6 @@ MODEL_REGISTRY_IDS = (
     (3, ("EventStateModel",), "trm_M3ES001", "trm_ESM001", "trm_ESV001"),
     (4, ("UnifiedDecisionModel",), "trm_M4UD001", "trm_UDM001", "trm_UDV001"),
     (5, ("OptionExpressionModel",), "trm_M5OE002", "trm_OEM001", "trm_OEP001"),
-    (6, ("ResidualEventGovernanceModel",), "trm_M6REG001", "trm_REGM001", "trm_ERI001"),
 )
 
 FILES_TO_CHECK = (

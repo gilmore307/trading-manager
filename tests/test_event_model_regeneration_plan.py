@@ -32,7 +32,7 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
             ],
         )
         self.assertIn("model_01_market_context_and_model_01_sector_context_persistent_foundation_data", row["preserved_surfaces"])
-        self.assertIn("pre_replay_residual_event_governance_data_or_feature_outputs", row["superseded_surfaces"])
+        self.assertIn("pre_replay_event_state_outputs_built_from_non_current_event_sources", row["superseded_surfaces"])
         self.assertIn("base-stack and replay outputs remain reusable", row["invalidation_scope"])
         self.assertFalse(row["write_performed"])
         self.assertFalse(row["model_activation_performed"])
@@ -51,10 +51,11 @@ class EventModelRegenerationPlanTests(unittest.TestCase):
         self.assertTrue(steps["09_revisit_storage_lifecycle_hold"]["requires_review_before_apply"])
         self.assertIn("materialize_model_03_event_impact_inputs.py", steps["04_materialize_model_03_event_event_observation_fold_pool"]["command_ref"])
         self.assertEqual(steps["05_run_concentrated_live_flow_replay"]["status"], "blocked_until_model_03_event_event_observation_pool_ready")
-        self.assertEqual(steps["06_generate_post_replay_residual_event_governance"]["status"], "blocked_until_model_group_replay_complete")
-        self.assertIn("--model event_risk_governor", steps["07_evaluate_and_review_without_activation"]["command_ref"])
+        self.assertEqual(steps["06_run_replay_review_event_attribution"]["status"], "blocked_until_model_group_replay_complete")
+        self.assertIn("run_model_group_replay_review.py", steps["06_run_replay_review_event_attribution"]["command_ref"])
+        self.assertIn("--model model_group", steps["07_evaluate_and_review_without_activation"]["command_ref"])
         self.assertNotIn("--model model_06_residual_event_governance", steps["07_evaluate_and_review_without_activation"]["command_ref"])
-        self.assertEqual(steps["07_evaluate_and_review_without_activation"]["status"], "blocked_until_post_replay_event_attribution_ready")
+        self.assertEqual(steps["07_evaluate_and_review_without_activation"]["status"], "blocked_until_replay_review_event_attribution_ready")
 
     def test_writes_plan_file(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

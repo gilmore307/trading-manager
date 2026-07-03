@@ -248,7 +248,7 @@ def _run_detector(
             status="skipped_zero_bar_rows",
         )
     task_key = {
-        "task_id": f"model_06_residual_event_governance_detector_{symbol}_{ref_month.replace('-', '_')}_{output_dir.name.replace('-', '_')}",
+        "task_id": f"model_03_event_state_detector_{symbol}_{ref_month.replace('-', '_')}_{output_dir.name.replace('-', '_')}",
         "source": DETECTOR_SOURCE,
         "params": {
             "bars_sql_source": _bar_sql_source(ref),
@@ -280,7 +280,7 @@ def _run_detector(
                     event_count=0,
                     status="skipped_zero_sql_bar_rows",
                 )
-            raise TaskSystemError(f"M06 detector failed for {symbol}: {result.stderr.strip() or result.stdout.strip()}")
+            raise TaskSystemError(f"M03 event detector failed for {symbol}: {result.stderr.strip() or result.stdout.strip()}")
         payload = json.loads(result.stdout)
         status = str(payload.get("status") or "succeeded")
         event_count = int((payload.get("row_counts") or {}).get("equity_abnormal_activity_event") or 0)

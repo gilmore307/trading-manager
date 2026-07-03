@@ -1,4 +1,4 @@
-"""Execute deterministic next-action routing for M06 modelability packets.
+"""Execute deterministic next-action routing for M03 event-family modelability packets.
 
 This module turns evidence-packet readiness states into program-owned follow-up
 artifacts. It prepares queues and task keys only; it does not call providers,
@@ -427,7 +427,7 @@ def write_summary(summary: EventFamilyModelabilityNextActionSummary, *, output: 
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run deterministic next-action routing for M06 modelability evidence packets.")
+    parser = argparse.ArgumentParser(description="Run deterministic next-action routing for M03 event-family modelability evidence packets.")
     parser.add_argument("--event-family-id", action="append", default=[], help="Concrete event family id. Defaults to the current trial family set.")
     parser.add_argument("--target-symbol", default="AAPL")
     parser.add_argument("--target-cik", default="0000320193")

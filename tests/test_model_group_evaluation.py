@@ -216,7 +216,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
     def _write_ready_replay_and_attribution(self, storage_root: Path) -> Path:
         dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
         replay_run_root = dataset_root / "replay_execution_runs" / "model_group_replay_fixture"
-        attribution_root = dataset_root / "post_replay_attribution_runs" / "post_replay_attribution_fixture"
+        review_root = dataset_root / "post_replay_review_runs" / "post_replay_review_fixture"
+        attribution_root = review_root / "event_attribution"
         replay_run_root.mkdir(parents=True)
         attribution_root.mkdir(parents=True)
         with (dataset_root / "feed_acquisition_plan.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -298,11 +299,16 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        attribution_rows_path = attribution_root / "failure_attribution_rows.jsonl"
+        review_rows_path = review_root / "replay_review_rows.jsonl"
+        review_rows_path.write_text(
+            json.dumps({"contract_type": "post_replay_review_row", "review_status": "reviewed"}) + "\n",
+            encoding="utf-8",
+        )
+        attribution_rows_path = attribution_root / "event_attribution_rows.jsonl"
         attribution_rows_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "model_06_residual_event_governance_event_attribution_row",
+                    "contract_type": "post_replay_review_event_attribution_row",
                     "attribution_id": "attr_1",
                     "event_candidate_ref": "event_candidate_fixture",
                 }
@@ -314,7 +320,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         proposal_rows_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "model_06_residual_event_governance_event_focus_proposal",
+                    "contract_type": "post_replay_review_event_focus_proposal",
                     "event_focus_proposal_id": "focus_1",
                     "proposal_status": "watch_candidate",
                     "event_ref": "event_candidate_fixture",
@@ -324,26 +330,47 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
-        (attribution_root / "post_replay_attribution_receipt.json").write_text(
+        event_attribution_summary_path = attribution_root / "event_attribution_summary.json"
+        event_attribution_summary = {
+            "contract_type": "post_replay_review_event_attribution_summary",
+            "status": "succeeded",
+            "event_attribution_status": "succeeded",
+            "created_at_utc": "2026-05-28T00:00:01+00:00",
+            "decision_rows_ref": str(decision_rows_path),
+            "attribution_rows_ref": str(attribution_rows_path),
+            "event_attribution_summary_ref": str(event_attribution_summary_path),
+            "event_focus_proposals_ref": str(proposal_rows_path),
+            "event_focus_proposal_count": 1,
+            "event_evidence_consumed": True,
+            "event_observation_count": 1,
+            "event_candidate_count": 1,
+            "replay_execution_run_id": "model_group_replay_fixture",
+            "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+            "candidate_fold_id": "fold_aapl_2016",
+            "candidate_training_target": "AAPL",
+            "target_symbol": "AAPL",
+            "replay_review_scope_status": "passed",
+            "control_analysis_status": "passed",
+        }
+        event_attribution_summary_path.write_text(
+            json.dumps(event_attribution_summary)
+            + "\n",
+            encoding="utf-8",
+        )
+        (review_root / "post_replay_review_receipt.json").write_text(
             json.dumps(
                 {
-                    "contract_type": "post_replay_residual_event_governance_receipt",
+                    "contract_type": "post_replay_review_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-28T00:00:01+00:00",
                     "decision_rows_ref": str(decision_rows_path),
-                    "attribution_rows_ref": str(attribution_rows_path),
-                    "event_focus_proposals_ref": str(proposal_rows_path),
-                    "event_focus_proposal_count": 1,
-                    "event_evidence_consumed": True,
-                    "event_observation_count": 1,
-                    "event_candidate_count": 1,
+                    "review_rows_ref": str(review_rows_path),
+                    "event_attribution": event_attribution_summary,
                     "replay_execution_run_id": "model_group_replay_fixture",
                     "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                     "candidate_fold_id": "fold_aapl_2016",
                     "candidate_training_target": "AAPL",
                     "target_symbol": "AAPL",
-                    "replay_review_scope_status": "passed",
-                    "control_analysis_status": "passed",
                 }
             )
             + "\n",
@@ -351,15 +378,15 @@ class ModelGroupEvaluationTests(unittest.TestCase):
         )
         return dataset_root
 
-    def test_ignores_replay_review_as_residual_event_governance(self):
+    def test_requires_replay_review_event_attribution_summary(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_ready_replay_and_attribution(storage_root)
             self._write_completed_fold(storage_root)
-            shutil.rmtree(dataset_root / "post_replay_attribution_runs")
             review_root = dataset_root / "post_replay_review_runs" / "post_replay_review_fixture"
+            shutil.rmtree(review_root)
             review_root.mkdir(parents=True)
             review_rows = review_root / "replay_review_rows.jsonl"
             review_rows.write_text(
@@ -374,7 +401,6 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                         "created_at_utc": "2026-05-28T00:00:01+00:00",
                         "decision_rows_ref": str(dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"),
                         "review_rows_ref": str(review_rows),
-                        "residual_event_governance_status": "not_performed",
                         "event_evidence_consumed": False,
                         "event_observation_count": 0,
                         "event_candidate_count": 0,
@@ -423,7 +449,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(receipt["candidate_fold_id"], "fold_aapl_2016")
             self.assertEqual(receipt["candidate_training_target"], "AAPL")
             self.assertEqual(receipt["replay_execution_run_id"], "model_group_replay_fixture")
-            self.assertIn("residual_event_governance_event_focus_proposal", receipt["ready_checks"])
+            self.assertIn("replay_review_event_focus_proposal", receipt["ready_checks"])
             review = json.loads(review_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(review["agent_invocation_status"], "completed")
             self.assertEqual(review["recommendation"], "deferred")
@@ -488,14 +514,14 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             second = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
             self.assertIsNone(second)
 
-            replay_decision_rows = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
-            refreshed_attribution_root = dataset_root / "post_replay_attribution_runs" / "post_replay_attribution_refreshed"
-            refreshed_attribution_root.mkdir(parents=True)
-            refreshed_attribution_rows = refreshed_attribution_root / "residual_event_governance_rows.jsonl"
+            review_root = dataset_root / "post_replay_review_runs" / "post_replay_review_fixture"
+            replay_review_receipt = review_root / "post_replay_review_receipt.json"
+            refreshed_attribution_root = review_root / "event_attribution"
+            refreshed_attribution_rows = refreshed_attribution_root / "event_attribution_rows.jsonl"
             refreshed_attribution_rows.write_text(
                 json.dumps(
                     {
-                        "contract_type": "model_06_residual_event_governance_event_attribution_row",
+                        "contract_type": "post_replay_review_event_attribution_row",
                         "attribution_id": "attr_2",
                         "event_candidate_ref": "event_candidate_refreshed",
                     }
@@ -507,7 +533,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             refreshed_proposal_rows.write_text(
                 json.dumps(
                     {
-                        "contract_type": "model_06_residual_event_governance_event_focus_proposal",
+                        "contract_type": "post_replay_review_event_focus_proposal",
                         "event_focus_proposal_id": "focus_2",
                         "proposal_status": "watch_candidate",
                         "event_ref": "event_candidate_refreshed",
@@ -517,32 +543,33 @@ class ModelGroupEvaluationTests(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            refreshed_attribution_receipt = refreshed_attribution_root / "post_replay_attribution_receipt.json"
-            refreshed_attribution_receipt.write_text(
-                json.dumps(
-                    {
-                        "contract_type": "post_replay_residual_event_governance_receipt",
-                        "status": "succeeded",
-                        "created_at_utc": "2026-05-28T00:00:03+00:00",
-                        "decision_rows_ref": str(replay_decision_rows),
-                        "attribution_rows_ref": str(refreshed_attribution_rows),
-                        "event_focus_proposals_ref": str(refreshed_proposal_rows),
-                        "event_focus_proposal_count": 1,
-                        "event_evidence_consumed": True,
-                        "event_observation_count": 1,
-                        "event_candidate_count": 2,
-                        "replay_execution_run_id": "model_group_replay_fixture",
-                        "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
-                        "candidate_fold_id": "fold_aapl_2016",
-                        "candidate_training_target": "AAPL",
-                        "target_symbol": "AAPL",
-                        "replay_review_scope_status": "passed",
-                        "control_analysis_status": "passed",
-                    }
-                )
-                + "\n",
-                encoding="utf-8",
-            )
+            refreshed_summary_path = refreshed_attribution_root / "event_attribution_summary.json"
+            replay_decision_rows = dataset_root / "replay_execution_runs" / "model_group_replay_fixture" / "decision_rows.jsonl"
+            refreshed_summary = {
+                "contract_type": "post_replay_review_event_attribution_summary",
+                "status": "succeeded",
+                "event_attribution_status": "succeeded",
+                "created_at_utc": "2026-05-28T00:00:03+00:00",
+                "decision_rows_ref": str(replay_decision_rows),
+                "attribution_rows_ref": str(refreshed_attribution_rows),
+                "event_attribution_summary_ref": str(refreshed_summary_path),
+                "event_focus_proposals_ref": str(refreshed_proposal_rows),
+                "event_focus_proposal_count": 1,
+                "event_evidence_consumed": True,
+                "event_observation_count": 1,
+                "event_candidate_count": 2,
+                "replay_execution_run_id": "model_group_replay_fixture",
+                "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
+                "candidate_fold_id": "fold_aapl_2016",
+                "candidate_training_target": "AAPL",
+                "target_symbol": "AAPL",
+                "replay_review_scope_status": "passed",
+                "control_analysis_status": "passed",
+            }
+            refreshed_summary_path.write_text(json.dumps(refreshed_summary) + "\n", encoding="utf-8")
+            replay_receipt = json.loads(replay_review_receipt.read_text(encoding="utf-8"))
+            replay_receipt["event_attribution"] = refreshed_summary
+            replay_review_receipt.write_text(json.dumps(replay_receipt) + "\n", encoding="utf-8")
 
             refreshed_attribution_decision = run_model_group_evaluation_if_ready(
                 storage_root=storage_root,
@@ -557,7 +584,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(len(receipt_paths), 2)
             latest_receipt_path = max(receipt_paths, key=lambda path: path.stat().st_mtime)
             latest_receipt = json.loads(latest_receipt_path.read_text(encoding="utf-8"))
-            self.assertEqual(latest_receipt["residual_event_governance_receipt_ref"], str(refreshed_attribution_receipt))
+            self.assertEqual(latest_receipt["event_attribution_summary_ref"], str(refreshed_summary_path))
 
             state_path = storage_root / "runtime" / "model_training_fold_state_aapl_2016-01_2017-06.json"
             newer_mtime = max(path.stat().st_mtime for path in (dataset_root / "promotion_review_runs").glob("*/promotion_eligibility_decision.json")) + 1
@@ -700,21 +727,16 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             assert decision is not None
             self.assertEqual(decision.reason_code, "model_group_evaluation_replay_scope_mismatch")
 
-    def test_unscoped_m06_attribution_receipt_blocks_evaluation(self):
+    def test_unscoped_event_attribution_summary_blocks_evaluation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_ready_replay_and_attribution(storage_root)
             self._write_completed_fold(storage_root)
-            receipt_path = (
-                dataset_root
-                / "post_replay_attribution_runs"
-                / "post_replay_attribution_fixture"
-                / "post_replay_attribution_receipt.json"
-            )
+            receipt_path = dataset_root / "post_replay_review_runs" / "post_replay_review_fixture" / "post_replay_review_receipt.json"
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-            receipt.pop("candidate_fold_id", None)
+            receipt["event_attribution"].pop("candidate_fold_id", None)
             receipt_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
 
             decision = run_model_group_evaluation_if_ready(storage_root=storage_root, selected_target_symbol="AAPL")
@@ -969,7 +991,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             settlement=settlement,
             settlement_ref="/tmp/fold_settlement_run.json",
             benchmark_contract_ref="trading-evaluation/replays/promotion_replay_candidate_policy.json",
-            residual_event_governance_ref="/tmp/post_replay_attribution_receipt.json",
+            event_attribution_summary_ref="/tmp/event_attribution_summary.json",
             created_at_utc="2026-06-13T20:00:00+00:00",
         )
 

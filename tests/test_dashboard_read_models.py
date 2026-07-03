@@ -80,13 +80,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(active["detail"]["runtime_activity"]["reason_code"], runtime_activity["reason_code"])
         self.assertEqual(timeline[0]["status"], "blocked")
 
-    def test_scheduler_decision_runtime_activity_describes_m06_missing_event_inputs(self):
+    def test_scheduler_decision_runtime_activity_describes_replay_review_missing_event_inputs(self):
         activity = _scheduler_decision_runtime_activity(
             {
                 "decision_status": "backoff",
-                "reason_code": "model_group_residual_event_evidence_missing",
-                "reason": "replay review is ready, but M06 has no local point-in-time event observations or candidates to attribute",
-                "selected_work": "model_group.residual_event_governance",
+                "reason_code": "model_group_replay_review_event_attribution_missing",
+                "reason": "replay review is ready, but the fixed M03 event ledger has no local point-in-time event observations or candidates to attribute",
+                "selected_work": "model_group.replay_review",
                 "next_internal_stage": "residual_event_governance",
                 "now_utc": "2026-06-28T13:30:21.213306+00:00",
                 "execution_summary": {
@@ -96,22 +96,22 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "standardized_event_candidate_count": 0,
                     },
                     "fold_scope": {"start_month": "2021-01", "end_month": "2025-12"},
-                    "required_next_action": "materialize reviewed PIT event observations/candidates before residual-event audit can complete",
+                    "required_next_action": "materialize reviewed PIT event observations/candidates before event attribution can complete",
                 },
             }
         )
 
         self.assertIsNotNone(activity)
         assert activity is not None
-        self.assertEqual(activity["activity_label"], "M06 Event Risk Governor")
+        self.assertEqual(activity["activity_label"], "Replay Review Event Attribution")
         self.assertIn("waiting for PIT event observations/candidates", activity["activity_summary"])
         self.assertIn("2021-01 to 2025-12", activity["activity_summary"])
         self.assertIn("raw events 0", activity["activity_summary"])
         self.assertIn("candidates 0", activity["activity_summary"])
-        self.assertEqual(activity["reason_code"], "model_group_residual_event_evidence_missing")
+        self.assertEqual(activity["reason_code"], "model_group_replay_review_event_attribution_missing")
         self.assertEqual(
             activity["required_next_step"],
-            "materialize reviewed PIT event observations/candidates before residual-event audit can complete",
+            "materialize reviewed PIT event observations/candidates before event attribution can complete",
         )
         self.assertIn("Checked 2 event input paths", activity["activity_details"])
 
@@ -174,8 +174,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         json.dumps({"selected_work": "model_group.replay", "now_utc": "2026-06-28T13:00:00+00:00"}),
                         json.dumps(
                             {
-                                "selected_work": "model_group.residual_event_governance",
-                                "reason_code": "model_group_residual_event_evidence_missing",
+                                "selected_work": "model_group.replay_review",
+                                "reason_code": "model_group_replay_review_event_attribution_missing",
                                 "now_utc": "2026-06-28T13:30:00+00:00",
                             }
                         ),
@@ -192,8 +192,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
             decision = _runtime_activity_decision(status)
 
-        self.assertEqual(decision["selected_work"], "model_group.residual_event_governance")
-        self.assertEqual(decision["reason_code"], "model_group_residual_event_evidence_missing")
+        self.assertEqual(decision["selected_work"], "model_group.replay_review")
+        self.assertEqual(decision["reason_code"], "model_group_replay_review_event_attribution_missing")
 
     def test_runtime_activity_decision_prefers_workflow_transition_ledger(self):
         status = SimpleNamespace(
@@ -651,13 +651,13 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             self.assertEqual(_compatible_replay_run_ids(dataset_root=dataset_root), {"canonical", "layer2_handoff"})
 
     def _write_post_replay_attribution_receipt(self, replay_root: Path) -> Path:
-        receipt_root = replay_root / "post_replay_attribution_runs" / "fixture"
+        receipt_root = replay_root / "post_replay_review_runs" / "fixture"
         receipt_root.mkdir(parents=True, exist_ok=True)
         proposals_path = receipt_root / "event_focus_proposals.jsonl"
         proposals_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "model_06_residual_event_governance_event_focus_proposal",
+                    "contract_type": "post_replay_review_event_focus_proposal",
                     "event_focus_proposal_id": "focus_fixture",
                     "proposal_status": "watch_candidate",
                     "event_ref": "event_fixture",
@@ -1622,7 +1622,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.replay_review",
-                "model_group.model_06_event_risk_governor",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -1630,7 +1629,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         )
         self.assertEqual(
             [task["stage_type"] for task in evaluation_tasks],
-            ["replay", "replay_review", "model_06_event_risk_governor", "model_evaluation", "promotion_review", "maintenance"],
+            ["replay", "replay_review", "model_evaluation", "promotion_review", "maintenance"],
         )
         self.assertTrue(all(task["worker_id"] == "evaluation_worker_1" for task in evaluation_tasks))
         self.assertTrue(all(task["layer_key"] == "model_group" for task in evaluation_tasks))
@@ -1697,7 +1696,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.replay_review",
-                "model_group.model_06_event_risk_governor",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -2546,7 +2544,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
 
         fold1_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2016-01..2017-06"]
         fold2_tasks = [task for task in payload["chart_payload"]["task_timeline"] if task["month"] == "2017-01..2018-06"]
-        self.assertEqual(len(fold1_tasks), 11)
+        self.assertEqual(len(fold1_tasks), 10)
         self.assertEqual(
             [task["task_label"] for task in fold1_tasks],
             [
@@ -2557,7 +2555,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "Model 05 Fixture",
                 "Model Replay",
                 "Replay Review",
-                "M06 Event Risk Governor",
                 "Model Evaluation",
                 "Model Promotion",
                 "Model Maintenance",
@@ -2656,7 +2653,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.replay_review",
-                "model_group.model_06_event_risk_governor",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
@@ -3023,19 +3019,9 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(replay_review_task["detail"]["progress"]["ready_count"], 0)
         self.assertEqual(replay_review_task["detail"]["progress"]["pending_count"], 2)
         self.assertEqual(replay_review_task["detail"]["progress"]["progress_source"], "post_replay_review_rows")
-        m06_task = next(
-            task
-            for task in payload["chart_payload"]["task_timeline"]
-            if task["task_id"] == "model_group.model_06_event_risk_governor"
-        )
         self.assertEqual(
-            m06_task["detail"]["m06_post_replay_workflow"]["contract_type"],
-            "manager_model_06_post_replay_workflow_plan",
-        )
-        self.assertIsNone(m06_task["detail"]["m06_post_replay_workflow"]["next_stage_id"])
-        self.assertEqual(
-            m06_task["detail"]["m06_post_replay_workflow"]["stage_statuses"][0]["blockers"],
-            ["model_group_replay_review_complete"],
+            replay_review_task["detail"]["replay_review_event_attribution"]["contract_type"],
+            "post_replay_review_event_attribution_dashboard_detail",
         )
         self.assertEqual(payload["chart_payload"]["active_stage"], "model_group.replay_review")
         self.assertEqual(payload["chart_payload"]["blocker_category"], None)
@@ -3143,17 +3129,14 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.replay_review",
-                "model_group.model_06_event_risk_governor",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",
             ],
         )
         self.assertEqual(lifecycle_tasks[0]["status"], "blocked")
-        m06_task = next(task for task in lifecycle_tasks if task["task_id"] == "model_group.model_06_event_risk_governor")
-        self.assertIsNone(m06_task["detail"]["m06_post_replay_workflow"]["next_stage_id"])
         self.assertIn("model_group.replay", {task["task_id"] for task in lifecycle_tasks})
-        self.assertNotEqual(payload["chart_payload"]["active_stage"], "model_group.model_06_event_risk_governor")
+        self.assertNotEqual(payload["chart_payload"]["active_stage"], "model_group.evaluation")
 
     def test_data_acquisition_progress_aggregates_fold_source_month_requests(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -5532,7 +5515,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(agent_errors[0]["repair_status"], "superseded")
         self.assertEqual(agent_errors[0]["handling_status"], "closed")
         self.assertEqual(agent_errors[0]["dashboard_severity"], "notice")
-        self.assertIn("model_06_residual_event_governance", agent_errors[0]["retry_recommendation"])
+        self.assertIn("M03 event-state and replay-review event-attribution route", agent_errors[0]["retry_recommendation"])
 
     def test_active_scheduler_no_executable_backoff_is_running_not_error(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -5940,7 +5923,6 @@ class DashboardReadModelProducerTests(unittest.TestCase):
             [
                 "model_group.replay",
                 "model_group.replay_review",
-                "model_group.model_06_event_risk_governor",
                 "model_group.evaluation",
                 "model_group.promotion",
                 "model_group.maintenance",

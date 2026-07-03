@@ -1,10 +1,10 @@
 """M03 event-failure feature materialization.
 
-M03 event-state does not discover event families and does not reinterpret raw event
-artifacts. It consumes M06 / review-owned event interpretation evidence and
-turns accepted, point-in-time interpretations into model-facing event failure
-gate rows when they are already target-routable. Empty input is an explicit
-neutral receipt, not a missing-data error.
+M03 event-state owns the reviewed event-family route but does not reinterpret
+raw event artifacts inline. It consumes accepted point-in-time event
+interpretation evidence and turns it into model-facing event failure gate rows
+when the evidence is already target-routable. Empty input is an explicit neutral
+receipt, not a missing-data error.
 """
 
 from __future__ import annotations

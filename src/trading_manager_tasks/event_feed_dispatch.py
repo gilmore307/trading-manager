@@ -379,8 +379,8 @@ def dispatch_event_feed_backfill(
     dispatch_count = sum(1 for item in items if item.status in {"dispatched_succeeded", "dispatched_failed", "dispatched_failed_browser_ui_fallback_required"})
     provider_call_count = sum(item.attempt_count for item in items if item.attempt_count)
     return EventFeedDispatchSummary(
-        contract_type="manager_residual_event_governance_event_feed_dispatch_summary",
-        stage_id="model_06_residual_event_governance.event_feed_backfill",
+        contract_type="manager_model_03_event_impact_feed_dispatch_summary",
+        stage_id="model_03_event_state.event_feed_backfill",
         start_month=start_month,
         end_month=end_month,
         target_symbol=target_symbol.upper(),

@@ -1,6 +1,6 @@
 """M03 event-family modelability evidence acquisition planning.
 
-This module owns the pre-review acquisition plan for M06 modelability work. It
+This module owns the pre-review acquisition plan for M03 event-impact modelability work. It
 may prepare bounded provider task keys through the existing event-feed backfill
 route, but it does not call providers, judge probability-function classes,
 activate models, submit broker orders, or write dashboard read models.
@@ -194,7 +194,7 @@ def plan_event_family_modelability_acquisition(
     write_files: bool = False,
 ) -> EventFamilyModelabilityAcquisitionPlan:
     if minimum_same_family_observations < 2:
-        raise TaskSystemError("M06 modelability review requires multiple same-family observations")
+        raise TaskSystemError("M03 event-family modelability review requires multiple same-family observations")
     canonical_family = canonical_event_family_id(event_family_id)
     required_feed_ids = required_feeds_for_event_family(canonical_family)
     feed_summary = prepare_event_feed_backfill(
@@ -208,11 +208,11 @@ def plan_event_family_modelability_acquisition(
     )
     return EventFamilyModelabilityAcquisitionPlan(
         contract_type=MODELABILITY_ACQUISITION_CONTRACT_TYPE,
-        model_surface="model_06_residual_event_governance",
+        model_surface="model_03_event_state",
         event_family_id=canonical_family,
         event_family_modelability_review_gate="event-family-modelability-review",
         projection_mode_review_scope="impact_function_projection|conditional_effect_projection|context_only_projection|do_not_model",
-        probability_function_class_review_scope="M06 selects the allowed probability-function class only after acquired same-family evidence is sufficient; M03 owns concrete parameter training.",
+        probability_function_class_review_scope="M03 selects the allowed probability-function class only after acquired same-family evidence is sufficient and owns concrete parameter training.",
         deterministic_control_policy="Program gates own acquisition scope, source coverage, sample thresholds, PIT clocks, dedupe, overlap checks, stop conditions, and review readiness.",
         agent_role_policy="Codex skills are semantic reviewers only; they do not control provider dispatch, expand scope, decide readiness, train parameters, or perform actions that deterministic code can own.",
         start_month=start_month,
@@ -221,7 +221,7 @@ def plan_event_family_modelability_acquisition(
         target_cik=str(target_cik).zfill(10),
         candidate_seed_event_ref=candidate_seed_event_ref,
         minimum_same_family_observations=minimum_same_family_observations,
-        same_family_evidence_policy="M06 modelability review must use multiple PIT-valid same-family observations with coverage, controls, and leakage evidence.",
+        same_family_evidence_policy="M03 event-family modelability review must use multiple PIT-valid same-family observations with coverage, controls, and leakage evidence.",
         event_family_generalization_policy="Event families are defined by scenario/mechanism, not by ticker or company identity; AAPL/NVDA/AMD are observation entities or acquisition filters.",
         single_observation_policy="A single event is only a candidate seed; it cannot establish event-family probability-function type.",
         required_feed_ids=required_feed_ids,

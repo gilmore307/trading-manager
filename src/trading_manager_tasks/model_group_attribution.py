@@ -1,11 +1,9 @@
 """Manager-owned replay review execution.
 
 Replay review is the local, replay-derived review task that runs immediately
-after model-group replay and before M06 residual-event audit. It
-converts replay failure/miss rows into durable review units and records the
-ledger contract for later hierarchical component analysis. It is deliberately
-not M06 residual-event audit because it does not consume point-in-time event
-observations, event candidates, controls, co-events, or confounder evidence.
+after model-group replay. It converts replay failure/miss rows into durable
+review units, records the ledger contract for hierarchical component analysis,
+and embeds event attribution against the fixed pre-replay M03 event ledger.
 """
 
 from __future__ import annotations
@@ -23,6 +21,11 @@ from zoneinfo import ZoneInfo
 
 from .fold_naming import parse_model_worker_fold_id
 from .model_group_layer_attribution import build_model_group_layer_attribution
+from .model_group_replay_event_attribution import (
+    EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS,
+    MAX_EVENT_STRATEGY_REVIEW_PACKETS,
+    build_replay_review_event_attribution,
+)
 from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
@@ -117,6 +120,12 @@ def run_model_group_replay_review_if_ready(
     now_utc: datetime | None = None,
     force: bool = False,
     allow_partial_replay: bool = False,
+    call_agent_review: bool = True,
+    agent_reviewer: Any | None = None,
+    codex_bin: str = "codex",
+    codex_model: str | None = None,
+    codex_timeout_seconds: int = EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS,
+    max_agent_review_packets: int = MAX_EVENT_STRATEGY_REVIEW_PACKETS,
 ) -> SchedulerDecision | None:
     """Run one replay review task when replay is complete."""
 
@@ -353,7 +362,7 @@ def run_model_group_replay_review_if_ready(
             run_id=f"{run_id}_layer_attribution",
             now_utc=now,
         )
-        receipt = {
+        base_receipt_fields = {
             "contract_type": REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE,
             "status": "succeeded",
             "stage_id": "model_group.replay_review",
@@ -372,6 +381,24 @@ def run_model_group_replay_review_if_ready(
             if replay_run_id
             else None,
             "review_rows_ref": str(review_rows_path),
+        }
+        event_attribution_summary = build_replay_review_event_attribution(
+            storage_root=storage_root,
+            dataset_root=dataset_root,
+            output_root=output_root,
+            review_receipt=base_receipt_fields,
+            review_receipt_path=receipt_path,
+            review_rows_path=review_rows_path,
+            created_at_utc=now,
+            call_agent_review=call_agent_review,
+            agent_reviewer=agent_reviewer,
+            codex_bin=codex_bin,
+            codex_model=codex_model,
+            codex_timeout_seconds=codex_timeout_seconds,
+            max_agent_review_packets=max_agent_review_packets,
+        )
+        receipt = {
+            **base_receipt_fields,
             "layer_review_rows_ref": str(layer_review_rows_path),
             "replay_review_performance_summary_ref": str(performance_summary_path),
             "replay_review_performance_summary": performance_summary["summary"],
@@ -404,11 +431,16 @@ def run_model_group_replay_review_if_ready(
             "layer_review_diagnostic_summary": layer_review_summary,
             "model_03_event_pool_summary": m03_event_pool_summary,
             "cause_family_contract": ["data_insufficiency", "execution_connection_failure", "model_mechanism_defect"],
-            "residual_event_governance_status": "not_performed",
-            "event_evidence_consumed": False,
-            "event_observation_count": 0,
-            "event_candidate_count": 0,
-            "control_analysis_performed": False,
+            "event_attribution": event_attribution_summary,
+            "event_attribution_status": event_attribution_summary.get("event_attribution_status"),
+            "event_attribution_summary_ref": event_attribution_summary.get("event_attribution_summary_ref"),
+            "event_attribution_rows_ref": event_attribution_summary.get("attribution_rows_ref"),
+            "event_focus_proposals_ref": event_attribution_summary.get("event_focus_proposals_ref"),
+            "event_evidence_consumed": bool(event_attribution_summary.get("event_evidence_consumed")),
+            "event_observation_count": event_attribution_summary.get("event_observation_count", 0),
+            "event_candidate_count": event_attribution_summary.get("event_candidate_count", 0),
+            "event_focus_proposal_count": event_attribution_summary.get("event_focus_proposal_count", 0),
+            "control_analysis_performed": event_attribution_summary.get("control_analysis_status") == "passed",
             "provider_calls": 0,
             "broker_execution_performed": False,
             "model_activation_performed": False,
@@ -457,7 +489,10 @@ def run_model_group_replay_review_if_ready(
             "replay_review_completion_scope": completion_scope,
             "max_review_rows": max_review_rows,
             "replay_review_diagnostic_summary": review_summary,
-            "residual_event_governance_status": "not_performed",
+            "event_attribution_status": event_attribution_summary.get("event_attribution_status"),
+            "event_attribution_summary_ref": event_attribution_summary.get("event_attribution_summary_ref"),
+            "event_candidate_count": event_attribution_summary.get("event_candidate_count", 0),
+            "event_focus_proposal_count": event_attribution_summary.get("event_focus_proposal_count", 0),
         },
     )
 
@@ -874,7 +909,7 @@ def _review_row(row: Mapping[str, Any], *, decision_index: int, review_index: in
         "review_status": "reviewed",
         "failure_type": failure_type,
         "cause_family": "model_mechanism_defect",
-        "cause_family_basis": "replay row was visible and locally reviewable; event attribution is deferred to M06",
+        "cause_family_basis": "replay row was visible and locally reviewable; event attribution is handled by replay review against the fixed M03 event ledger",
         "eligibility_ledger_status": "reviewable_from_replay_row",
         "decision_ledger_status": "reviewable_from_replay_row",
         "outcome_ledger_status": "reviewable_from_replay_row",
@@ -1034,11 +1069,11 @@ def _load_m03_event_pool_rows(
     max_rows: int | None,
 ) -> tuple[tuple[dict[str, Any], ...], dict[str, Any]]:
     try:
-        from .model_group_residual_event_governance import _fold_scope_from_dataset, _load_event_candidates
+        from .model_group_replay_event_attribution import _fold_scope_from_dataset, _load_event_candidates
     except ImportError:
         return (), {
             "event_pool_status": "unavailable",
-            "event_pool_error": "model_group_residual_event_governance_import_failed",
+            "event_pool_error": "model_group_replay_event_attribution_import_failed",
         }
     fold_scope = _fold_scope_from_dataset(dataset_root)
     event_candidates, source_summary = _load_event_candidates(storage_root=storage_root, fold_scope=fold_scope)

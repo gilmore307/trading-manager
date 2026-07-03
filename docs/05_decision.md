@@ -27,15 +27,15 @@ scheduler should select no historical work while realtime trading, market-data
 ingestion, broker gates, account freshness, and C08 model-group comparison are
 competing for host capacity.
 
-## D006 - The model stack has six current models
+## D006 - The manager model stack has five pre-replay models
 
-Manager recognizes the current M01-M06 stack: BackgroundContext, TargetState, EventState, UnifiedDecision, OptionExpression, and ResidualEventGovernance.
+Manager recognizes the current pre-replay model stack as M01 BackgroundContext, M02 TargetState, M03 EventState, M04 UnifiedDecision, and M05 OptionExpression. Former M06 residual-event functions are no longer an independent model/task lane; their useful event-attribution role is embedded in replay review.
 
 ## D006A - Model tasks share lifecycle stage semantics
 
 All model groups use the same model-task lifecycle vocabulary: data acquisition, feature or evidence generation, model generation, evaluation, promotion or shadow handoff, and runtime monitoring. Model groups may declare different domain contracts for sources, clocks, labels, features, gates, and not-applicable states, but they must not create separate orchestration semantics for the same lifecycle responsibilities.
 
-Manager owns the lifecycle state machine, gap discovery, provider-dispatch boundary, retry/stop routing, artifact references, point-in-time/leakage gates, and readiness projection. Model-group code owns domain-specific implementation behind those declared contracts. M03 owns the pre-replay event-universe and event-impact lifecycle stages. M06 uses the same stage vocabulary only for the post-replay residual-event audit lane.
+Manager owns the lifecycle state machine, gap discovery, provider-dispatch boundary, retry/stop routing, artifact references, point-in-time/leakage gates, and readiness projection. Model-group code owns domain-specific implementation behind those declared contracts. M03 owns the pre-replay event-universe and event-impact lifecycle stages. Replay review owns post-replay event attribution as a diagnostic sub-surface, not as a separate model lifecycle.
 
 ## D007 - Reusable foundation catch-up is priority
 
@@ -43,7 +43,7 @@ The scheduler should first advance reusable targetless foundation substrate befo
 
 Historical training uses the 18-month `12+3+3` cumulative walk-forward fold as the public first-class work unit across all layers. Current fold ids use the training data source and training year, such as `fold_aapl_2016`; the window range `2016-01..2017-06` is coverage evidence, not the business fold name. Months are child partitions inside a fold for data coverage, receipts, and provider batching; they are not separate owner-facing training tasks. Dashboard task identity and stage progress must therefore present M01+ data acquisition, feature generation, model generation, evaluation, and review under the same fold period. A fold is eligible only after its final test-window calendar month is complete in `America/New_York`; the `fold_aapl_2016` window cannot open before `2017-07-01` because it needs data through 2017-06. Public task numbers are list sequence numbers assigned after chronological fold, layer, and workflow-stage sorting; `task_uid` is the durable identity for progress/evidence joins. Historical runtime advances one canonical month at a time; worker identity is internal execution detail and Tasks should not display or filter by worker. For overlapping January-June substrate months, public task ownership stays with the earliest open training-year fold that contains the month; `2024-01` through `2024-06` cannot display or run as `fold_aapl_2024` while `fold_aapl_2023` is still open. Pre-replay model work includes a fold-scoped cumulative replay-entry checkpoint. The first fold may cold start; each later fold must continue from the immediately previous fold checkpoint and add the next 12 training months before replay admission.
 
-The scheduler must finish one fold's full run cycle before opening the next fold. Completion means M01-M05 pre-replay model work, model replay, replay review, post-replay residual-event audit, model evaluation, model promotion, and maintenance/readiness handoff are done. M03 event-impact changes can update the event-observation pool used by later folds, so starting the next fold after pre-replay model generation alone is still invalid.
+The scheduler must finish one fold's full run cycle before opening the next fold. Completion means M01-M05 pre-replay model work, model replay, replay review with event attribution, model evaluation, model promotion, and maintenance/readiness handoff are done. M03 event-impact changes can update the event-observation pool used by later folds, so starting the next fold after pre-replay model generation alone is still invalid.
 
 ## D008 - M05 is optional trading guidance/expression
 
@@ -53,16 +53,16 @@ M05 may produce optional offline trading-guidance records and option-expression 
 
 M03 event-state owns the fold-scoped point-in-time event universe before replay. It materializes reviewed event observations, deterministic calendar/session events, structured event-family evidence, modelability gates, and event-impact projection inputs for the full fold rather than waiting for later model failures. M03 trains and applies point-in-time impact-state projections for events that pass deterministic coverage, control, leakage, overlap, label, and calibration gates.
 
-M03 may materialize a no-event state only when the full fold event-universe route has validly found no reviewed event observations or no admissible event-impact evidence. It must not use selected replay trades, replay failures, post-fold outcomes, or M06 residual audit rows to decide which upstream event rows exist.
+M03 may materialize a no-event state only when the full fold event-universe route has validly found no reviewed event observations or no admissible event-impact evidence. It must not use selected replay trades, replay failures, post-fold outcomes, or replay-review attribution rows to decide which upstream event rows exist.
 
 C07 provisional untrained-event risk estimates are not M03 event-state inputs. They may
 support live trading-review decisions and later M03 event-state promotion
 research, but they cannot be treated as trained event-failure evidence until the
 normal review and acceptance route completes.
 
-## D010 - M06 is post-replay residual event audit
+## D010 - Replay review owns post-replay event attribution
 
-M06 governs residual event risk only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It consumes replay-review evidence plus the pre-replay M03 event-impact ledger to explain residual failures, missed events, overblocks, underblocks, and path deviations. M06 must not own pre-replay event-universe discovery, event-family modelability gates, or event-impact training. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
+Replay review governs post-replay event attribution only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It consumes replay-review evidence plus the fixed pre-replay M03 event-impact ledger to explain residual failures, missed events, overblocks, underblocks, and path deviations. It must not own pre-replay event-universe discovery, event-family modelability gates, event-impact training, provider acquisition, or a separate M06 scheduler stage. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Agent model review is advisory and blinded
 
@@ -118,7 +118,7 @@ Runtime promoted-model lifecycle management belongs in `trading-execution`: the 
 
 Promotion review is not triggered when one model finishes a local check or one target substrate lane completes. Model-local checks and target-substrate runs remain diagnostic until the candidate bundle has completed the same run cycle.
 
-The current run cycle is reusable foundation substrate, target substrate where needed, live-flow replay, replay review, post-replay residual-event audit, evaluation, and promotion/lifecycle handoff. Replay must simulate the frozen live component graph over the historical candidate pool with a fixed `25000.0` USD replay initial capital for equity-path diagnostics and return normalization; this is not broker/account state. Components may choose no target, one target, or a target combination. Replay review is the first post-replay task: it compares decisions against replay-derived missed/failure evidence and prepares component-funnel review rows before residual-event audit. Evaluation compares the pinned candidate bundle against accepted baselines after attribution evidence exists. Promotion acceptance is bundle-scoped: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently without an accepted component-local lifecycle contract.
+The current run cycle is reusable foundation substrate, target substrate where needed, live-flow replay, replay review with event attribution, evaluation, and promotion/lifecycle handoff. Replay must simulate the frozen live component graph over the historical candidate pool with a fixed `25000.0` USD replay initial capital for equity-path diagnostics and return normalization; this is not broker/account state. Components may choose no target, one target, or a target combination. Replay review is the first post-replay task: it compares decisions against replay-derived missed/failure evidence, prepares component-funnel review rows, and performs event attribution against the fixed M03 event ledger. Evaluation compares the pinned candidate bundle against accepted baselines after attribution evidence exists. Promotion acceptance is bundle-scoped: individual layer results are diagnostic and support failure attribution, but no single layer or partial substack can be promoted independently without an accepted component-local lifecycle contract.
 
 Equity/options replay uses five simultaneous risk slots by default, each based on a `0.20` model-owned target allocation fraction. Replay keeps scanning after cash or slots are committed and may replace the weakest held position when the new candidate is point-in-time executable, allocation-compatible, and clears the score-scale-aware switch threshold. Receipts using the old fixed `0.05` switch threshold are stale and not current replay evidence.
 
@@ -136,7 +136,7 @@ input contract.
 This rule is owned by `docs/29_train_replay_realtime_input_parity.md`. It does
 not make broker/account guardrails, halt checks, restrictions, or emergency
 kill-switches trained model inputs. Untrained realtime event/calendar context
-may support advisory C07/trading-review evidence, but it cannot become M03/M04/M06
+may support advisory C07/trading-review evidence, but it cannot become M03/M04
 model input or automatic live trading action until accepted through the M03
 event-impact governance route.
 

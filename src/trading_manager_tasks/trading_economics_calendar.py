@@ -1,6 +1,6 @@
 """Trading Economics calendar storage-source planning.
 
-This module separates canonical storage source maintenance from M06 event
+This module separates canonical storage source maintenance from M03 event
 admission. Recent/future calendar polling may acquire Trading Economics rows
 into storage source artifacts, but it does not materialize SQL event rows,
 activate models, submit broker orders, or mutate accounts.
@@ -200,7 +200,7 @@ def plan_historical_seed(*, start_month: str, end_month: str, trading_data_root:
         task_key_path=None,
         task_key_hash=None,
         write_performed=False,
-        retired_reason="Historical-seed planning remains inventory-only; M06 materialization consumes reviewed TE storage artifacts directly as macro_data event inputs.",
+        retired_reason="Historical-seed planning remains inventory-only; M03 event materialization consumes reviewed TE storage artifacts directly as macro_data event inputs.",
         provider_calls=0,
         database_writes_performed=False,
         model_activation_performed=False,

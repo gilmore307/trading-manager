@@ -48,13 +48,13 @@ Deferred decisions, rejected decisions, failed runs, partial evidence, stale con
 
 AUROC is ranking diagnostic evidence, not a standalone hard promotion gate. Promotion settlement must preserve AUROC/ROC, PR-AUC, calibration, and Brier evidence, but guardrails are based on sample sufficiency, point-in-time integrity, positive excess return, acceptable drawdown/tail behavior, high-score tail-risk separation, positive intended-threshold utility, and acceptable bad-fill / model-missed-winner rates.
 
-High-score tail-risk settlement is deterministic and fixed-input. Evaluation must block promotion when high-score filled losses reach the minimum tail-loss count and filled winners versus filled losers have near-zero or inverted score separation. It must also block high-score tail-loss candidates whose filled-trade evidence is below the minimum tail-risk sample count. Short-DTE concentration is weak option-selection evidence only when it reaches the same minimum tail-loss count, and must be carried as a regression/follow-up unless confirmed by stronger option-selection evidence. Feature timing/leakage, liquidity/spread/fill realism, and regime/event miss remain evidence requirements until point-in-time feature traces, quote/fill evidence, or M06 event overlays are attached.
+High-score tail-risk settlement is deterministic and fixed-input. Evaluation must block promotion when high-score filled losses reach the minimum tail-loss count and filled winners versus filled losers have near-zero or inverted score separation. It must also block high-score tail-loss candidates whose filled-trade evidence is below the minimum tail-risk sample count. Short-DTE concentration is weak option-selection evidence only when it reaches the same minimum tail-loss count, and must be carried as a regression/follow-up unless confirmed by stronger option-selection evidence. Feature timing/leakage, liquidity/spread/fill realism, and regime/event miss remain evidence requirements until point-in-time feature traces, quote/fill evidence, or replay-review event-attribution evidence is attached.
 
 For the first accepted model bundle, evaluation may set `first_model_bootstrap = true`. That bundle's own frozen settlement run becomes the bootstrap baseline for later anonymous incumbent comparisons. This is a promotion/readiness exception only; it still cannot activate a production pointer without execution-owned shadow-cycle evidence.
 
 ## Failure Attribution Boundary
 
-Replay review is the first-class task between replay and M06. It is not the same as evaluation and it is not limited to event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, and the component-funnel layer where the replay first diverged. M06 runs after replay review and owns event/co-event explanations.
+Replay review is the first-class task after replay. It is not the same as evaluation and it is not limited to event research. It investigates replay misses, residual alpha errors, bad target selection, omitted target combinations, overblocking, underblocking, position-management mistakes, option-expression drag, event/co-event explanations, and the component-funnel layer where the replay first diverged.
 
 Replay review is path-conditioned. A miss is reviewable only inside the
 information and upstream selection path the replay row actually observed. If an
@@ -103,16 +103,15 @@ the first-gap attribution needed for operator review:
 The `post_replay_review_receipt` embeds
 `post_replay_review_diagnostic_summary` so dashboard and operator surfaces can
 scan total regret, top regret rows, best-action counts, and first-gap
-component/mechanism counts before reruns or residual-event audit.
+component/mechanism counts before reruns or event-attribution review.
 
-Replay review is only the first post-replay diagnostic step. A
+Replay review is the post-replay diagnostic step. A
 `post_replay_review_receipt` may identify failed fills, missed winners,
-and other candidate failure rows, but it does not satisfy M06 residual-event
-audit. That audit requires a separate receipt produced by the event-risk route
-with replay-review scope, point-in-time event
-observations or candidates, event-evidence refs, and control/co-event/confounder
-analysis. Evaluation must not treat generic replay review rows as completed
-M06 residual-event audit.
+and other candidate failure rows, and embeds event attribution when the fixed
+M03 event ledger is available. Event attribution requires replay-review scope,
+point-in-time event observations or candidates, event-evidence refs, and
+control/co-event/confounder analysis. Evaluation must not treat generic replay
+review rows as completed event attribution.
 
 Replay review must not complete when reviewable rows lack the future outcome or
 return data needed to quantify hindsight grading. In that case it emits
@@ -121,12 +120,12 @@ return data needed to quantify hindsight grading. In that case it emits
 backs off. Those requirement rows are acquisition or replay-repair inputs only;
 they are not reviewed failures and they do not satisfy downstream attribution.
 
-The manager-owned historical workflow therefore has two explicit post-replay
-steps before evaluation: first `model_group.replay_review`, then M06 Event Risk
-Governor attribution (`model_group.residual_event_governance`). If replay review is ready but no reviewed
-point-in-time event evidence exists, M06 must back off and prepare the
-bounded event-feed backfill task keys needed to materialize event observations;
-that preparation is not itself attribution and does not call providers.
+The manager-owned historical workflow has one explicit post-replay review step
+before evaluation: `model_group.replay_review`. Event attribution is a replay
+review diagnostic that consumes the fixed pre-replay M03 event-impact ledger.
+If that ledger is missing or incomplete, the fold must return to the M03
+event-impact route before replay; replay review must not launch a separate
+provider-acquisition or residual-governance scheduler stage.
 
 The same boundary is required in live operation. Execution may run C07 as a
 realtime failure/deviation watch during market hours, then run settlement
@@ -134,7 +133,7 @@ attribution after the regular session closes or in another explicitly accepted
 off-hours window. Realtime watch may produce warning evidence for C03/C05/C06
 review paths, but it must not mutate intraday entry, lifecycle, sizing, or
 execution decisions by itself. If C07 identifies an event or anomaly that has not
-been trained and accepted through M06/M03 event-state, it may only emit a
+been trained and accepted through M03 event-state, it may only emit a
 provisional untrained-event risk estimate from model-failure severity and
 supporting evidence. That estimate must be routed to the trading-review agent
 before it can affect a live block, reduce, exit, or human-review path.
@@ -142,7 +141,7 @@ Evaluation may use attribution evidence, but evaluation must not silently invent
 attribution labels inside promotion scoring.
 
 Replay review writes `replay_layer_decision_review_rows.jsonl` for the Replay
-Decisions surface before M06 residual-event attribution. These M01-M05 rows are
+Decisions surface before embedded event attribution. These M01-M05 rows are
 judged only against the point-in-time input state and candidate set available to
 that layer at the replay decision clock. They carry review-boundary reference
 and status, upstream-state isolation policy, downstream-input policy,
@@ -312,7 +311,7 @@ point-in-time evidence. The tool's role is to decide the next bounded
 counterfactual or repair question when promotion fails due to overblocking,
 underblocking, option-expression drag, alpha calibration, or drawdown.
 
-## M06 / M03 event-state Rule
+## M03 Event-State Rule
 
 M03 event-impact research may propose a promotion packet. M03 event-state may consume only accepted event/strategy-failure factors. Event text, raw abnormal activity, unknown-overlap activity bridge evidence, and C07 provisional untrained-event risk estimates cannot be promoted directly.
 

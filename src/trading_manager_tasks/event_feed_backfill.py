@@ -1,7 +1,7 @@
 """M03 event feed backfill preparation helpers.
 
-This module prepares the reviewed local feed artifacts required by the M06
-`model_06_residual_event_governance_data_acquisition` coverage gate. It only writes manager task-key files;
+This module prepares the reviewed local feed artifacts required by the M03
+event-impact route. It only writes manager task-key files;
 it does not call providers, activate models, submit broker orders, mutate
 accounts, or write dashboard read models.
 """

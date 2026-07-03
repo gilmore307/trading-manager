@@ -29,7 +29,7 @@ The resident historical scheduler is the normal path for no-broker historical mo
    - Treat execution/broker consumption as a separate controlled gate, not automatic scheduler completion.
 
 5. **Event-risk governance lane**
-   - Keep M06 as post-replay residual event-risk attribution within the historical service boundary; it starts after concentrated replay exposes failures, residuals, misses, or deviations.
+   - Keep event attribution embedded in replay review within the historical service boundary; it starts after concentrated replay exposes failures, residuals, misses, or deviations and consumes the fixed pre-replay M03 event ledger.
    - Admit realtime observation families only after review.
    - Let M03 event-state consume only accepted evidence packets and M05 compose optional offline guidance/expression context.
 

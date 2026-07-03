@@ -63,7 +63,7 @@ Historical status surfaces expose one current task fact, not a future task
 scaffold. Month checkpoints, fold states, and downstream blocked stages remain
 internal scheduler evidence. The dashboard may show completed history and the
 single current fold- or month-scoped task, with child partitions inside detail,
-but it must not project later M03-M06 dependencies as independent Future
+but it must not project later model-group dependencies as independent Future
 Tasks rows. Current fold ids use the source and training year, such as
 `fold_aapl_2016`; coverage windows such as `2016-01..2017-06` are evidence
 ranges, not fold names. A 12+3+3 walk-forward fold opens only after its final
@@ -80,15 +80,15 @@ must not open multiple month lanes or project parallel month work into Tasks.
 
 The service completes one fold's full run cycle before opening the next fold.
 M01-M05 generation is the pre-replay boundary; it unlocks replay, replay
-review, post-replay M06 residual attribution, model evaluation, promotion
+review with event attribution, model evaluation, promotion
 review, and maintenance/readiness handoff. Until that lifecycle emits
 maintenance/readiness evidence, the next fold and next target stay internal
 workflow dependencies.
 
 M01 background-context acquisition is the only reusable provider stage in the
 foundation path. M03 event-state observation inputs are fold-scoped local
-materializations, because accepted event families and M06-governed event
-attributes can differ across folds.
+materializations, because accepted event families and event-attribution evidence
+can differ across folds.
 
 M02 target-state materialization remains a local source-stage command. It turns
 reviewed target-local `01_feed_alpaca_bars` artifacts into
@@ -165,22 +165,22 @@ option-expression surface.
 PYTHONPATH=src python3 scripts/tasks/prepare_model_worker_target_queue.py --bootstrap-target AAPL --write
 ```
 
-## Residual Event Governance
+## Replay Review Event Attribution
 
-M06 is the residual-event governance model. It learns intervention,
+Replay review owns post-replay event attribution. It diagnoses intervention,
 overblock/underblock, missed-event, and underlying-vs-option failure attribution
 after M04/M05 thesis formation and replay settlement. It does not appear as a
-pre-replay provider data-acquisition lane.
+separate provider data-acquisition lane.
 
 M03 owns event-family attributes that describe where an event primarily acts,
 including cases where option prices are affected more strongly than the
 underlying price. M03 applies those attributes point-in-time as event state and
 passes them through to M04/M05. M04 consumes the state for trade/no-trade
-utility; M05 consumes it for option-expression suitability. M06 later audits
-whether replay residuals were explained by that fixed pre-replay event-impact
+utility; M05 consumes it for option-expression suitability. Replay review later
+audits whether residuals were explained by that fixed pre-replay event-impact
 ledger.
 
-residual-event audit must separate model failure time from impact exposure time.
+Event attribution must separate model failure time from impact exposure time.
 Event attribution uses `impact_exposure_time`, the earliest known time the
 adverse or missed impact began to appear, as the causal cutoff; `decision_time`
 is only a marked fallback. Impact severity is target-normalized when possible

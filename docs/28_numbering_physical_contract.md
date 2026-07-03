@@ -1,6 +1,7 @@
 # Current Numbering and Physical-Name Contract
 
-This file records the active numbering rule for manager-facing docs, scripts, SQL table names, storage paths, and registry rows.
+This file records the active numbering rule for manager-facing docs, scripts,
+SQL table names, storage paths, and registry rows.
 
 ## Current Model Numbers
 
@@ -11,11 +12,22 @@ This file records the active numbering rule for manager-facing docs, scripts, SQ
 | M03 | EventStateModel | `model_03_event_state`, `event_state_model`, `event_state_vector` |
 | M04 | UnifiedDecisionModel | `model_04_unified_decision`, `unified_decision_model`, `unified_decision_vector` |
 | M05 | OptionExpressionModel | `model_05_option_expression`, `option_expression_model`, `option_expression_plan` |
-| M06 | ResidualEventGovernanceModel | `model_06_residual_event_governance`, `residual_event_governance_model`, `event_risk_intervention` |
+
+## Compatibility Physical Tokens
+
+`model_06_residual_event_governance`, `residual_event_governance_model`, and
+`event_risk_intervention` may still appear in registry rows, SQL/source storage
+paths, and cross-repository physical artifacts until those owning repositories
+complete their own migration. They are compatibility physical names, not an
+independent manager model/task lane.
 
 ## Rule
 
-Active docs, code, tests, scripts, SQL table names, storage paths, and registry rows use the current M01-M06 physical tokens above. Immutable SQL migration history may contain older text because migrations are audit records.
+Active manager workflow, scheduler, promotion, and dashboard surfaces use the
+current M01-M05 model stack. Replay review owns post-replay event attribution
+as an embedded diagnostic surface, while M03 owns pre-replay event-state and
+event-family modelability. Immutable SQL migration history may contain older
+text because migrations are audit records.
 
 ## Review Check
 

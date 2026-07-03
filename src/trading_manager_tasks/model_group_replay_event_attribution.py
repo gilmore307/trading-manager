@@ -1,11 +1,11 @@
-"""Post-replay M06 ResidualEventGovernance attribution.
+"""Replay-review event attribution.
 
-This module is the M06 boundary after replay review and before model-group
-evaluation. It consumes replay review rows plus local point-in-time event
-observations or candidates, writes standardized event
-interpretation evidence, applies basic co-event/control/leakage checks, and
-emits a residual-event audit receipt. It performs no provider calls, no broker
-mutation, and no model activation.
+Replay review owns residual-event attribution as one of its diagnostic tools.
+This module consumes replay review rows plus point-in-time event observations
+or candidates, writes event-attribution subartifacts under the replay-review
+run, and returns a summary to embed in the replay-review receipt. It performs
+no provider calls, no broker mutation, no same-fold M03 mutation, and no model
+activation.
 """
 
 from __future__ import annotations
@@ -14,28 +14,25 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
-from .model_group_attribution import REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE, REPLAY_REVIEW_ROW_CONTRACT_TYPE
-from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES, DEFAULT_REPLAY_CONTRACT_ID
-from .request_payloads import DEFAULT_STORAGE_ROOT
-from .scheduler import SchedulerDecision
-from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
+from .model_group_replay import CURRENT_REPLAY_CANDIDATE_UNIVERSE_SOURCES
 
 NEW_YORK = ZoneInfo("America/New_York")
-RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE = "post_replay_residual_event_governance_receipt"
-RESIDUAL_EVENT_GOVERNANCE_ATTRIBUTION_ROW_CONTRACT_TYPE = "model_06_residual_event_governance_event_attribution_row"
-EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE = "model_06_residual_event_governance_event_focus_proposal"
-TEMPORAL_ATTENTION_CANDIDATE_ROW_CONTRACT_TYPE = "model_06_residual_event_governance_temporal_attention_candidate"
-EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE = "model_06_residual_event_governance_event_family_occurrence_scan_row"
-EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_CONTRACT_TYPE = "model_06_residual_event_governance_event_family_bias_association_packet"
+REPLAY_REVIEW_RECEIPT_CONTRACT_TYPE = "post_replay_review_receipt"
+REPLAY_REVIEW_ROW_CONTRACT_TYPE = "post_replay_review_row"
+REPLAY_REVIEW_EVENT_ATTRIBUTION_SUMMARY_CONTRACT_TYPE = "post_replay_review_event_attribution_summary"
+REPLAY_REVIEW_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE = "post_replay_review_event_attribution_row"
+EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE = "post_replay_review_event_focus_proposal"
+TEMPORAL_ATTENTION_CANDIDATE_ROW_CONTRACT_TYPE = "post_replay_review_temporal_attention_candidate"
+EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE = "post_replay_review_event_family_occurrence_scan_row"
+EVENT_FAMILY_BIAS_ASSOCIATION_PACKET_CONTRACT_TYPE = "post_replay_review_event_family_bias_association_packet"
 EVENT_STRATEGY_PROMOTION_REVIEW_CONTRACT_TYPE = "event_strategy_promotion_review"
-ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE = "model_06_residual_event_governance_temporal_attention_pool_entry"
+ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE = "post_replay_review_temporal_attention_pool_entry"
 EVENT_INTERPRETATION_CONTRACT_TYPE = "event_interpretation"
 LEGACY_EVENT_INTERPRETATION_CONTRACT_TYPES = {"event_interpretation_v1"}
 COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
@@ -158,140 +155,90 @@ M06_SQL_EVENT_FIELDS = [
 ]
 
 
-def run_model_group_residual_event_governance_if_ready(
+def build_replay_review_event_attribution(
     *,
-    storage_root: Path = DEFAULT_STORAGE_ROOT,
-    contract_id: str = DEFAULT_REPLAY_CONTRACT_ID,
-    execute: bool = True,
-    python_executable: str = sys.executable,
-    now_utc: datetime | None = None,
-    force: bool = False,
+    storage_root: Path,
+    dataset_root: Path,
+    output_root: Path,
+    review_receipt: Mapping[str, Any],
+    review_receipt_path: Path,
+    review_rows_path: Path,
+    created_at_utc: datetime,
     call_agent_review: bool = True,
     agent_reviewer: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
     codex_bin: str = "codex",
     codex_model: str | None = None,
     codex_timeout_seconds: int = EVENT_STRATEGY_CODEX_TIMEOUT_SECONDS,
     max_agent_review_packets: int = MAX_EVENT_STRATEGY_REVIEW_PACKETS,
-) -> SchedulerDecision | None:
-    """Run residual-event audit when replay review and PIT event evidence exist."""
+) -> dict[str, Any]:
+    """Write replay-review event attribution subartifacts and return a summary."""
 
-    dataset_root = _replay_dataset_root(storage_root, contract_id)
-    review_receipt_path, review_receipt = _latest_replay_review_receipt(dataset_root)
-    if review_receipt_path is None or review_receipt is None:
-        return None
     decision_rows_ref = str(review_receipt.get("decision_rows_ref") or "")
-    review_rows_path = Path(str(review_receipt.get("review_rows_ref") or ""))
-    if not decision_rows_ref or not review_rows_path.exists():
-        return None
-    if not force and _latest_residual_event_governance_receipt(dataset_root, decision_rows_ref=decision_rows_ref) is not None:
-        return None
-
-    now = (now_utc or datetime.now(UTC)).astimezone(UTC)
-    command = [
-        python_executable,
-        "scripts/tasks/run_model_group_residual_event_governance.py",
-        "--contract-id",
-        contract_id,
-        "--storage-root",
-        str(storage_root),
-    ]
-    if not execute:
-        fold_scope = _fold_scope_from_dataset(dataset_root)
-        event_source_summary = _event_candidate_readiness_summary(storage_root=storage_root, fold_scope=fold_scope)
-        if not event_source_summary["event_evidence_available"]:
-            return _decision(
-                now=now,
-                decision_status="backoff",
-                reason_code="model_group_residual_event_evidence_missing",
-                reason="replay review is ready, but M06 has no local point-in-time event observations or candidates to attribute",
-                command=command,
-                execution_summary={
-                    "contract_id": contract_id,
-                    "dataset_root": str(dataset_root),
-                    "replay_review_receipt_ref": str(review_receipt_path),
-                    "review_rows_ref": str(review_rows_path),
-                    "fold_scope": fold_scope,
-                    "event_source_summary": event_source_summary,
-                    "event_feed_backfill_preparation": None,
-                    "required_next_action": "materialize reviewed PIT event observations/candidates before residual-event audit can complete",
-                },
-            )
-        return _decision(
-            now=now,
-            decision_status="ready",
-            reason_code="model_group_residual_event_governance_ready",
-            reason="post-replay M06 residual-event audit is ready to run over replay-reviewed failures and PIT event candidates",
-            command=command,
-            execution_summary={
-                "contract_id": contract_id,
-                "dataset_root": str(dataset_root),
-                "replay_review_receipt_ref": str(review_receipt_path),
-                "review_rows_ref": str(review_rows_path),
-                "fold_scope": fold_scope,
-                "event_source_summary": event_source_summary,
-                "event_candidate_count": "not_counted_during_readiness_probe",
-                "expected_attribution_rows": "not_counted_during_readiness_probe",
-                "expected_event_focus_proposal_count": "not_counted_during_readiness_probe",
-                "expected_temporal_attention_candidate_count": "not_counted_during_readiness_probe",
-                "expected_event_family_occurrence_count": "not_counted_during_readiness_probe",
-                "expected_event_family_bias_association_packet_count": "not_counted_during_readiness_probe",
-            },
-        )
-
     review_rows = tuple(_load_jsonl_objects(review_rows_path))
     fold_scope = _fold_scope(dataset_root=dataset_root, review_rows=review_rows)
     event_candidates, event_source_summary = _load_event_candidates(storage_root=storage_root, fold_scope=fold_scope)
+    attribution_root = output_root / "event_attribution"
+    attribution_rows_path = attribution_root / "event_attribution_rows.jsonl"
+    event_interpretations_path = attribution_root / "event_interpretations.jsonl"
+    event_focus_proposals_path = attribution_root / "event_focus_proposals.jsonl"
+    temporal_attention_candidates_path = attribution_root / "temporal_attention_candidate_pool.jsonl"
+    event_family_occurrence_scan_path = attribution_root / "event_family_occurrence_scan.jsonl"
+    event_family_bias_packets_path = attribution_root / "event_family_bias_association_packets.jsonl"
+    event_strategy_reviews_path = attribution_root / "event_strategy_promotion_reviews.jsonl"
+    accepted_temporal_attention_pool_path = attribution_root / "accepted_temporal_attention_pool_entries.jsonl"
+    control_report_path = attribution_root / "control_coevent_leakage_report.json"
+    summary_path = attribution_root / "event_attribution_summary.json"
 
     if not event_candidates:
-        return _decision(
-            now=now,
-            decision_status="backoff",
-            reason_code="model_group_residual_event_evidence_missing",
-            reason="replay review is ready, but M06 has no local point-in-time event observations or candidates to attribute",
-            command=command,
-            execution_summary={
-                "contract_id": contract_id,
-                "dataset_root": str(dataset_root),
-                "replay_review_receipt_ref": str(review_receipt_path),
-                "review_rows_ref": str(review_rows_path),
-                "fold_scope": fold_scope,
-                "event_source_summary": event_source_summary,
-                "event_feed_backfill_preparation": None,
-                "required_next_action": "materialize reviewed PIT event observations/candidates before residual-event audit can complete",
-            },
+        summary = _event_attribution_summary(
+            review_receipt=review_receipt,
+            review_receipt_path=review_receipt_path,
+            review_rows_path=review_rows_path,
+            decision_rows_ref=decision_rows_ref,
+            created_at_utc=created_at_utc.isoformat(),
+            event_source_summary=event_source_summary,
+            event_attribution_status="skipped_no_event_evidence",
+            event_evidence_consumed=False,
+            event_observation_count=0,
+            event_candidate_count=0,
+            processed_replay_review_row_count=len(review_rows),
+            attribution_row_count=0,
+            event_focus_proposal_count=0,
+            temporal_attention_candidate_count=0,
+            event_family_occurrence_scan_row_count=0,
+            event_family_bias_association_packet_count=0,
+            event_strategy_promotion_review_count=0,
+            accepted_temporal_attention_pool_entry_count=0,
+            attribution_rows_ref=None,
+            event_interpretations_ref=None,
+            event_focus_proposals_ref=None,
+            temporal_attention_candidate_pool_ref=None,
+            event_family_occurrence_scan_ref=None,
+            event_family_bias_association_packets_ref=None,
+            event_strategy_promotion_reviews_ref=None,
+            accepted_temporal_attention_pool_ref=None,
+            control_coevent_leakage_report_ref=None,
+            control_analysis_status="not_applicable_no_event_evidence",
+            co_event_handling_status="not_applicable_no_event_evidence",
+            confounder_analysis_status="not_applicable_no_event_evidence",
+            leakage_status="not_applicable_no_event_evidence",
+            deterministic_event_family_gate_status="not_applicable_no_event_evidence",
+            event_strategy_promotion_review_status="not_applicable_no_event_evidence",
         )
+        attribution_root.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        summary["event_attribution_summary_ref"] = str(summary_path)
+        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return summary
 
-    attribution_rows, control_report = _build_attribution_rows(review_rows=review_rows, event_candidates=event_candidates, created_at_utc=now.isoformat())
-    event_focus_proposals = _build_event_focus_proposals(
-        attribution_rows=attribution_rows,
-        residual_event_governance_receipt_ref=None,
-        attribution_rows_ref=None,
-        event_interpretations_ref=None,
-        event_summaries_by_ref=_event_summaries_by_ref(event_candidates),
-    )
-    attention_evidence = _build_event_family_attention_evidence(
-        event_focus_proposals=event_focus_proposals,
-        attribution_rows=attribution_rows,
+    attribution_rows, control_report = _build_attribution_rows(
+        review_rows=review_rows,
         event_candidates=event_candidates,
-        temporal_attention_candidate_pool_ref=None,
-        event_family_occurrence_scan_ref=None,
-        event_family_bias_association_packets_ref=None,
+        created_at_utc=created_at_utc.isoformat(),
     )
-    run_id = "post_replay_residual_event_governance_" + now.strftime("%Y%m%dT%H%M%SZ")
-    output_root = dataset_root / "post_replay_attribution_runs" / run_id
-    attribution_rows_path = output_root / "residual_event_governance_rows.jsonl"
-    event_interpretations_path = output_root / "event_interpretations.jsonl"
-    event_focus_proposals_path = output_root / "event_focus_proposals.jsonl"
-    temporal_attention_candidates_path = output_root / "temporal_attention_candidate_pool.jsonl"
-    event_family_occurrence_scan_path = output_root / "event_family_occurrence_scan.jsonl"
-    event_family_bias_packets_path = output_root / "event_family_bias_association_packets.jsonl"
-    event_strategy_reviews_path = output_root / "event_strategy_promotion_reviews.jsonl"
-    accepted_temporal_attention_pool_path = output_root / "accepted_temporal_attention_pool_entries.jsonl"
-    control_report_path = output_root / "control_coevent_leakage_report.json"
-    receipt_path = output_root / "post_replay_attribution_receipt.json"
     event_focus_proposals = _build_event_focus_proposals(
         attribution_rows=attribution_rows,
-        residual_event_governance_receipt_ref=str(receipt_path),
+        event_attribution_summary_ref=str(summary_path),
         attribution_rows_ref=str(attribution_rows_path),
         event_interpretations_ref=str(event_interpretations_path),
         event_summaries_by_ref=_event_summaries_by_ref(event_candidates),
@@ -318,147 +265,149 @@ def run_model_group_residual_event_governance_if_ready(
         event_strategy_reviews,
         accepted_temporal_attention_pool_ref=str(accepted_temporal_attention_pool_path),
         event_strategy_reviews_ref=str(event_strategy_reviews_path),
-        created_at_utc=now.isoformat(),
+        created_at_utc=created_at_utc.isoformat(),
     )
-    lock_ref = SchedulerLockRef(
-        contract_type="scheduler_lock",
-        lock_scope="promotion",
-        lock_key=f"lock:model_group_residual_event_governance:{contract_id}",
-        lock_path=str(storage_root / "runtime" / "locks" / "model_group" / f"{contract_id}.residual_event_governance.lock"),
-        model_id="model_group",
-        candidate_ref=contract_id,
+    summary = _event_attribution_summary(
+        review_receipt=review_receipt,
+        review_receipt_path=review_receipt_path,
+        review_rows_path=review_rows_path,
+        decision_rows_ref=decision_rows_ref,
+        created_at_utc=created_at_utc.isoformat(),
+        event_source_summary=event_source_summary,
+        event_attribution_status="succeeded",
+        event_evidence_consumed=True,
+        event_observation_count=sum(1 for candidate in event_candidates if candidate["observation_status"] == "accepted_observation"),
+        event_candidate_count=len(event_candidates),
+        processed_replay_review_row_count=len(review_rows),
+        attribution_row_count=len(attribution_rows),
+        event_focus_proposal_count=len(event_focus_proposals),
+        temporal_attention_candidate_count=len(attention_evidence["temporal_attention_candidates"]),
+        event_family_occurrence_scan_row_count=len(attention_evidence["event_family_occurrence_scan_rows"]),
+        event_family_bias_association_packet_count=len(attention_evidence["event_family_bias_association_packets"]),
+        event_strategy_promotion_review_count=len(event_strategy_reviews),
+        accepted_temporal_attention_pool_entry_count=len(accepted_temporal_attention_pool_entries),
+        attribution_rows_ref=str(attribution_rows_path),
+        event_interpretations_ref=str(event_interpretations_path),
+        event_focus_proposals_ref=str(event_focus_proposals_path),
+        temporal_attention_candidate_pool_ref=str(temporal_attention_candidates_path),
+        event_family_occurrence_scan_ref=str(event_family_occurrence_scan_path),
+        event_family_bias_association_packets_ref=str(event_family_bias_packets_path),
+        event_strategy_promotion_reviews_ref=str(event_strategy_reviews_path),
+        accepted_temporal_attention_pool_ref=str(accepted_temporal_attention_pool_path),
+        control_coevent_leakage_report_ref=str(control_report_path),
+        control_analysis_status="passed",
+        co_event_handling_status="passed",
+        confounder_analysis_status="passed",
+        leakage_status="passed",
+        deterministic_event_family_gate_status=attention_evidence["deterministic_gate_status"],
+        event_strategy_promotion_review_status=_event_strategy_review_status(event_strategy_reviews),
     )
-    with acquire_scheduler_lock(lock_ref):
-        output_root.mkdir(parents=True, exist_ok=True)
-        _write_jsonl(event_interpretations_path, (candidate["interpretation"] for candidate in event_candidates))
-        _write_jsonl(attribution_rows_path, attribution_rows)
-        _write_jsonl(event_focus_proposals_path, event_focus_proposals)
-        _write_jsonl(temporal_attention_candidates_path, attention_evidence["temporal_attention_candidates"])
-        _write_jsonl(event_family_occurrence_scan_path, attention_evidence["event_family_occurrence_scan_rows"])
-        _write_jsonl(event_family_bias_packets_path, attention_evidence["event_family_bias_association_packets"])
-        _write_jsonl(event_strategy_reviews_path, event_strategy_reviews)
-        _write_jsonl(accepted_temporal_attention_pool_path, accepted_temporal_attention_pool_entries)
-        control_report_path.write_text(json.dumps(control_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        receipt = {
-            "contract_type": RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE,
-            "status": "succeeded",
-            "stage_id": "model_group.residual_event_governance",
-            "model_surface": "model_06_residual_event_governance",
-            "run_id": run_id,
-            "contract_id": contract_id,
-            "created_at_utc": now.isoformat(),
-            "completed_at_utc": now.isoformat(),
-            "decision_rows_ref": decision_rows_ref,
-            "replay_review_receipt_ref": str(review_receipt_path),
-            "replay_execution_run_id": review_receipt.get("replay_execution_run_id"),
-            "replay_execution_receipt_ref": review_receipt.get("replay_execution_receipt_ref"),
-            "candidate_model_ref": review_receipt.get("candidate_model_ref"),
-            "candidate_fold_id": review_receipt.get("candidate_fold_id"),
-            "candidate_training_target": review_receipt.get("candidate_training_target"),
-            "target_symbol": review_receipt.get("target_symbol") or review_receipt.get("candidate_training_target"),
-            "review_rows_ref": str(review_rows_path),
-            "attribution_rows_ref": str(attribution_rows_path),
-            "event_interpretations_ref": str(event_interpretations_path),
-            "event_focus_proposals_ref": str(event_focus_proposals_path),
-            "temporal_attention_candidate_pool_ref": str(temporal_attention_candidates_path),
-            "event_family_occurrence_scan_ref": str(event_family_occurrence_scan_path),
-            "event_family_bias_association_packets_ref": str(event_family_bias_packets_path),
-            "event_strategy_promotion_reviews_ref": str(event_strategy_reviews_path),
-            "accepted_temporal_attention_pool_ref": str(accepted_temporal_attention_pool_path),
-            "control_coevent_leakage_report_ref": str(control_report_path),
-            "event_evidence_consumed": True,
-            "event_observation_count": sum(1 for candidate in event_candidates if candidate["observation_status"] == "accepted_observation"),
-            "event_candidate_count": len(event_candidates),
-            "replay_review_scope_status": "passed",
-            "control_analysis_status": "passed",
-            "co_event_handling_status": "passed",
-            "confounder_analysis_status": "passed",
-            "leakage_status": "passed",
-            "upstream_overlap_status": "residual_after_upstream_conditioning",
-            "processed_replay_review_row_count": len(review_rows),
-            "attribution_row_count": len(attribution_rows),
-            "event_focus_proposal_count": len(event_focus_proposals),
-            "temporal_attention_candidate_count": len(attention_evidence["temporal_attention_candidates"]),
-            "event_family_occurrence_scan_row_count": len(attention_evidence["event_family_occurrence_scan_rows"]),
-            "event_family_bias_association_packet_count": len(attention_evidence["event_family_bias_association_packets"]),
-            "event_strategy_promotion_review_count": len(event_strategy_reviews),
-            "accepted_temporal_attention_pool_entry_count": len(accepted_temporal_attention_pool_entries),
-            "deterministic_event_family_gate_status": attention_evidence["deterministic_gate_status"],
-            "event_strategy_promotion_review_status": _event_strategy_review_status(event_strategy_reviews),
-            "event_focus_proposal_review_gate": "event-strategy-promotion-review",
-            "accepted_event_pool_mutation_performed": False,
-            "temporal_attention_pool_mutation_performed": bool(accepted_temporal_attention_pool_entries),
-            "provider_calls": 0,
-            "broker_execution_performed": False,
-            "model_activation_performed": False,
-            "model_03_event_state_promotion_performed": False,
-        }
-        receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-    return _decision(
-        now=now,
-        decision_status="executed",
-        reason_code="model_group_residual_event_governance_executed",
-        reason="executed post-replay M06 ResidualEventGovernance attribution over replay-reviewed rows and PIT event candidates",
-        command=command,
-        execution_summary={
-            "contract_id": contract_id,
-            "dataset_root": str(dataset_root),
-            "post_replay_residual_event_governance_receipt": str(receipt_path),
-            "attribution_rows_ref": str(attribution_rows_path),
-            "replay_execution_run_id": review_receipt.get("replay_execution_run_id"),
-            "candidate_model_ref": review_receipt.get("candidate_model_ref"),
-            "candidate_fold_id": review_receipt.get("candidate_fold_id"),
-            "candidate_training_target": review_receipt.get("candidate_training_target"),
-            "target_symbol": review_receipt.get("target_symbol") or review_receipt.get("candidate_training_target"),
-            "event_interpretations_ref": str(event_interpretations_path),
-            "event_focus_proposals_ref": str(event_focus_proposals_path),
-            "temporal_attention_candidate_pool_ref": str(temporal_attention_candidates_path),
-            "event_family_occurrence_scan_ref": str(event_family_occurrence_scan_path),
-            "event_family_bias_association_packets_ref": str(event_family_bias_packets_path),
-            "event_strategy_promotion_reviews_ref": str(event_strategy_reviews_path),
-            "accepted_temporal_attention_pool_ref": str(accepted_temporal_attention_pool_path),
-            "event_candidate_count": len(event_candidates),
-            "attribution_row_count": len(attribution_rows),
-            "event_focus_proposal_count": len(event_focus_proposals),
-            "temporal_attention_candidate_count": len(attention_evidence["temporal_attention_candidates"]),
-            "event_family_bias_association_packet_count": len(attention_evidence["event_family_bias_association_packets"]),
-            "event_strategy_promotion_review_count": len(event_strategy_reviews),
-            "accepted_temporal_attention_pool_entry_count": len(accepted_temporal_attention_pool_entries),
-        },
-    )
+    attribution_root.mkdir(parents=True, exist_ok=True)
+    _write_jsonl(event_interpretations_path, (candidate["interpretation"] for candidate in event_candidates))
+    _write_jsonl(attribution_rows_path, attribution_rows)
+    _write_jsonl(event_focus_proposals_path, event_focus_proposals)
+    _write_jsonl(temporal_attention_candidates_path, attention_evidence["temporal_attention_candidates"])
+    _write_jsonl(event_family_occurrence_scan_path, attention_evidence["event_family_occurrence_scan_rows"])
+    _write_jsonl(event_family_bias_packets_path, attention_evidence["event_family_bias_association_packets"])
+    _write_jsonl(event_strategy_reviews_path, event_strategy_reviews)
+    _write_jsonl(accepted_temporal_attention_pool_path, accepted_temporal_attention_pool_entries)
+    control_report_path.write_text(json.dumps(control_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary["event_attribution_summary_ref"] = str(summary_path)
+    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return summary
 
 
-def _decision(
+def _event_attribution_summary(
     *,
-    now: datetime,
-    decision_status: str,
-    reason_code: str,
-    reason: str,
-    command: list[str],
-    execution_summary: dict[str, Any],
-) -> SchedulerDecision:
-    now_et = now.astimezone(NEW_YORK)
-    return SchedulerDecision(
-        contract_type="manager_scheduler_decision",
-        now_utc=now.isoformat(),
-        now_et=now_et.isoformat(),
-        decision_status=decision_status,  # type: ignore[arg-type]
-        reason_code=reason_code,
-        reason=reason,
-        market_protection_active=False,
-        resource_pressure_active=False,
-        selected_work="model_group.residual_event_governance",
-        command=command,
-        next_internal_stage="residual_event_governance",
-        provider_calls=0,
-        dispatch_performed=False,
-        model_activation_performed=False,
-        broker_execution_performed=False,
-        storage_lifecycle_mutation_performed=False,
-        execution_summary=execution_summary,
-        lock_plan=scheduler_lock_plan(month=None, selected_work="model_group.residual_event_governance", next_internal_stage="residual_event_governance"),
-    )
+    review_receipt: Mapping[str, Any],
+    review_receipt_path: Path,
+    review_rows_path: Path,
+    decision_rows_ref: str,
+    created_at_utc: str,
+    event_source_summary: Mapping[str, Any],
+    event_attribution_status: str,
+    event_evidence_consumed: bool,
+    event_observation_count: int,
+    event_candidate_count: int,
+    processed_replay_review_row_count: int,
+    attribution_row_count: int,
+    event_focus_proposal_count: int,
+    temporal_attention_candidate_count: int,
+    event_family_occurrence_scan_row_count: int,
+    event_family_bias_association_packet_count: int,
+    event_strategy_promotion_review_count: int,
+    accepted_temporal_attention_pool_entry_count: int,
+    attribution_rows_ref: str | None,
+    event_interpretations_ref: str | None,
+    event_focus_proposals_ref: str | None,
+    temporal_attention_candidate_pool_ref: str | None,
+    event_family_occurrence_scan_ref: str | None,
+    event_family_bias_association_packets_ref: str | None,
+    event_strategy_promotion_reviews_ref: str | None,
+    accepted_temporal_attention_pool_ref: str | None,
+    control_coevent_leakage_report_ref: str | None,
+    control_analysis_status: str,
+    co_event_handling_status: str,
+    confounder_analysis_status: str,
+    leakage_status: str,
+    deterministic_event_family_gate_status: str,
+    event_strategy_promotion_review_status: str,
+) -> dict[str, Any]:
+    return {
+        "contract_type": REPLAY_REVIEW_EVENT_ATTRIBUTION_SUMMARY_CONTRACT_TYPE,
+        "status": "succeeded",
+        "stage_id": "model_group.replay_review",
+        "model_surface": "post_replay_review",
+        "created_at_utc": created_at_utc,
+        "completed_at_utc": created_at_utc,
+        "decision_rows_ref": decision_rows_ref,
+        "replay_review_receipt_ref": str(review_receipt_path),
+        "replay_execution_run_id": review_receipt.get("replay_execution_run_id"),
+        "replay_execution_receipt_ref": review_receipt.get("replay_execution_receipt_ref"),
+        "candidate_model_ref": review_receipt.get("candidate_model_ref"),
+        "candidate_fold_id": review_receipt.get("candidate_fold_id"),
+        "candidate_training_target": review_receipt.get("candidate_training_target"),
+        "target_symbol": review_receipt.get("target_symbol") or review_receipt.get("candidate_training_target"),
+        "review_rows_ref": str(review_rows_path),
+        "attribution_rows_ref": attribution_rows_ref,
+        "event_interpretations_ref": event_interpretations_ref,
+        "event_focus_proposals_ref": event_focus_proposals_ref,
+        "temporal_attention_candidate_pool_ref": temporal_attention_candidate_pool_ref,
+        "event_family_occurrence_scan_ref": event_family_occurrence_scan_ref,
+        "event_family_bias_association_packets_ref": event_family_bias_association_packets_ref,
+        "event_strategy_promotion_reviews_ref": event_strategy_promotion_reviews_ref,
+        "accepted_temporal_attention_pool_ref": accepted_temporal_attention_pool_ref,
+        "control_coevent_leakage_report_ref": control_coevent_leakage_report_ref,
+        "event_source_summary": dict(event_source_summary),
+        "event_attribution_status": event_attribution_status,
+        "event_evidence_consumed": event_evidence_consumed,
+        "event_observation_count": event_observation_count,
+        "event_candidate_count": event_candidate_count,
+        "replay_review_scope_status": "passed",
+        "control_analysis_status": control_analysis_status,
+        "co_event_handling_status": co_event_handling_status,
+        "confounder_analysis_status": confounder_analysis_status,
+        "leakage_status": leakage_status,
+        "upstream_overlap_status": "residual_after_upstream_conditioning" if event_evidence_consumed else "not_applicable_no_event_evidence",
+        "processed_replay_review_row_count": processed_replay_review_row_count,
+        "attribution_row_count": attribution_row_count,
+        "event_focus_proposal_count": event_focus_proposal_count,
+        "temporal_attention_candidate_count": temporal_attention_candidate_count,
+        "event_family_occurrence_scan_row_count": event_family_occurrence_scan_row_count,
+        "event_family_bias_association_packet_count": event_family_bias_association_packet_count,
+        "event_strategy_promotion_review_count": event_strategy_promotion_review_count,
+        "accepted_temporal_attention_pool_entry_count": accepted_temporal_attention_pool_entry_count,
+        "deterministic_event_family_gate_status": deterministic_event_family_gate_status,
+        "event_strategy_promotion_review_status": event_strategy_promotion_review_status,
+        "event_focus_proposal_review_gate": "event-strategy-promotion-review" if event_evidence_consumed else None,
+        "accepted_event_pool_mutation_performed": False,
+        "temporal_attention_pool_mutation_performed": accepted_temporal_attention_pool_entry_count > 0,
+        "same_fold_model_03_event_mutation_performed": False,
+        "provider_calls": 0,
+        "broker_execution_performed": False,
+        "model_activation_performed": False,
+        "model_03_event_state_promotion_performed": False,
+    }
 
 
 def _build_attribution_rows(
@@ -500,8 +449,8 @@ def _build_attribution_rows(
         row_id = f"l6_event_attr_{index:08d}"
         rows.append(
             {
-                "contract_type": RESIDUAL_EVENT_GOVERNANCE_ATTRIBUTION_ROW_CONTRACT_TYPE,
-                "stage_id": "model_group.residual_event_governance",
+                "contract_type": REPLAY_REVIEW_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE,
+                "stage_id": "model_group.replay_review",
                 "attribution_id": row_id,
                 "source_replay_review_row_contract_type": str(review_row.get("contract_type") or REPLAY_REVIEW_ROW_CONTRACT_TYPE),
                 "source_replay_review_id": review_row.get("review_id") or review_row.get("attribution_id"),
@@ -542,7 +491,7 @@ def _build_attribution_rows(
             }
         )
     control_report = {
-        "contract_type": "model_06_residual_event_governance_control_coevent_leakage_report",
+        "contract_type": "post_replay_review_control_coevent_leakage_report",
         "status": "passed",
         "review_row_count": len(review_rows),
         "event_candidate_count": len(event_candidates),
@@ -556,9 +505,9 @@ def _build_attribution_rows(
         "upstream_overlap_status": "residual_after_upstream_conditioning",
         "same_fold_model_03_event_mutation_performed": False,
         "notes": [
-            "residual-event audit consumes post-replay review rows; it does not create same-fold M03 event-state inputs.",
+            "replay review event attribution consumes post-replay review rows; it does not create same-fold M03 event-state inputs.",
             "Rows with multiple matching events are marked confounded until a later promotion packet proves incremental value.",
-            "M06 uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay review row provides an impact clock.",
+            "replay review event attribution uses impact_exposure_time rather than model decision_time as the causal cutoff when the replay review row provides an impact clock.",
         ],
     }
     return rows, control_report
@@ -567,7 +516,7 @@ def _build_attribution_rows(
 def _build_event_focus_proposals(
     *,
     attribution_rows: Sequence[Mapping[str, Any]],
-    residual_event_governance_receipt_ref: str | None,
+    event_attribution_summary_ref: str | None,
     attribution_rows_ref: str | None,
     event_interpretations_ref: str | None,
     event_summaries_by_ref: Mapping[str, Mapping[str, Any]],
@@ -660,8 +609,8 @@ def _build_event_focus_proposals(
         proposals.append(
             {
                 "contract_type": EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE,
-                "stage_id": "model_group.residual_event_governance",
-                "model_surface": "model_06_residual_event_governance",
+                "stage_id": "model_group.replay_review",
+                "model_surface": "post_replay_review",
                 "event_focus_proposal_id": proposal_id,
                 "proposal_status": "watch_candidate",
                 "review_gate": "event-strategy-promotion-review",
@@ -689,7 +638,7 @@ def _build_event_focus_proposals(
                 "average_incremental_attribution_score": _average(group["supporting_scores"]),
                 "average_attribution_confidence_score": _average(group["supporting_confidences"]),
                 "event_interpretation_refs": sorted(group["event_interpretation_refs"])[:50],
-                "residual_event_governance_receipt_ref": residual_event_governance_receipt_ref,
+                "event_attribution_summary_ref": event_attribution_summary_ref,
                 "attribution_rows_ref": attribution_rows_ref,
                 "event_interpretations_ref": event_interpretations_ref,
                 "accepted_event_pool_mutation_performed": False,
@@ -770,7 +719,7 @@ def _build_event_family_attention_evidence(
         stats = event_ref_stats.get(event_ref, _empty_event_ref_stats())
         row = {
             "contract_type": EVENT_FAMILY_OCCURRENCE_SCAN_ROW_CONTRACT_TYPE,
-            "stage_id": "model_group.residual_event_governance",
+            "stage_id": "model_group.replay_review",
             "event_family_id": family_id,
             "event_ref": event_ref,
             "target_symbol": _family_target_symbol(candidate, event_focus_proposals),
@@ -934,7 +883,7 @@ def _build_event_family_attention_evidence(
         candidate_rows.append(
             {
                 "contract_type": TEMPORAL_ATTENTION_CANDIDATE_ROW_CONTRACT_TYPE,
-                "stage_id": "model_group.residual_event_governance",
+                "stage_id": "model_group.replay_review",
                 "candidate_id": "l10_temporal_attention_candidate_" + _stable_token(group["event_family_id"]),
                 "candidate_status": "ready_for_agent_review" if deterministic_gate_status == "passed" else "blocked_by_deterministic_controls",
                 "event_family_id": group["event_family_id"],
@@ -1423,7 +1372,7 @@ def _invoke_event_strategy_review_agent(
 
 def _event_strategy_review_agent_prompt(review_packet: Mapping[str, Any]) -> str:
     return (
-        "Use the event-strategy-promotion-review skill. Review this deterministic residual-event family packet as a final guard only.\n"
+        "Use the event-strategy-promotion-review skill. Review this deterministic replay-review event-family packet as a final guard only.\n"
         "Do not recompute co-event/confounder, impact-onset, impact-severity, or leakage gates; those are deterministic inputs. Pre-release and post-release evidence are lifecycle stages of the same event family. Do not require a linear up/down prediction when the packet is a phase-aware state overlay for M03 event-state.\n"
         "Do not activate models, call providers, mutate SQL/storage, submit orders, or mutate accounts.\n"
         "Return strict JSON only, with exactly this contract shape and no markdown:\n"
@@ -1502,7 +1451,7 @@ def _build_accepted_temporal_attention_pool_entries(
         entries.append(
             {
                 "contract_type": ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE,
-                "stage_id": "model_group.residual_event_governance",
+                "stage_id": "model_group.replay_review",
                 "pool_entry_id": "temporal_attention_pool_" + _stable_token(family_id, created_at_utc),
                 "pool_status": "accepted",
                 "event_family_id": family_id,
@@ -1829,7 +1778,7 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
             "relation_type": raw_event.get("dedup_status") or "canonical",
             "canonical_event_id": raw_event.get("canonical_event_id") or raw_event.get("event_id"),
         },
-        "rationale_summary": raw_event.get("rationale_summary") or raw_event.get("summary") or raw_event.get("title") or "Structured local event candidate standardized for residual-event audit.",
+        "rationale_summary": raw_event.get("rationale_summary") or raw_event.get("summary") or raw_event.get("title") or "Structured local event candidate standardized for replay review event attribution.",
         "evidence_spans": raw_event.get("evidence_spans") or [{"source_ref": raw_event.get("reference") or raw_event.get("source_artifact_ref"), "field": "structured_event_candidate"}],
         "review_status": raw_event.get("review_status") or "candidate",
         "standardization_status": raw_event.get("standardization_status") or "standardized",
@@ -1860,7 +1809,7 @@ def _fill_interpretation_defaults(row: dict[str, Any], *, index: int) -> dict[st
     row.setdefault("source_quality_score", 0.5)
     row.setdefault("evidence_confidence_score", 0.5)
     row.setdefault("canonical_relation", {"relation_type": "canonical"})
-    row.setdefault("rationale_summary", "Structured local event candidate standardized for residual-event audit.")
+    row.setdefault("rationale_summary", "Structured local event candidate standardized for replay review event attribution.")
     row.setdefault("evidence_spans", [])
     row.setdefault("review_status", "candidate")
     row.setdefault("standardization_status", "standardized")
@@ -1950,24 +1899,25 @@ def _replay_receipt_full_completion_scope(receipt: Mapping[str, Any]) -> bool:
     return receipt.get("max_decision_rows") is None
 
 
-def _latest_residual_event_governance_receipt(dataset_root: Path, *, decision_rows_ref: str) -> dict[str, Any] | None:
-    path, receipt = _latest_receipt(
-        dataset_root / "post_replay_attribution_runs",
-        "post_replay_attribution_receipt.json",
-        accepted_statuses=COMPLETE_STATUSES,
-        required_field=("decision_rows_ref", decision_rows_ref),
-        predicate=lambda receipt: str(receipt.get("contract_type") or "") == RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE,
-    )
-    return dict(receipt) if path is not None and receipt is not None else None
-
-
-def latest_residual_event_governance_receipt(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
-    return _latest_receipt(
-        dataset_root / "post_replay_attribution_runs",
-        "post_replay_attribution_receipt.json",
-        accepted_statuses=COMPLETE_STATUSES,
-        predicate=lambda receipt: str(receipt.get("contract_type") or "") == RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE,
-    )
+def latest_replay_review_event_attribution_summary(dataset_root: Path) -> tuple[Path | None, dict[str, Any] | None]:
+    root = dataset_root / "post_replay_review_runs"
+    if not root.exists():
+        return None, None
+    candidates: list[tuple[str, Path, Mapping[str, Any]]] = []
+    for path in sorted(root.glob("*/event_attribution/event_attribution_summary.json")):
+        receipt = _load_optional_json_object(path)
+        if receipt is None:
+            continue
+        if str(receipt.get("contract_type") or "") != REPLAY_REVIEW_EVENT_ATTRIBUTION_SUMMARY_CONTRACT_TYPE:
+            continue
+        if str(receipt.get("status") or receipt.get("event_attribution_status") or "") not in COMPLETE_STATUSES:
+            continue
+        created = str(receipt.get("created_at_utc") or receipt.get("completed_at_utc") or path.parent.parent.name)
+        candidates.append((created, path, receipt))
+    if not candidates:
+        return None, None
+    _created, path, receipt = sorted(candidates, key=lambda item: item[0])[-1]
+    return path, dict(receipt)
 
 
 def _latest_receipt(
@@ -2259,9 +2209,10 @@ def _stable_token(*parts: Any) -> str:
 
 
 __all__ = [
+    "ACCEPTED_TEMPORAL_ATTENTION_POOL_ENTRY_CONTRACT_TYPE",
     "EVENT_FOCUS_PROPOSAL_ROW_CONTRACT_TYPE",
-    "RESIDUAL_EVENT_GOVERNANCE_RECEIPT_CONTRACT_TYPE",
-    "RESIDUAL_EVENT_GOVERNANCE_ATTRIBUTION_ROW_CONTRACT_TYPE",
-    "latest_residual_event_governance_receipt",
-    "run_model_group_residual_event_governance_if_ready",
+    "REPLAY_REVIEW_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE",
+    "REPLAY_REVIEW_EVENT_ATTRIBUTION_SUMMARY_CONTRACT_TYPE",
+    "build_replay_review_event_attribution",
+    "latest_replay_review_event_attribution_summary",
 ]

@@ -131,8 +131,8 @@ expand the point-in-time candidate set.
 
 Bounded smoke runs may use `--max-review-rows`. Those receipts must carry
 `replay_review_completion_scope=bounded_diagnostic` and `max_review_rows`; they
-are inspection artifacts only and must not satisfy full Replay Review, M06, or
-evaluation lifecycle gates. Only `replay_review_completion_scope=full_replay_review`
+are inspection artifacts only and must not satisfy full replay review,
+event-attribution, or evaluation lifecycle gates. Only `replay_review_completion_scope=full_replay_review`
 with no row cap can unlock downstream stages.
 
 ## Lock Contract
@@ -166,7 +166,7 @@ Reusable foundation catch-up remains first. Runtime advances exactly one
 canonical month during this phase after reusable M01 background-context
 data/feature substrate and fold-scoped M03 event-state observation inputs are
 complete. M03 event substrate is collected each fold because accepted event
-families and M06-governed event attributes may differ across folds.
+families and event attributes may differ across folds.
 
 Target-specific substrate work is the second phase. It prepares M02 target
 state, target-local evidence, M05 option-expression inputs when applicable, and
@@ -177,21 +177,21 @@ task lanes; they do not force replay to trade that target.
 Fold progression is serial. Pre-replay model work includes the fold-scoped
 replay entry utility checkpoint; after the first fold, that checkpoint must be
 continued from the previous fold's checkpoint before replay can start. After a
-fold finishes M01-M05 model work, the scheduler holds the fold lane until model replay, replay review,
-residual-event governance attribution, model evaluation, model promotion, and maintenance/readiness
+fold finishes M01-M05 model work, the scheduler holds the fold lane until model replay, replay review
+with event attribution, model evaluation, model promotion, and maintenance/readiness
 handoff complete. It must not start the next fold or rotate to another target
 while that model-group lifecycle is still open.
 
 Replay is run-cycle scoped. It simulates the frozen live component graph against the historical point-in-time candidate pool, allowing components to choose no target, one target, or a target combination. Replay does not start from a preselected symbol except in explicit diagnostic repair scenarios.
 
-Replay review is a separate task between replay and M06. It inspects target
+Replay review is the post-replay diagnostic task. It inspects target
 selection misses, portfolio combinations, underlying-vs-option failure locus,
-option-expression drag, overblock/underblock behavior, and the component-funnel
-layer where replay first diverged. M06 residual-event governance starts after
-replay review for event/co-event explanations and must not run as a pre-replay
-provider input stage.
+option-expression drag, overblock/underblock behavior, the component-funnel
+layer where replay first diverged, and event/co-event explanations against the
+fixed pre-replay M03 event ledger. It must not launch a separate event provider
+input stage.
 
-Evaluation consumes replay, replay-review, and attribution evidence. Promotion review must wait for the candidate bundle's replay, replay-review, attribution, and evaluation evidence; single-layer checks and target-substrate runs remain diagnostic until the full run cycle closes.
+Evaluation consumes replay and replay-review event-attribution evidence. Promotion review must wait for the candidate bundle's replay, replay-review attribution, and evaluation evidence; single-layer checks and target-substrate runs remain diagnostic until the full run cycle closes.
 
 ## Safety Evidence
 

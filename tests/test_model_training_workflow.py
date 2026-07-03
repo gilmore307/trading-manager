@@ -13,10 +13,8 @@ from trading_manager_tasks.model_training_workflow import (
     MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,
     MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID,
     MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
-    MODEL_GROUP_REPLAY_REVIEW_COMPLETE_BLOCKER,
     MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
-    build_model_06_post_replay_workflow_plan,
     build_model_training_workflow_plan,
     model_script,
 )
@@ -303,63 +301,6 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertNotIn("model_06_residual_event_governance.feature_generation", stage_ids)
         self.assertFalse(any(stage_id.startswith("model_06_residual_event_governance.model_generation") for stage_id in stage_ids))
 
-    def test_m06_post_replay_plan_uses_shared_lifecycle_vocabulary(self) -> None:
-        plan = build_model_06_post_replay_workflow_plan(
-            start_month="2016-01",
-            end_month="2017-06",
-            selected_target_symbol="aapl",
-        )
-
-        self.assertEqual(plan.contract_type, "manager_model_06_post_replay_workflow_plan")
-        self.assertEqual(plan.selected_target_symbol, "AAPL")
-        self.assertEqual(plan.trigger_stage, "model_group.replay_review")
-        self.assertEqual(plan.layer_count, 1)
-        layer = plan.layers[0]
-        self.assertEqual(layer.layer_key, "model_06_residual_event_governance")
-        self.assertEqual(layer.dataset_unit.unit_kind, "post_replay_residual_event_audit_walk_forward_12_3_3")
-        self.assertEqual(
-            [stage.stage_type for stage in layer.stages],
-            [
-                "model_generation",
-                "model_evaluation",
-                "promotion_review",
-                "maintenance",
-            ],
-        )
-        self.assertIsNone(plan.next_stage)
-        self.assertIn(MODEL_GROUP_REPLAY_REVIEW_COMPLETE_BLOCKER, layer.stages[0].blockers)
-        self.assertIn("model_03_event_state.event_impact_complete", layer.stages[0].blockers)
-        self.assertIn("scripts/tasks/run_model_group_residual_event_governance.py", layer.stages[0].command)
-        self.assertFalse(any(stage.provider_calls_allowed for stage in layer.stages))
-
-    def test_m06_post_replay_plan_advances_after_each_gate(self) -> None:
-        plan = build_model_06_post_replay_workflow_plan(
-            start_month="2016-01",
-            end_month="2017-06",
-            selected_target_symbol="AAPL",
-            replay_review_complete=True,
-        )
-        self.assertIsNone(plan.next_stage)
-
-        plan = build_model_06_post_replay_workflow_plan(
-            start_month="2016-01",
-            end_month="2017-06",
-            selected_target_symbol="AAPL",
-            replay_review_complete=True,
-            event_impact_ready=True,
-        )
-        self.assertEqual(plan.next_stage.stage_id, "model_06_residual_event_governance.model_generation")
-
-        plan = build_model_06_post_replay_workflow_plan(
-            start_month="2016-01",
-            end_month="2017-06",
-            selected_target_symbol="AAPL",
-            replay_review_complete=True,
-            event_impact_ready=True,
-            residual_attribution_complete=True,
-        )
-        self.assertEqual(plan.next_stage.stage_id, "model_06_residual_event_governance.model_evaluation")
-
     def test_model_generation_uses_chronological_train_validation_test_split_stages(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             plan = build_model_training_workflow_plan(
@@ -458,14 +399,6 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--from-database", command)
         self.assertIn("--source-start", command)
         self.assertIn("--source-end", command)
-
-    def test_m06_model_generation_uses_database_backed_current_route(self) -> None:
-        command = model_script(6, "residual_event_governance", "generate")
-
-        self.assertIn("--from-database", command)
-        self.assertIn("--source-start", command)
-        self.assertIn("--source-end", command)
-
 
 if __name__ == "__main__":
     unittest.main()

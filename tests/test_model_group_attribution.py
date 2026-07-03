@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import trading_manager_tasks.model_group_attribution as model_group_attribution
 from trading_manager_tasks.model_group_attribution import run_model_group_replay_review_if_ready
-from trading_manager_tasks.model_group_residual_event_governance import _event_effect_profile, run_model_group_residual_event_governance_if_ready
+from trading_manager_tasks.model_group_replay_event_attribution import _event_effect_profile
 
 
 class ModelGroupAttributionTests(unittest.TestCase):
@@ -327,8 +327,8 @@ class ModelGroupAttributionTests(unittest.TestCase):
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
             self.assertEqual(receipt["contract_type"], "post_replay_review_receipt")
             self.assertEqual(receipt["reviewed_failure_count"], 3)
-            self.assertEqual(receipt["residual_event_governance_status"], "not_performed")
-            self.assertIs(receipt["event_evidence_consumed"], False)
+            self.assertEqual(receipt["event_attribution_status"], "succeeded")
+            self.assertIs(receipt["event_evidence_consumed"], True)
             self.assertEqual(receipt["replay_review_diagnostic_summary"]["reviewed_row_count"], 3)
             self.assertIn("layer_review_rows_ref", receipt)
             layer_review_rows = [
@@ -699,7 +699,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             self.assertEqual(receipt["replay_review_completion_scope"], "completed_replay_run_diagnostic")
             self.assertTrue(Path(receipt["replay_review_performance_summary_ref"]).exists())
-            self.assertIsNone(run_model_group_residual_event_governance_if_ready(storage_root=storage_root))
+            self.assertIsNone(run_model_group_replay_review_if_ready(storage_root=storage_root))
 
     def test_newer_incompatible_replay_receipt_does_not_hide_latest_compatible_replay(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
@@ -766,14 +766,12 @@ class ModelGroupAttributionTests(unittest.TestCase):
 
             self.assertIsNone(decision)
 
-    def test_writes_real_residual_event_governance_receipt_from_event_observation(self):
+    def test_writes_replay_review_event_attribution_from_event_observation(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_replay_dataset(storage_root)
-            review_decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
-            self.assertIsNotNone(review_decision)
             observation_root = storage_root / "runtime" / "model_03_event_observation_inputs"
             observation_root.mkdir(parents=True)
             (observation_root / "2021-01_2021-02.json").write_text(
@@ -848,7 +846,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            decision = run_model_group_residual_event_governance_if_ready(
+            decision = run_model_group_replay_review_if_ready(
                 storage_root=storage_root,
                 agent_reviewer=self._fake_approved_event_strategy_review,
             )
@@ -856,42 +854,45 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertIsNotNone(decision)
             assert decision is not None
             self.assertEqual(decision.decision_status, "executed")
-            self.assertEqual(decision.reason_code, "model_group_residual_event_governance_executed")
-            receipt_paths = list((dataset_root / "post_replay_attribution_runs").glob("*/post_replay_attribution_receipt.json"))
+            self.assertEqual(decision.reason_code, "model_group_replay_review_executed")
+            receipt_paths = list((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json"))
             self.assertEqual(len(receipt_paths), 1)
             receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
-            self.assertEqual(receipt["contract_type"], "post_replay_residual_event_governance_receipt")
+            self.assertEqual(receipt["contract_type"], "post_replay_review_receipt")
+            summary = receipt["event_attribution"]
+            self.assertEqual(summary["contract_type"], "post_replay_review_event_attribution_summary")
+            self.assertEqual(summary["event_attribution_status"], "succeeded")
             self.assertTrue(receipt["event_evidence_consumed"])
             self.assertEqual(receipt["event_candidate_count"], 2)
             self.assertEqual(receipt["event_observation_count"], 2)
-            self.assertEqual(receipt["control_analysis_status"], "passed")
+            self.assertEqual(summary["control_analysis_status"], "passed")
             rows = [
                 json.loads(line)
-                for line in Path(receipt["attribution_rows_ref"]).read_text(encoding="utf-8").splitlines()
+                for line in Path(summary["attribution_rows_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            self.assertEqual(rows[0]["contract_type"], "model_06_residual_event_governance_event_attribution_row")
+            self.assertEqual(rows[0]["contract_type"], "post_replay_review_event_attribution_row")
             self.assertEqual(rows[0]["attribution_status"], "attributed")
             self.assertEqual(rows[0]["impact_exposure_time"], "2021-01-05T10:10:00-05:00")
             self.assertEqual(rows[0]["impact_onset_basis"], "source_impact_clock")
             self.assertEqual(rows[0]["impact_search_window_end"], "2021-01-05T10:10:00-05:00")
             self.assertEqual(rows[0]["impact_normalized_severity_score"], 0.5)
             self.assertEqual(receipt["event_focus_proposal_count"], 1)
-            self.assertFalse(receipt["accepted_event_pool_mutation_performed"])
-            self.assertTrue(receipt["temporal_attention_pool_mutation_performed"])
-            self.assertEqual(receipt["temporal_attention_candidate_count"], 1)
-            self.assertEqual(receipt["event_family_occurrence_scan_row_count"], 2)
-            self.assertEqual(receipt["event_family_bias_association_packet_count"], 1)
-            self.assertEqual(receipt["event_strategy_promotion_review_count"], 1)
-            self.assertEqual(receipt["accepted_temporal_attention_pool_entry_count"], 1)
+            self.assertFalse(summary["accepted_event_pool_mutation_performed"])
+            self.assertTrue(summary["temporal_attention_pool_mutation_performed"])
+            self.assertEqual(summary["temporal_attention_candidate_count"], 1)
+            self.assertEqual(summary["event_family_occurrence_scan_row_count"], 2)
+            self.assertEqual(summary["event_family_bias_association_packet_count"], 1)
+            self.assertEqual(summary["event_strategy_promotion_review_count"], 1)
+            self.assertEqual(summary["accepted_temporal_attention_pool_entry_count"], 1)
             proposals = [
                 json.loads(line)
-                for line in Path(receipt["event_focus_proposals_ref"]).read_text(encoding="utf-8").splitlines()
+                for line in Path(summary["event_focus_proposals_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
             self.assertEqual(len(proposals), 1)
-            self.assertEqual(proposals[0]["contract_type"], "model_06_residual_event_governance_event_focus_proposal")
-            self.assertEqual(proposals[0]["stage_id"], "model_group.residual_event_governance")
+            self.assertEqual(proposals[0]["contract_type"], "post_replay_review_event_focus_proposal")
+            self.assertEqual(proposals[0]["stage_id"], "model_group.replay_review")
             self.assertEqual(proposals[0]["proposal_status"], "watch_candidate")
             self.assertEqual(proposals[0]["event_summary"]["normalized_event_type"], "microstructure_liquidity_disruption")
             self.assertIn("Fixture PIT event", proposals[0]["event_summary"]["rationale_summary"])
@@ -899,7 +900,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertIn("requires_event_strategy_promotion_review", proposals[0]["acceptance_blockers"])
             candidates = [
                 json.loads(line)
-                for line in Path(receipt["temporal_attention_candidate_pool_ref"]).read_text(encoding="utf-8").splitlines()
+                for line in Path(summary["temporal_attention_candidate_pool_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
             self.assertEqual(candidates[0]["candidate_status"], "ready_for_agent_review")
@@ -910,7 +911,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(candidates[0]["event_family_impact_parameterization"]["severity_model"], "target_normalized_market_response")
             packets = [
                 json.loads(line)
-                for line in Path(receipt["event_family_bias_association_packets_ref"]).read_text(encoding="utf-8").splitlines()
+                for line in Path(summary["event_family_bias_association_packets_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
             self.assertEqual(packets[0]["deterministic_gate_status"], "passed")
@@ -929,16 +930,16 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(packets[0]["unmatched_occurrence_count"], 1)
             reviews = [
                 json.loads(line)
-                for line in Path(receipt["event_strategy_promotion_reviews_ref"]).read_text(encoding="utf-8").splitlines()
+                for line in Path(summary["event_strategy_promotion_reviews_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
             self.assertEqual(reviews[0]["decision"], "approve")
             accepted = [
                 json.loads(line)
-                for line in Path(receipt["accepted_temporal_attention_pool_ref"]).read_text(encoding="utf-8").splitlines()
+                for line in Path(summary["accepted_temporal_attention_pool_ref"]).read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            self.assertEqual(accepted[0]["contract_type"], "model_06_residual_event_governance_temporal_attention_pool_entry")
+            self.assertEqual(accepted[0]["contract_type"], "post_replay_review_temporal_attention_pool_entry")
             self.assertEqual(accepted[0]["pool_status"], "accepted")
             self.assertEqual(accepted[0]["event_temporal_form"], "instantaneous_unscheduled_event")
             self.assertEqual(accepted[0]["event_family_prior_role"], "event_family_impact_parameterization")
@@ -947,23 +948,24 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(accepted[0]["event_lifecycle_stage"], "post_release_impact_state")
             self.assertEqual(accepted[0]["state_signal_type"], "impact_state")
             self.assertEqual(accepted[0]["model_03_event_state_overlay"], "event_post_release_impact_state")
-            self.assertFalse(receipt["model_03_event_state_promotion_performed"])
+            self.assertFalse(summary["model_03_event_state_promotion_performed"])
 
-    def test_residual_event_governance_backoff_when_event_evidence_missing(self):
+    def test_replay_review_event_attribution_writes_negative_finding_when_event_evidence_missing(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
             dataset_root = self._write_replay_dataset(storage_root)
-            review_decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
-            self.assertIsNotNone(review_decision)
-
-            decision = run_model_group_residual_event_governance_if_ready(storage_root=storage_root)
+            decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
 
             self.assertIsNotNone(decision)
             assert decision is not None
-            self.assertEqual(decision.decision_status, "backoff")
-            self.assertEqual(decision.reason_code, "model_group_residual_event_evidence_missing")
+            self.assertEqual(decision.decision_status, "executed")
+            self.assertEqual(decision.reason_code, "model_group_replay_review_executed")
+            receipt_paths = list((dataset_root / "post_replay_review_runs").glob("*/post_replay_review_receipt.json"))
+            receipt = json.loads(receipt_paths[0].read_text(encoding="utf-8"))
+            self.assertEqual(receipt["event_attribution_status"], "skipped_no_event_evidence")
+            self.assertFalse(receipt["event_evidence_consumed"])
             self.assertFalse((dataset_root / "post_replay_attribution_runs").exists())
 
     def test_event_effect_profile_keeps_earnings_in_pre_release_risk_stage(self):

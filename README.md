@@ -31,7 +31,7 @@ requirements.txt  Shared environment dependency ledger.
 ```text
 docs/00_scope.md                         Repository boundary.
 docs/01_context.md                       Repository map and operating assumptions.
-docs/02_architecture.md                  Current M01-M06 control-plane map.
+docs/02_architecture.md                  Current M01-M05 control-plane map plus replay-review event attribution.
 docs/03_contracts.md                     Manager control-plane contracts.
 docs/04_task.md                          Current active tasks and gates.
 docs/05_decision.md                      Current decision ledger.
@@ -49,7 +49,7 @@ docs/27_control_plane_acceptance.md      Accepted control-plane scope.
 docs/28_numbering_physical_contract.md   Current numbering and physical-name contract.
 docs/29_train_replay_realtime_input_parity.md  Train/replay/realtime input parity contract.
 docs/30_helpers.md                       Shared helper package policy.
-docs/31_event_impact_distribution.md     M03/M06 event-impact distribution contract.
+docs/31_event_impact_distribution.md     M03 event-impact and replay-review attribution contract.
 ```
 
 ## Registry Rule

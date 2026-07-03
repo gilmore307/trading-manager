@@ -47,8 +47,9 @@ availability rule match the declared model input contract.
 
 Promotion readiness is the handoff point into realtime/shadow execution. A
 promotion-readiness record must carry `model_input_context_bundle` with
-`historical_dataset_snapshot_ref`, `frozen_model_config_ref`, and M02-M06
-upstream context refs. Realtime feature snapshots consume that bundle instead
+`historical_dataset_snapshot_ref`, `frozen_model_config_ref`, M02-M05 upstream
+context refs, and the M03 event-state ledger ref. Realtime feature snapshots
+consume that bundle instead
 of accepting placeholder context refs or requiring an operator to manually
 reconstruct the training/replay input lineage.
 
@@ -61,28 +62,28 @@ reconstruct the training/replay input lineage.
   guardrails, restriction checks, halt checks, and kill switches are execution
   controls, not trained model inputs.
 - Untrained event or calendar context may be present in realtime. It remains
-  advisory evidence for C07/trading review until the M06/M03 governance route
-  accepts it as a model input family or state overlay.
+  advisory evidence for C07/trading review until the M03 event-state governance
+  route accepts it as a model input family or state overlay.
 - Missing data must be semantic, not silent. Examples: `not_in_dataset`,
   `feed_outage`, `source_delayed`, `stale_but_usable`, `structurally_not_applicable`,
   and `advisory_only_untrained_context` are different states and must not be
   collapsed into a generic null.
 
-## M06 Event Parity Matrix
+## Event Parity Matrix
 
-M06 is the first required parity audit surface because it consumes the richest
-event/calendar context and feeds both replay attribution and realtime event-risk
-watch.
+M03 event-state is the required pre-replay parity surface for event/calendar
+context. Replay review consumes that fixed ledger for event attribution, while
+realtime event-risk watch remains advisory until accepted by the event-state route.
 
 | Semantic family | Training resolution | Replay resolution | Realtime resolution | Governance state |
 |---|---|---|---|---|
-| Company/news event context | PIT Alpaca/GDELT/news artifacts and accepted event interpretation rows | Frozen replay snapshot plus bounded on-demand candidate news/event cache | Current news/event refs or accepted derived governance refs | Trained only after M06/M03 event-family acceptance; otherwise advisory |
+| Company/news event context | PIT Alpaca/GDELT/news artifacts and accepted event interpretation rows | Frozen replay snapshot plus bounded on-demand candidate news/event cache | Current news/event refs or accepted derived governance refs | Trained only after M03 event-family acceptance; otherwise advisory |
 | Company release/result context | SEC-derived filing/submission/company-financial evidence with availability clocks | Frozen SEC/company-financial refs for the replay window | SEC/company release context refs; Nasdaq current/future schedule only as pre-event shell | SEC facts may be result/context; signed surprise claims require accepted PIT baselines |
 | Macro release calendar | Trading Economics calendar artifacts with actual/previous/consensus clocks where available | Frozen TE macro rows for the replay window | `realtime_calendar_context` TE macro release refs | Trained only where the model contract accepts the macro family; otherwise calendar context |
 | Market structure calendar | Market session, holiday, early close, option expiry, triple-witching, and rebalance calendar rows | Frozen market-session/special-calendar rows for the replay window | `realtime_calendar_context` market-session/special-calendar refs | Calendar state/tradeability context; not a broker action by itself |
 | Option activity context | PIT option-chain/quote/trade/IV/OI evidence where available | Replay-triggered option snapshots when components request option expression | ThetaData/Alpaca option refs where approved | Trained option-expression/event-risk input only when option coverage and clocks are accepted |
 
-M01-M06 parity audits should use the same columns instead of inventing separate
+M01-M05 plus event-state parity audits should use the same columns instead of inventing separate
 phase-specific vocabulary.
 
 ## Acceptance

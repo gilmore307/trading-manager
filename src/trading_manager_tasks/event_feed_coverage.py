@@ -1,7 +1,7 @@
 """Neutral event-feed coverage helpers for model input gates.
 
 This module only discovers reviewed local event-feed artifacts and counts
-requested-window rows. It does not own M03 event-state semantics, M06 residual
+requested-window rows. It does not own M03 event-state semantics, replay review event
 attribution, provider dispatch, model activation, broker execution, or storage
 lifecycle mutation.
 """

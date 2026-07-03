@@ -6832,7 +6832,7 @@ def _high_score_tail_loss_attribution_packet(
         "implementation_limits": [
             "No bid/ask, order-book depth, IV, Greeks, or venue fill-priority fields are available in replay decision rows.",
             "No point-in-time feature trace timestamps are available for feature-timing or leakage attribution.",
-            "No event/regime overlay evidence is consumed by this packet; event miss classification remains M06-owned.",
+            "No event/regime overlay evidence is consumed by this packet; event miss classification remains replay-review event-attribution-owned.",
             "Matched controls are nearest fixed-input comparisons, not causal counterfactual trades.",
         ],
     }

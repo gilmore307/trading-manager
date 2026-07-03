@@ -1,9 +1,9 @@
 """Manager-owned model-group evaluation execution.
 
-The dashboard can see when replay and residual-event audit are ready, but the
-manager must still write concrete evaluation evidence before promotion can
-inspect it. This module performs that side-effect-free evidence build over the
-local replay dataset.
+The dashboard can see when replay review and its event-attribution diagnostics
+are ready, but the manager must still write concrete evaluation evidence before
+promotion can inspect it. This module performs that side-effect-free evidence
+build over the local replay dataset.
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ MODEL_GROUP_EVALUATION_CHECKS = (
     "replay_metrics",
     "guardrail_settlement",
     "incumbent_comparison",
-    "residual_event_governance",
-    "residual_event_governance_event_focus_proposal",
+    "replay_review_event_attribution",
+    "replay_review_event_focus_proposal",
 )
 PROMOTION_REVIEW_RECOMMENDATIONS = {"failed", "deferred", "eligible_for_shadow", "insufficient_evidence"}
 PROMOTION_REVIEW_CONFIDENCE = {"low", "medium", "high"}
@@ -62,11 +62,7 @@ SHORT_DTE_TAIL_LOSS_DAYS = 7
 MAX_ACCEPTABLE_MAX_DRAWDOWN = -0.30
 MAX_ACCEPTABLE_BAD_FILL_RATE = 0.55
 MAX_ACCEPTABLE_MODEL_MISSED_WINNER_RATE = 0.45
-RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES = {
-    "post_replay_residual_event_governance_receipt",
-    "model_06_residual_event_governance_event_attribution_receipt",
-}
-M06_COMPLETE_STATUSES = {"succeeded", "complete", "completed"}
+REPLAY_REVIEW_EVENT_ATTRIBUTION_SUMMARY_CONTRACT_TYPE = "post_replay_review_event_attribution_summary"
 
 
 def run_model_group_evaluation_if_ready(
@@ -86,7 +82,7 @@ def run_model_group_evaluation_if_ready(
     codex_model: str | None = None,
     codex_timeout_seconds: int = DEFAULT_PROMOTION_REVIEW_CODEX_TIMEOUT_SECONDS,
 ) -> SchedulerDecision | None:
-    """Run one model-group evaluation build when M06 evidence is complete."""
+    """Run one model-group evaluation build when replay review evidence is complete."""
 
     dataset_root = _replay_dataset_root(storage_root, contract_id)
     training_fold = _completed_training_fold(
@@ -106,15 +102,22 @@ def run_model_group_evaluation_if_ready(
     decision_rows_path = Path(str(replay_receipt.get("decision_rows_ref") or ""))
     if not decision_rows_path.exists():
         return None
-    attribution_receipt_path, attribution_receipt = _latest_attribution_receipt(
+    replay_review_receipt_path, replay_review_receipt = _latest_replay_review_receipt(
         dataset_root,
         decision_rows_ref=str(decision_rows_path),
     )
-    if attribution_receipt_path is None or attribution_receipt is None:
+    if replay_review_receipt_path is None or replay_review_receipt is None:
         return None
-    event_focus_proposals_path = Path(str(attribution_receipt.get("event_focus_proposals_ref") or ""))
-    if not event_focus_proposals_path.exists():
+    attribution_receipt = replay_review_receipt.get("event_attribution")
+    if not isinstance(attribution_receipt, Mapping):
         return None
+    event_focus_proposals_ref = str(attribution_receipt.get("event_focus_proposals_ref") or "").strip()
+    event_focus_proposals_path = Path(event_focus_proposals_ref) if event_focus_proposals_ref else None
+    if event_focus_proposals_path is not None and not event_focus_proposals_path.exists():
+        return None
+    event_attribution_summary_ref = str(attribution_receipt.get("event_attribution_summary_ref") or "").strip()
+    event_attribution_summary_path = Path(event_attribution_summary_ref) if event_attribution_summary_ref else None
+    event_attribution_mtime = _path_mtime(event_attribution_summary_path) if event_attribution_summary_path is not None else None
     replay_scope_status = _replay_receipt_scope_status(replay_receipt=replay_receipt, training_fold=training_fold)
     if not replay_scope_status["compatible"]:
         now = (now_utc or datetime.now(UTC)).astimezone(UTC)
@@ -165,7 +168,8 @@ def run_model_group_evaluation_if_ready(
                 "dataset_root": str(dataset_root),
                 "training_fold": training_fold,
                 "replay_execution_receipt_ref": str(replay_receipt_path),
-                "residual_event_governance_receipt_ref": str(attribution_receipt_path),
+                "replay_review_receipt_ref": str(replay_review_receipt_path),
+                "event_attribution_summary_ref": str(attribution_receipt.get("event_attribution_summary_ref") or ""),
                 "attribution_scope_status": attribution_scope_status,
             },
         )
@@ -198,16 +202,17 @@ def run_model_group_evaluation_if_ready(
     if not force and _latest_promotion_review_artifacts(
         dataset_root,
         replay_result_ref=str(replay_receipt_path),
-        residual_event_governance_receipt_ref=str(attribution_receipt_path),
-        residual_event_governance_event_focus_proposals_ref=str(event_focus_proposals_path),
+        replay_review_receipt_ref=str(replay_review_receipt_path),
+        event_attribution_summary_ref=event_attribution_summary_ref,
         fold_id=str(training_fold["fold_id"]),
         target_symbol=str(training_fold.get("target_symbol") or ""),
         candidate_model_ref=str(training_fold["candidate_model_ref"]),
-        minimum_mtime=_state_mtime(training_fold),
+        minimum_mtime=_max_optional_float(_state_mtime(training_fold), event_attribution_mtime),
     ) is not None:
         return None
-    attribution_rows_path = Path(str(attribution_receipt.get("attribution_rows_ref") or ""))
-    if not attribution_rows_path.exists():
+    attribution_rows_ref = str(attribution_receipt.get("attribution_rows_ref") or "").strip()
+    attribution_rows_path = Path(attribution_rows_ref) if attribution_rows_ref else None
+    if attribution_rows_path is not None and not attribution_rows_path.exists():
         return None
 
     now = (now_utc or datetime.now(UTC)).astimezone(UTC)
@@ -249,7 +254,7 @@ def run_model_group_evaluation_if_ready(
             now=now,
             decision_status="ready",
             reason_code="model_group_evaluation_ready",
-            reason="model-group evaluation is ready to build replay metrics, guardrails, incumbent comparison, and residual-event audit checks",
+            reason="model-group evaluation is ready to build replay metrics, guardrails, incumbent comparison, and replay-review event-attribution checks",
             selected_work="model_group.evaluation",
             command=command,
             execution_summary={
@@ -259,13 +264,14 @@ def run_model_group_evaluation_if_ready(
                 "expected_checks": list(MODEL_GROUP_EVALUATION_CHECKS),
                 "ready_checks": list(MODEL_GROUP_EVALUATION_CHECKS),
                 "replay_execution_receipt_ref": str(replay_receipt_path),
-                "residual_event_governance_receipt_ref": str(attribution_receipt_path),
-                "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
+                "replay_review_receipt_ref": str(replay_review_receipt_path),
+                "event_attribution_summary_ref": event_attribution_summary_ref,
+                "event_focus_proposals_ref": str(event_focus_proposals_path) if event_focus_proposals_path is not None else None,
             },
         )
 
     rows = tuple(_load_jsonl_objects(decision_rows_path))
-    attribution_rows = tuple(_load_jsonl_objects(attribution_rows_path))
+    attribution_rows = tuple(_load_jsonl_objects(attribution_rows_path)) if attribution_rows_path is not None else ()
     check_summary = _evaluation_check_summary(
         rows=rows,
         attribution_rows=attribution_rows,
@@ -299,7 +305,7 @@ def run_model_group_evaluation_if_ready(
             settlement=settlement,
             settlement_ref=str(settlement_path),
             benchmark_contract_ref=f"trading-evaluation/replays/{contract_id}.json",
-            residual_event_governance_ref=str(attribution_receipt_path),
+            event_attribution_summary_ref=event_attribution_summary_ref or str(replay_review_receipt_path),
             created_at_utc=now.isoformat(),
             call_agent_review=call_agent_review,
             agent_reviewer=agent_reviewer,
@@ -334,8 +340,9 @@ def run_model_group_evaluation_if_ready(
             "expected_check_count": len(MODEL_GROUP_EVALUATION_CHECKS),
             "ready_check_count": len(set(check_summary["ready_checks"]).intersection(MODEL_GROUP_EVALUATION_CHECKS)),
             "replay_execution_receipt_ref": str(replay_receipt_path),
-            "residual_event_governance_receipt_ref": str(attribution_receipt_path),
-            "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
+            "replay_review_receipt_ref": str(replay_review_receipt_path),
+            "event_attribution_summary_ref": event_attribution_summary_ref,
+            "event_focus_proposals_ref": str(event_focus_proposals_path) if event_focus_proposals_path is not None else None,
             "fold_settlement_run_ref": str(settlement_path),
             "promotion_evaluation_review_ref": str(review_path),
             "promotion_eligibility_decision_ref": str(decision_path),
@@ -2251,7 +2258,7 @@ def _build_promotion_review(
     settlement: Mapping[str, Any],
     settlement_ref: str,
     benchmark_contract_ref: str,
-    residual_event_governance_ref: str,
+    event_attribution_summary_ref: str,
     created_at_utc: str,
     call_agent_review: bool,
     agent_reviewer: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None,
@@ -2263,7 +2270,7 @@ def _build_promotion_review(
         settlement=settlement,
         settlement_ref=settlement_ref,
         benchmark_contract_ref=benchmark_contract_ref,
-        residual_event_governance_ref=residual_event_governance_ref,
+        event_attribution_summary_ref=event_attribution_summary_ref,
         created_at_utc=created_at_utc,
     )
     if agent_reviewer is not None:
@@ -2301,7 +2308,7 @@ def _build_promotion_review_packet(
     settlement: Mapping[str, Any],
     settlement_ref: str,
     benchmark_contract_ref: str,
-    residual_event_governance_ref: str,
+    event_attribution_summary_ref: str,
     created_at_utc: str,
 ) -> dict[str, Any]:
     metrics = settlement.get("metrics") if isinstance(settlement.get("metrics"), Mapping) else {}
@@ -2344,7 +2351,7 @@ def _build_promotion_review_packet(
         "uncertainty_status": "insufficient_evidence",
         "shadow_readiness_status": "insufficient_evidence",
         "settlement_run_ref": settlement_ref,
-        "residual_event_governance_ref": residual_event_governance_ref,
+        "event_attribution_summary_ref": event_attribution_summary_ref,
         "first_model_bootstrap": False,
         "bootstrap_baseline_ref": "",
         "candidate_model_ref": str(settlement.get("candidate_model_ref") or ""),
@@ -2633,15 +2640,15 @@ def _evaluation_check_summary(
     replay_metrics_ready = len(rows) > 0
     guardrail_ready = len(rows) >= 20
     comparison_ready = True
-    attribution_ready = len(attribution_rows) > 0
+    attribution_ready = str(attribution_receipt.get("contract_type") or "") == REPLAY_REVIEW_EVENT_ATTRIBUTION_SUMMARY_CONTRACT_TYPE
     event_focus_count = int(attribution_receipt.get("event_focus_proposal_count") or 0)
-    event_focus_ready = bool(str(attribution_receipt.get("event_focus_proposals_ref") or "").strip()) and event_focus_count > 0
+    event_focus_ready = event_focus_count > 0 or str(attribution_receipt.get("event_attribution_status") or "") == "skipped_no_event_evidence"
     for check, ready, detail in (
         ("replay_metrics", replay_metrics_ready, f"{len(rows)} replay decision rows available"),
         ("guardrail_settlement", guardrail_ready, f"{len(rows)} replay decision rows checked against guardrails"),
         ("incumbent_comparison", comparison_ready, "incumbent comparison recorded as insufficient evidence for promotion"),
-        ("residual_event_governance", attribution_ready, f"{len(attribution_rows)} residual-event audit rows linked"),
-        ("residual_event_governance_event_focus_proposal", event_focus_ready, f"{event_focus_count} M06 event-focus proposals prepared"),
+        ("replay_review_event_attribution", attribution_ready, f"{len(attribution_rows)} replay-review event-attribution rows linked"),
+        ("replay_review_event_focus_proposal", event_focus_ready, f"{event_focus_count} replay-review event-focus proposals prepared"),
     ):
         if ready:
             ready_checks.append(check)
@@ -2866,19 +2873,19 @@ def _attribution_receipt_scope_status(
         if not observed_value:
             return {
                 "compatible": False,
-                "reason": f"residual-event audit receipt is missing {key} for replay candidate scope",
+                "reason": f"replay-review event attribution summary is missing {key} for replay candidate scope",
                 "field": key,
                 "expected": expected_value,
             }
         if observed_value != expected_value:
             return {
                 "compatible": False,
-                "reason": f"residual-event audit receipt {key} does not match replay candidate scope",
+                "reason": f"replay-review event attribution summary {key} does not match replay candidate scope",
                 "field": key,
                 "expected": expected_value,
                 "observed": observed_value,
             }
-    return {"compatible": True, "reason": "residual-event audit receipt scope matches replay candidate"}
+    return {"compatible": True, "reason": "replay-review event attribution summary scope matches replay candidate"}
 
 
 def _replay_model_artifact_status(replay_receipt: Mapping[str, Any]) -> dict[str, Any]:
@@ -2981,14 +2988,15 @@ def _latest_replay_execution_receipt(
     return latest_path, latest_receipt
 
 
-def _latest_attribution_receipt(dataset_root: Path, *, decision_rows_ref: str) -> tuple[Path | None, dict[str, Any] | None]:
-    attribution_root = dataset_root / "post_replay_attribution_runs"
+def _latest_replay_review_receipt(dataset_root: Path, *, decision_rows_ref: str) -> tuple[Path | None, dict[str, Any] | None]:
+    review_root = dataset_root / "post_replay_review_runs"
     return _latest_receipt(
-        attribution_root,
-        "post_replay_attribution_receipt.json",
-        accepted_statuses=M06_COMPLETE_STATUSES,
+        review_root,
+        "post_replay_review_receipt.json",
+        accepted_statuses={"succeeded", "complete", "completed"},
         required_field=("decision_rows_ref", decision_rows_ref),
-        predicate=_is_residual_event_governance_receipt,
+        predicate=lambda receipt: str(receipt.get("contract_type") or "") == "post_replay_review_receipt"
+        and isinstance(receipt.get("event_attribution"), Mapping),
     )
 
 
@@ -3025,25 +3033,6 @@ def _latest_receipt(
     return path, dict(receipt)
 
 
-def _is_residual_event_governance_receipt(receipt: Mapping[str, Any]) -> bool:
-    contract_type = str(receipt.get("contract_type") or "")
-    if contract_type not in RESIDUAL_EVENT_GOVERNANCE_CONTRACT_TYPES:
-        return False
-    if receipt.get("event_evidence_consumed") is not True:
-        return False
-    event_observation_count = _safe_int(receipt.get("event_observation_count"))
-    event_candidate_count = _safe_int(receipt.get("event_candidate_count"))
-    if (event_observation_count or 0) <= 0 and (event_candidate_count or 0) <= 0:
-        return False
-    replay_review_status = str(receipt.get("replay_review_scope_status") or receipt.get("replay_review_status") or "")
-    if replay_review_status not in {"succeeded", "complete", "completed", "passed"}:
-        return False
-    control_status = str(receipt.get("control_analysis_status") or receipt.get("controls_status") or "")
-    if control_status not in {"succeeded", "complete", "completed", "passed"}:
-        return False
-    return True
-
-
 def _safe_int(value: Any) -> int | None:
     if value is None or value == "":
         return None
@@ -3061,12 +3050,24 @@ def _state_mtime(training_fold: Mapping[str, Any]) -> float | None:
         return None
 
 
+def _path_mtime(path: Path) -> float | None:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def _max_optional_float(*values: float | None) -> float | None:
+    available = [value for value in values if value is not None]
+    return max(available) if available else None
+
+
 def _latest_promotion_review_artifacts(
     dataset_root: Path,
     *,
     replay_result_ref: str,
-    residual_event_governance_receipt_ref: str,
-    residual_event_governance_event_focus_proposals_ref: str,
+    replay_review_receipt_ref: str,
+    event_attribution_summary_ref: str,
     fold_id: str,
     target_symbol: str,
     candidate_model_ref: str,
@@ -3082,9 +3083,9 @@ def _latest_promotion_review_artifacts(
             continue
         if str(receipt.get("replay_execution_receipt_ref") or "") != replay_result_ref:
             continue
-        if str(receipt.get("residual_event_governance_receipt_ref") or "") != residual_event_governance_receipt_ref:
+        if str(receipt.get("replay_review_receipt_ref") or "") != replay_review_receipt_ref:
             continue
-        if str(receipt.get("residual_event_governance_event_focus_proposals_ref") or "") != residual_event_governance_event_focus_proposals_ref:
+        if str(receipt.get("event_attribution_summary_ref") or "") != event_attribution_summary_ref:
             continue
         decision_path = receipt_path.parent / "promotion_eligibility_decision.json"
         decision = _load_optional_json_object(decision_path)

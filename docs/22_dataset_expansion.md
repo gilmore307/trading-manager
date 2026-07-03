@@ -16,7 +16,7 @@ Dataset expansion decides which historical dataset role should be broadened next
 3. Layers 4-9 downstream risk-policy/context/action/guidance chains once prerequisites exist.
 4. Concentrated replay.
 5. Replay review over the post-replay component funnel.
-6. M06 post-replay event-risk attribution with reviewed event families and strict non-overlap rules.
+6. Replay-review event-risk attribution with reviewed event families and strict non-overlap rules.
 
 ## Dataset Unit
 

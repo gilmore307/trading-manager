@@ -36,7 +36,7 @@ class TradingEconomicsCalendarPlanningTests(unittest.TestCase):
             self.assertIsNone(summary.task_key_path)
             self.assertIsNone(summary.task_key_hash)
             self.assertFalse(summary.write_performed)
-            self.assertIn("M06 materialization consumes reviewed TE storage artifacts directly", summary.retired_reason or "")
+            self.assertIn("M03 event materialization consumes reviewed TE storage artifacts directly", summary.retired_reason or "")
             self.assertFalse(summary.database_writes_performed)
             self.assertEqual(summary.provider_calls, 0)
 

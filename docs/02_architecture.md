@@ -1,9 +1,9 @@
 # Architecture
 
-This file is the manager-side map of the current M01-M06 model stack. It is a routing and boundary guide, not the model-design authority.
+This file is the manager-side map of the current M01-M05 model stack plus replay-review event attribution. It is a routing and boundary guide, not the model-design authority.
 
-The event-impact probability-distribution contract for the M03/M06 boundary
-lives in `docs/31_event_impact_distribution.md`.
+The event-impact probability-distribution and replay-review attribution
+contract lives in `docs/31_event_impact_distribution.md`.
 
 ## Module Map
 
@@ -22,28 +22,29 @@ lives in `docs/31_event_impact_distribution.md`.
 | M03 | `EventStateModel` | `model_03_event_state`, `event_state_model` | Accepted event-family exposure, uncertainty, and event-conditioned response context | `event_state_vector` | Does not mutate event-family identity, impact-window definitions, or action policy. |
 | M04 | `UnifiedDecisionModel` | `model_04_unified_decision`, `unified_decision_model` | Direct-underlying utility decision, no-trade probability, exposure intent, and action heads | `unified_decision_vector` | Not broker routing, order construction, or account mutation. |
 | M05 | `OptionExpressionModel` | `model_05_option_expression`, `option_expression_model` | Conditional option-expression context after M04 direct-underlying intent | `option_expression_plan` | Not execution and not broker/account mutation. |
-| M06 | `ResidualEventGovernanceModel` | `model_06_residual_event_governance`, `residual_event_governance_model` | Residual event governance over the M04/M05 decision context after replay evidence | `event_risk_intervention`, review/provenance/promotion packets | May warn/block/cap/review; cannot auto-promote or trade. |
 
 ## Physical Surface Rule
 
-Active code, scripts, registry rows, SQL table names, storage paths, and docs should use the current M01-M06 model numbers above. SQL migration history is append-only audit material and is not rewritten by documentation cleanup.
+Active manager code, scripts, registry rows, SQL table names, storage paths, and docs should use the current M01-M05 model numbers above. Existing cross-repository physical `model_06_*` source/table tokens are compatibility surfaces until their owning repositories migrate them; they are not an independent manager workflow lane. SQL migration history is append-only audit material and is not rewritten by documentation cleanup.
 
 ## Event Path Rule
 
-M06 may inspect residual event evidence and abnormal activity only after
-concentrated live-flow replay has exposed failures, residuals, misses, or path
-deviations. It is not a pre-replay input stage. M03/M04 may consume only
-accepted event evidence packets that passed point-in-time checks, non-overlap
-checks, matched-control review, leakage review, and agent/manager acceptance.
+M03 owns the full fold-scoped point-in-time event universe before replay.
+Replay review may inspect residual event evidence and abnormal activity only
+after concentrated live-flow replay has exposed failures, residuals, misses, or
+path deviations, and only as attribution against the fixed M03 ledger. M03/M04
+may consume only accepted event evidence packets that passed point-in-time
+checks, non-overlap checks, matched-control review, leakage review, and
+agent/manager acceptance.
 Shared event-feed coverage helpers are neutral source-coverage plumbing: their
 row counts can prove local evidence availability, but they do not by themselves
-complete M03 event-state substrate or perform residual-event audit.
+complete M03 event-state substrate or perform replay-review event attribution.
 
-M05 remains the optional option-expression layer. It should not directly absorb event anomalies as alpha or duplicate M06 residual evidence.
+M05 remains the optional option-expression layer. It should not directly absorb event anomalies as alpha or duplicate replay-review event-attribution evidence.
 
 ## Candidate Policy
 
-M01 owns background context over broad market, sector, and industry state; it does not emit final target choices. M02 candidate handling is rule-fixed, not final-ticker-fixed: live routing builds candidates from the reviewed realtime total-symbol pool, target metadata, current hot/liquid market-wide names, and point-in-time liquidity, spread, data-quality, and optionability filters, then M02 ranks anonymous target-state candidates for handoff. Promotion replay uses the fixed `historical_candidate_universe.csv` table seeded from the current realtime equity pool plus the reviewed crypto spot candidate pool; it is stable replay scope, not point-in-time historical market-wide ranking evidence. A same-day candidate-universe freeze may be used for route smoke checks, but replay execution backs off until the accepted post-close readiness time so the final pool is not frozen during an active session. Downstream models still own decision, option expression, residual event governance, and execution review.
+M01 owns background context over broad market, sector, and industry state; it does not emit final target choices. M02 candidate handling is rule-fixed, not final-ticker-fixed: live routing builds candidates from the reviewed realtime total-symbol pool, target metadata, current hot/liquid market-wide names, and point-in-time liquidity, spread, data-quality, and optionability filters, then M02 ranks anonymous target-state candidates for handoff. Promotion replay uses the fixed `historical_candidate_universe.csv` table seeded from the current realtime equity pool plus the reviewed crypto spot candidate pool; it is stable replay scope, not point-in-time historical market-wide ranking evidence. A same-day candidate-universe freeze may be used for route smoke checks, but replay execution backs off until the accepted post-close readiness time so the final pool is not frozen during an active session. Downstream routes still own decision, option expression, replay-review diagnostics, and execution review.
 
 Manager may schedule target-major substrate work because routing symbols only prepare data samples. That scheduling choice does not select the replay target. Live-flow replay must run the component graph against the fixed historical candidate pool, allowing components to choose no target, one target, or a target combination. A fixed-symbol run is a diagnostic repair scenario, not ordinary promotion evidence.
 

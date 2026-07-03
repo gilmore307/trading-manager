@@ -1227,7 +1227,7 @@ def build_event_family_modelability_evidence_packet(
     observation_sample_limit: int = DEFAULT_OBSERVATION_SAMPLE_LIMIT,
 ) -> EventFamilyModelabilityEvidencePacket:
     if minimum_same_family_observations < 2:
-        raise TaskSystemError("M06 modelability evidence requires multiple same-family observations")
+        raise TaskSystemError("M03 event-family modelability evidence requires multiple same-family observations")
     canonical_family = canonical_event_family_id(event_family_id)
     source_family_gate = ""
     if canonical_family == "company_earnings_or_financial_results":
@@ -1307,7 +1307,7 @@ def build_event_family_modelability_evidence_packet(
     return EventFamilyModelabilityEvidencePacket(
         contract_type=MODELABILITY_EVIDENCE_PACKET_CONTRACT_TYPE,
         source_contract_type=MODELABILITY_ACQUISITION_CONTRACT_TYPE,
-        model_surface="model_06_residual_event_governance",
+        model_surface="model_03_event_state",
         event_family_id=canonical_family,
         target_symbol=target_symbol.upper(),
         target_cik=str(target_cik).zfill(10),

@@ -24,7 +24,6 @@ from .scheduler_daemon import (
     select_next_historical_work,
 )
 from .request_payloads import DEFAULT_STORAGE_ROOT
-from .model_training_workflow import build_model_06_post_replay_workflow_plan
 from .scheduler_locks import inspect_scheduler_lock, scheduler_lock_plan
 from .workflow_transition_ledger import DEFAULT_LATEST_TRANSITION_PATH, read_latest_transition
 
@@ -346,36 +345,6 @@ def _m06_scope_from_decision(decision: Mapping[str, Any] | None) -> dict[str, st
     }
 
 
-def _m06_projected_current_stage(decision: Mapping[str, Any] | None) -> str | None:
-    if not isinstance(decision, Mapping):
-        return None
-    selected_work = str(decision.get("selected_work") or "").strip()
-    next_internal_stage = str(decision.get("next_internal_stage") or "").strip()
-    reason_code = str(decision.get("reason_code") or "").strip()
-    if selected_work not in {"model_group.residual_event_governance", "model_group.m03_event_impact_inputs"} and next_internal_stage not in {
-        "residual_event_governance",
-        "model_group.m03_event_impact_inputs",
-    }:
-        return None
-    if selected_work == "model_group.m03_event_impact_inputs" or next_internal_stage == "model_group.m03_event_impact_inputs":
-        return "model_03_event_state.data_acquisition"
-    scope = _m06_scope_from_decision(decision)
-    replay_review_complete = True
-    event_impact_ready = reason_code not in {
-        "model_group_residual_event_evidence_missing",
-        "model_group_m03_event_feed_provider_required",
-        "model_group_m03_event_feed_backfill_running",
-    }
-    plan = build_model_06_post_replay_workflow_plan(
-        start_month=scope["start_month"] or "2016-01",
-        end_month=scope["end_month"] or "2017-06",
-        selected_target_symbol=scope["target_symbol"],
-        replay_review_complete=replay_review_complete,
-        event_impact_ready=event_impact_ready,
-    )
-    return plan.next_stage.stage_id if plan.next_stage is not None else selected_work
-
-
 def _gated_scope_status() -> dict[str, Any]:
     return {
         "provider_acquisition": {
@@ -512,12 +481,17 @@ def collect_historical_scheduler_status(
         )
     ):
         blocked_reason = None
+    selected_transition_work = str((transition_current or {}).get("selected_work") or "")
+    selected_decision_work = str((current_decision or {}).get("selected_work") or "")
+    if selected_transition_work == "model_group.m03_event_impact_inputs" or selected_decision_work == "model_group.m03_event_impact_inputs":
+        projected_event_input_stage: str | None = "model_03_event_state.data_acquisition"
+    else:
+        projected_event_input_stage = None
     current_stage = (
-        _m06_projected_current_stage(transition_current)
-        or _m06_projected_current_stage(current_decision)
-        or str((transition_current or {}).get("selected_work") or "")
+        projected_event_input_stage
+        or selected_transition_work
         or workflow.next_stage_id
-        or str((current_decision or {}).get("selected_work") or "")
+        or selected_decision_work
         or None
     )
     if lifecycle_holds_fold_lane and transition_current is None:

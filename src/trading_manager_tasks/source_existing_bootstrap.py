@@ -196,9 +196,9 @@ def _source_stage_coverage(
 def _event_source_coverage(*, month: str, row_count: int) -> EventSourceCoverage:
     status = "ready" if row_count > 0 else "missing"
     reason = (
-        f"existing model_06_residual_event_governance_data_acquisition rows found for {month}; M06 residual-event governance can reuse source evidence"
+        f"existing model_06_residual_event_governance_data_acquisition rows found for {month}; M03 event-state compatibility route can reuse source evidence"
         if row_count > 0
-        else f"no model_06_residual_event_governance_data_acquisition rows found for {month}; M06 residual-event governance has no existing source evidence"
+        else f"no model_06_residual_event_governance_data_acquisition rows found for {month}; M03 event-state compatibility route has no existing source evidence"
     )
     return EventSourceCoverage(
         contract_type="manager_source_existing_event_coverage",

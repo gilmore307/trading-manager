@@ -34,7 +34,7 @@ STAGE_PROGRESS_CONTRACTS: dict[str, dict[str, str]] = {
         "unit_label": "replay months",
         "progress_basis": "event replay months in the fixed five-year replay window",
     },
-    "model_06_residual_event_governance": {
+    "replay_review_event_attribution": {
         "unit_label": "failure attributions",
         "progress_basis": "replay failure, residual, missed-opportunity, and path-deviation attribution units",
     },

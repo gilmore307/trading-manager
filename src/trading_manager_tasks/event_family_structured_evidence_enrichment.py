@@ -1,6 +1,6 @@
 """Materialize structured event-family evidence from reviewed local sources.
 
-This module owns deterministic enrichment work after an M06 modelability packet
+This module owns deterministic enrichment work after an M03 event-family modelability packet
 blocks on missing structured evidence. It reads existing local source artifacts
 and writes canonical SQL calendar tables; it performs no provider calls, Codex
 review, model training, model activation, broker execution, or dashboard writes.
@@ -438,7 +438,7 @@ def enrich_structured_macro_evidence(
         model_activation_performed=False,
         broker_execution_performed=False,
         dashboard_read_model_writes=0,
-        next_rebuild_gate="rebuild M06 evidence packet from calendar_scheduled_event/calendar_event_result",
+        next_rebuild_gate="rebuild event-family evidence packet from calendar_scheduled_event/calendar_event_result",
     )
     if write_file:
         output_path.parent.mkdir(parents=True, exist_ok=True)
