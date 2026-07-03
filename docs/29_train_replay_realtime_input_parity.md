@@ -58,6 +58,11 @@ reconstruct the training/replay input lineage.
 - Training sample breadth may exceed live routing breadth. That is valid only
   when the feature semantics remain aligned and promotion reports both broad
   generalization and live-route simulation.
+- Forward outcome labels are not decision-time model inputs. Their market-data
+  acquisition may extend beyond the row's split or fold window under the shared
+  label-settlement contract in `docs/03_contracts.md`, but a row can train or
+  evaluate a model only after `label_available_at` is on or before the run's
+  `training_cutoff`.
 - Realtime safety context may exceed trained model context. Broker/account
   guardrails, restriction checks, halt checks, and kill switches are execution
   controls, not trained model inputs.

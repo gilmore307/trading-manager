@@ -62,6 +62,14 @@ ready-state projection across all model groups. Event-family modelability follow
 these conventions inside M03 event-state generation, while replay review owns
 post-replay event attribution as an embedded diagnostic surface.
 
+Model rows and labels use the shared label-settlement contract in
+`docs/03_contracts.md`. A row belongs to a split by its observed or decision
+time. Forward outcome labels may settle after that split when the declared
+horizon requires later market data. Such labels are usable only when
+`label_available_at` is on or before the relevant `training_cutoff`; leakage
+checks must audit feature availability and label availability instead of
+dropping all split-boundary rows.
+
 The public task list is a task-fact projection over scheduler state. It shows
 completed history, failures, and one current executable or review task. Future
 blocked stages remain internal workflow dependencies and must not appear as

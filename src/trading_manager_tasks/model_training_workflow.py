@@ -55,6 +55,7 @@ ROLLING_FOLD_SPLIT_MONTHS = (
     ("validation", ROLLING_FOLD_VALIDATION_MONTHS),
     ("test", ROLLING_FOLD_TEST_MONTHS),
 )
+LABEL_SETTLEMENT_POLICY = "observed_row_with_declared_forward_label_settlement"
 REQUIRED_MODEL_GENERATION_SPLIT_NAMES = tuple(split_name for split_name, _months in ROLLING_FOLD_SPLIT_MONTHS)
 PROMOTION_STAGE_TYPE = "promotion_review"
 FOLD_STACK_PROMOTION_BLOCKER = "fold_models_01_05_model_generation_complete"
@@ -752,6 +753,11 @@ def _rolling_fold_dataset_splits(start_month: str, end_month: str) -> tuple[dict
                 "split_start_time": _month_start_et(split_start),
                 "split_end_time": _exclusive_month_start_et(split_end),
                 "split_policy": ROLLING_FOLD_SPLIT_POLICY,
+                "row_ownership_clock": "observed_at_or_decision_time",
+                "label_settlement_policy": LABEL_SETTLEMENT_POLICY,
+                "label_acquisition_policy": "declared_forward_horizon_may_extend_beyond_split_window",
+                "training_eligibility_policy": "label_available_at_must_be_on_or_before_training_cutoff",
+                "leakage_audit_policy": "audit_feature_available_at_and_label_available_at_instead_of_rejecting_boundary_rows",
             }
         )
         offset += month_count

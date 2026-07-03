@@ -164,6 +164,44 @@ Historical workflow stages must keep source data, derived features, and model-de
 
 For example, `trading_data.model_01_market_regime_feature_generation` is a valid feature surface when it is deterministically derived from acquired market bars. A target/event table that requires TargetStateVectorModel output, EventFailureRiskModel output, or replay portfolio state is not a feature surface under this definition.
 
+## Label Settlement Contract
+
+All historical model tasks use the same label-settlement clock discipline. A
+row belongs to a fold or split by the time the row was observed or the decision
+would have been made, not by the time its future outcome label becomes known.
+Declared forward labels may acquire market data beyond the row's split or fold
+window when the label horizon requires it. Boundary rows are not rejected merely
+because their label settles later.
+
+Each supervised or evaluated row must keep these clocks separate when the data
+is available:
+
+```text
+observed_at or decision_time
+feature_available_at
+label_horizon
+label_end_at
+label_available_at
+training_cutoff
+```
+
+Training eligibility is controlled by settlement, not by row ownership:
+
+```text
+row ownership = observed_at / decision_time in the split or fold scope
+label acquisition = declared forward horizon, even when it crosses the window
+training eligibility = label_available_at <= training_cutoff
+leakage audit = feature_available_at and label_available_at timing checks
+```
+
+For example, an event observed on `2016-12-29` in the `fold_aapl_2016`
+training period remains a 2016 training-period event row. If its declared
+10-trading-day risk label settles in January 2017, manager may acquire the
+January market data needed for that label. The row can be used only by training
+or evaluation runs whose `training_cutoff` is after `label_available_at`; it
+must not be treated as known by a model snapshot whose cutoff preceded label
+settlement.
+
 ## Train Replay Realtime Input Parity
 
 `docs/29_train_replay_realtime_input_parity.md` owns the cross-phase model-input

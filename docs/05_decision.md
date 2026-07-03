@@ -200,3 +200,18 @@ Architecture-driven regeneration is a controlled `model_group_rerun_plan`, not a
 The plan must identify the earliest affected `layer.stage`, compute all downstream generated outputs and completed workflow state that must be invalidated or lifecycle-classified, preserve unaffected upstream/source evidence, and record reused artifacts in `retained_set` with their controlling root. Source data is protected by default. It may enter the lifecycle candidate set only when the cutpoint is `data_acquisition` and the required source data definition, provider/source parameters, acquisition contract, or existing source partition is itself stale or wrong.
 
 After the candidate/protected/retained sets are accepted, the embedded `storage_lifecycle_request` hands physical artifact treatment to the storage lifecycle pipeline. The reset then invalidates bounded workflow state, writes a durable receipt under the control-plane runtime root, and the single active scheduler reenters from the cutpoint under current contracts. Rerun verification must include contract validation, controlled-root audit, model-output quality checks, lifecycle/evaluation artifacts where applicable, and dashboard/read-model refresh. Physical deletion remains a later storage-owned lifecycle action, not a manager reset action.
+
+## D215 - Model labels settle after row ownership
+
+Historical model rows belong to a fold or split by the time they were observed
+or the decision would have been made. Future outcome labels are acquired by the
+declared horizon and may require market data after the row's split or fold
+window. Boundary rows must not be dropped merely because their labels settle in
+a later calendar window.
+
+Every model group must separate row ownership, feature availability, label
+settlement, and training eligibility. A label can train or evaluate a model only
+when `label_available_at` is on or before that run's `training_cutoff`. Leakage
+checks must audit `feature_available_at` and `label_available_at`; they must not
+replace this timing evidence with a blanket ban on labels that cross a split
+boundary.

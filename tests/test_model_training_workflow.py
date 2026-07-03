@@ -13,6 +13,7 @@ from trading_manager_tasks.model_training_workflow import (
     MODEL_FIVE_OPTION_CHAIN_SOURCE_BLOCKER,
     MODEL_FIVE_OPTION_CHAIN_SOURCE_STAGE_ID,
     MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID,
+    LABEL_SETTLEMENT_POLICY,
     MODEL_THREE_EVENT_OBSERVATION_COVERAGE_BLOCKER,
     MODEL_TWO_TARGET_LOCAL_FEED_ARTIFACTS_BLOCKER,
     MULTI_TARGET_SYMBOL_BLOCKER,
@@ -371,6 +372,34 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertEqual([stage.dataset_split["split_months"] for stage in split_stages], [12, 3, 3])
         self.assertEqual(split_stages[1].blockers, ("model_04_unified_decision.model_generation.train_complete",))
         self.assertEqual(split_stages[2].blockers, ("model_04_unified_decision.model_generation.validation_complete",))
+
+    def test_dataset_splits_declare_label_settlement_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            plan = build_model_training_workflow_plan(
+                storage_root=Path(raw_tmp),
+                trading_storage_root=Path(raw_tmp),
+                start_month="2016-01",
+                end_month="2017-06",
+                selected_target_symbol="AAPL",
+                foundation_catch_up_only=False,
+            )
+
+        split_stages = [stage for stage in plan.layers[3].stages if stage.stage_type == "model_generation"]
+        for stage in split_stages:
+            self.assertEqual(stage.dataset_split["row_ownership_clock"], "observed_at_or_decision_time")
+            self.assertEqual(stage.dataset_split["label_settlement_policy"], LABEL_SETTLEMENT_POLICY)
+            self.assertEqual(
+                stage.dataset_split["label_acquisition_policy"],
+                "declared_forward_horizon_may_extend_beyond_split_window",
+            )
+            self.assertEqual(
+                stage.dataset_split["training_eligibility_policy"],
+                "label_available_at_must_be_on_or_before_training_cutoff",
+            )
+            self.assertEqual(
+                stage.dataset_split["leakage_audit_policy"],
+                "audit_feature_available_at_and_label_available_at_instead_of_rejecting_boundary_rows",
+            )
 
     def test_model_group_fold_includes_cumulative_checkpoint_stage(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
