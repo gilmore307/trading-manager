@@ -559,7 +559,7 @@ class SchedulerDaemonTests(unittest.TestCase):
         self.assertIsNone(updated.last_stall_agent_error_ref)
         handler.assert_not_called()
 
-    def test_scheduler_progress_stall_reports_model_group_lifecycle_hold(self):
+    def test_scheduler_progress_stall_ignores_model_group_lifecycle_hold(self):
         state = SchedulerDaemonState(
             start_month="2016-01",
             end_month="2017-06",
@@ -568,7 +568,6 @@ class SchedulerDaemonTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as raw_tmp, patch("trading_manager_tasks.scheduler_daemon.handle_server_error") as handler:
             tmp = Path(raw_tmp)
-            handler.return_value = {"error_ref": "ERR-LIFECYCLE-HOLD"}
             updated = handle_scheduler_progress_stall(
                 state,
                 storage_root=tmp / "storage",
@@ -577,8 +576,8 @@ class SchedulerDaemonTests(unittest.TestCase):
                 stall_seconds=600,
             )
 
-        self.assertEqual(updated.last_stall_agent_error_ref, "ERR-LIFECYCLE-HOLD")
-        handler.assert_called_once()
+        self.assertIsNone(updated.last_stall_agent_error_ref)
+        handler.assert_not_called()
 
     def test_scheduler_progress_stall_ignores_event_evidence_waits(self):
         for reason_code in (

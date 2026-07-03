@@ -1799,6 +1799,7 @@ def _scheduler_waiting_for_future_fold(state: SchedulerDaemonState) -> bool:
 def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonState) -> bool:
     known_nonprogress_reasons = {
         "waiting_for_next_training_fold_to_complete",
+        "model_group_lifecycle_holds_fold_lane",
         "model_group_replay_dataset_acquisition_required",
         "model_group_evaluation_complete",
         "model_group_evaluation_executed",
