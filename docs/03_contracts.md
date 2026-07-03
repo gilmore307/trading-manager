@@ -305,12 +305,16 @@ replay. Fold-specific replay manifests may cite those refs, but they must not
 create duplicate private copies of identical source payloads.
 
 For market bars, the canonical storage unit is the shared bars store, not a
-separate artifact per fold, consumer, or bar flavor. Differences such as
-provider, symbol, frequency/granularity, adjustment policy, point-in-time
-availability clock, cleaning status, and calendar partition are columns,
-partition keys, or query/view constraints inside that shared store. Consumers
-record refs to the selected rows or partitions; maintenance removes duplicate
-fold-local extracts, not the shared rows that replay or future folds may need.
+separate artifact per fold or consumer. Provider-native `1Min` bars after
+accepted cleaning and PIT normalization are the formal source route. Coarser
+bars such as 5-minute, 30-minute, and daily materializations are derived
+datasets when they can be rebuilt from canonical source bars. They live as
+storage-managed payload artifacts with SQL/index manifests that record
+`source_dataset_id`, granularity or transform id, artifact path, hash,
+retention class, reproducibility class, and `consumer_refs`. Consumers record
+refs to the selected source rows/partitions or to the storage-managed derived
+dataset; maintenance removes duplicate fold-local extracts, not source rows or
+derived datasets still cited by replay or future folds.
 
 The fixed fold disposition matrix is:
 
@@ -326,6 +330,7 @@ The fixed fold disposition matrix is:
 | Progress-monitoring side products | Stage heartbeats, row-progress snapshots, local scheduler progress files, detailed run-step progress, transient debug traces | `rolling_retention_side_product`; keep final completion receipt, transition summary, counters, and error refs only. |
 | Temporary scratch and repair diagnostics | One-off scratch CSV/JSON, investigation dumps, failed-run copied context, non-promoted repair artifacts | `delete_after_fold_settlement` or `rolling_retention_side_product` after the repair receipt cites the durable evidence. |
 | Data-acquisition receipts and coverage summaries | Source refs, coverage summary rows, provider run receipts, hashes, source quality summaries | `retained_evidence_summary`; keep compact evidence, not duplicate source payloads. |
+| Derived dataset payloads | Resampled 5-minute/30-minute/daily bars, large fold feature matrices, replay snapshot payloads, rebuildable analytical intermediates | Keep as storage-managed payloads while any `consumer_refs` remain. After consumers close, classify by reproducibility and retention class; large analytical bars should use direct-readable compressed Parquet/Arrow rather than JSON. |
 | Deterministic feature-generation intermediates | Rebuildable feature tables/files, intermediate joins, temporary vectorization outputs, split-local feature caches | `retained_manifest_only` when source refs, code/schema refs, hashes, row counts, and quality summaries can reproduce them; otherwise `compress_or_archive_candidate` until reproducibility is proven. |
 | Label-settlement artifacts | Label horizon manifests, label availability clocks, forward-outcome summaries, eligibility rows, leakage audit summaries | `retained_evidence_summary`; large rebuildable label tables may be `compress_or_archive_candidate` after fixed summaries and hashes remain. |
 | M03 event ledger and target/scope projections | Fold PIT event ledger, event-risk state for M04, market/sector/symbol residual scope projections, target exposure projections | Shared ledger and accepted ontology are protected; fold/target projections keep summaries/manifests and may compress large rebuildable projection tables. |

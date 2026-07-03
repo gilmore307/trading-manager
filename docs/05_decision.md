@@ -14,9 +14,18 @@ Active registry entries live in `scripts/registry/current.csv` and sync into the
 
 Manager work flows through request, input-binding, run, artifact, ready-signal, and summary contracts. Components perform implementation work and emit receipts. Manager validates whether outputs are acceptable for downstream use.
 
-## D004 - SQL stores durable control-plane facts
+## D004 - SQL stores formal facts, identities, and references
 
-Manager SQL stores concise durable facts and references. Large payloads, logs, source files, model artifacts, and dashboard payloads live in storage or runtime paths and are referenced by URI/hash/metadata.
+Manager SQL stores concise durable facts, formal data identities, lineage,
+consumer references, and query/index metadata. Large payloads, logs, source
+files, model artifacts, dashboard payloads, and rebuildable derived datasets
+live in storage or runtime paths and are referenced by URI/hash/metadata.
+
+SQL is the authority for what a formal dataset is, what produced it, which
+source dataset it derives from, who consumes it, how it can be found, and
+whether lifecycle mutation is allowed. SQL should not become the default home
+for high-volume derived payload bodies merely because they are convenient to
+query.
 
 ## D005 - Historical modeling is not trading execution
 
@@ -235,11 +244,55 @@ manifests rather than duplicated per fold. If a completed fold's cleanup pass
 finds data that replay or another fold still cites, maintenance must retain the
 canonical copy and delete only duplicate fold-local copies.
 
-Market bars use one shared canonical bars store. Granularity, provider, symbol,
-adjustment policy, PIT clock, cleaning status, and calendar window are fields or
-partition/query constraints in that store, not separate per-fold payloads. A fold
-or replay consumer should store refs to the rows/partitions it used rather than
-private copies of the same bars.
+Market bars use one shared canonical source route for the formal source
+granularity, normally provider-native `1Min` bars after accepted cleaning and
+PIT normalization. Provider, symbol, adjustment policy, PIT clock, cleaning
+status, and calendar window are fields or partition/query constraints in that
+canonical source route. Coarser bars such as 5-minute, 30-minute, and daily
+materializations are derived datasets when they can be rebuilt from canonical
+source bars. They should live as storage-managed payload artifacts with SQL
+dataset manifests and consumer refs, not as private per-fold payloads or
+untracked files. A fold or replay consumer records refs to the canonical source
+rows/partitions or to the storage-managed derived dataset it used; maintenance
+removes duplicate fold-local extracts, not shared source rows or derived
+artifacts still cited by active consumers.
+
+## D217 - Derived dataset payloads live in storage under SQL manifests
+
+Date: 2026-07-03
+Status: Accepted
+
+Formal SQL tables hold source facts, durable evidence rows, compact run/replay
+records, dataset identities, lineage, hashes, retention class, and
+`consumer_refs`. Storage holds large derived payload bodies such as resampled
+bars, fold feature matrices, replay snapshot payloads, and rebuildable
+intermediate tables when the payload is too large or too derived to be a formal
+SQL fact table.
+
+A derived dataset manifest must record at least:
+
+```text
+derived_dataset_id
+source_dataset_id
+granularity or transform_id
+artifact_path
+artifact_hash
+schema_ref
+consumer_refs
+retention_class
+reproducibility_class
+```
+
+Bars should use a columnar direct-readable format such as Parquet or Arrow with
+compression when they are large analytical payloads. JSON is reserved for
+manifests, receipts, small summaries, and control metadata, not large bar
+payloads.
+
+Temporary side products such as progress files, debug traces, repeated provider
+request manifests, and duplicate extracts are not durable data. After the owning
+fold/run/replay settles and compact receipts, hashes, summaries, and consumer
+refs are retained, they enter rolling retention or cleanup under storage
+lifecycle policy.
 
 Progress-monitoring side products are not durable evidence. After fold
 settlement, manager/storage retain only the minimum receipts, transition
