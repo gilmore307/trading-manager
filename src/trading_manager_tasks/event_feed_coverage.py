@@ -111,6 +111,119 @@ def discover_event_feed_artifacts(
     return paths, coverage
 
 
+def _saved_event_feed_artifacts(month_dir: Path, filename: str) -> tuple[Path, ...]:
+    candidates = sorted(month_dir.glob(f"runs/*/saved/{filename}"))
+    candidates.extend(sorted(month_dir.glob(f"saved/{filename}")))
+    return tuple(candidate for candidate in dict.fromkeys(candidates) if candidate.exists())
+
+
+def _event_feed_receipt_source_month(receipt_path: Path) -> tuple[str, str, Path] | None:
+    if receipt_path.name != "completion_receipt.json":
+        return None
+    parts = receipt_path.parts
+    try:
+        marker = parts.index("monthly_backfill")
+    except ValueError:
+        return None
+    if len(parts) <= marker + 3:
+        return None
+    source_id = parts[marker + 1]
+    month = parts[marker + 2]
+    if source_id not in EVENT_FEED_ARTIFACTS:
+        return None
+    try:
+        validate_month(month)
+    except (TaskSystemError, ValueError):
+        return None
+    return source_id, month, receipt_path.parent
+
+
+def _csv_row_count(path: Path) -> int:
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            return sum(1 for _ in csv.DictReader(handle))
+    except OSError:
+        return 0
+
+
+def _successful_feed_runs_from_saved_artifacts(receipt_path: Path) -> tuple[Mapping[str, Any], ...]:
+    source_month = _event_feed_receipt_source_month(receipt_path)
+    if source_month is None:
+        return ()
+    source_id, month, month_dir = source_month
+    filename = EVENT_FEED_ARTIFACTS[source_id]
+    runs: list[Mapping[str, Any]] = []
+    for artifact in _saved_event_feed_artifacts(month_dir, filename):
+        row_count = _csv_row_count(artifact)
+        if row_count <= 0:
+            continue
+        if artifact.parent.name == "saved" and artifact.parent.parent.parent == month_dir / "runs":
+            run_id = artifact.parent.parent.name
+        else:
+            run_id = f"{source_id}_{month}_saved_artifact"
+        runs.append(
+            {
+                "run_id": run_id,
+                "status": "succeeded",
+                "row_counts": {Path(filename).stem: row_count},
+                "outputs": [str(artifact)],
+                "references": [str(artifact)],
+                "source_artifact_ref": str(artifact),
+                "receipt_reconstruction": "saved_artifact_fallback",
+            }
+        )
+    return tuple(runs)
+
+
+def _storage_project_root_from_receipt(receipt_path: Path) -> Path | None:
+    for parent in receipt_path.resolve().parents:
+        if parent.name == "storage":
+            return parent.parent
+    return None
+
+
+def _successful_feed_runs_from_compact_manifest(receipt_path: Path) -> tuple[Mapping[str, Any], ...]:
+    source_month = _event_feed_receipt_source_month(receipt_path)
+    storage_root = _storage_project_root_from_receipt(receipt_path)
+    if source_month is None or storage_root is None:
+        return ()
+    source_id, month, _ = source_month
+    manifest_path = (
+        storage_root
+        / "storage"
+        / "90_lifecycle"
+        / "maintenance"
+        / "compact_contracts"
+        / "event_feed_monthly_receipt_compaction_manifest.json"
+    )
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ()
+    rows = manifest.get("source_month_summaries")
+    if not isinstance(rows, list):
+        return ()
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        if row.get("source_id") != source_id or row.get("month") != month:
+            continue
+        row_counts = row.get("row_counts") if isinstance(row.get("row_counts"), Mapping) else {}
+        if not row_counts:
+            return ()
+        return (
+            {
+                "run_id": f"{source_id}_{month}_compact_provenance",
+                "status": "succeeded",
+                "row_counts": dict(row_counts),
+                "outputs": row.get("outputs") or [],
+                "references": [str(manifest_path)],
+                "receipt_reconstruction": "compact_provenance_manifest",
+            },
+        )
+    return ()
+
+
 def missing_event_feed_artifacts(coverage: Mapping[str, int]) -> list[str]:
     return [source_id for source_id in REQUIRED_EVENT_FEED_ARTIFACTS if int(coverage.get(source_id) or 0) <= 0]
 
@@ -181,9 +294,11 @@ def missing_event_feed_rows(row_coverage: Mapping[str, int]) -> list[str]:
     return [source_id for source_id in REQUIRED_EVENT_FEED_ARTIFACTS if int(row_coverage.get(source_id) or 0) <= 0]
 
 
-def successful_feed_runs(receipt_path: Path) -> tuple[Mapping[str, Any], ...]:
+def successful_feed_runs(receipt_path: Path, *, allow_saved_artifact_fallback: bool = True) -> tuple[Mapping[str, Any], ...]:
     if not receipt_path.exists():
-        return ()
+        if not allow_saved_artifact_fallback:
+            return ()
+        return _successful_feed_runs_from_saved_artifacts(receipt_path) or _successful_feed_runs_from_compact_manifest(receipt_path)
     try:
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):

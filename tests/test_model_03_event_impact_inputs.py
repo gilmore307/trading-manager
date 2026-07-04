@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from trading_manager_tasks.control_plane import TaskSystemError
-from trading_manager_tasks.event_feed_coverage import discover_event_feed_artifacts
+from trading_manager_tasks.event_feed_coverage import discover_event_feed_artifacts, successful_feed_runs
 from trading_manager_tasks.model_03_event_impact_inputs import materialize_model_03_event_impact_inputs
 
 
@@ -213,6 +213,76 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
 
             self.assertEqual(coverage["gdelt_news"], 1)
             self.assertEqual(paths, [str(new_path)])
+
+    def test_successful_feed_runs_falls_back_to_saved_artifact_after_receipt_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            artifact = storage_root / "monthly_backfill" / "release_calendar" / "2016-01" / "runs" / "run_001" / "saved" / "release_calendar.csv"
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text(
+                "event_id,calendar_source,event_name,release_time,event_date,timezone,source_url,raw_summary,symbol\n"
+                "c1,nasdaq_earnings_calendar,XLF earnings,2016-01-20T16:05:00-05:00,2016-01-20,America/New_York,https://example.com/calendar,,XLF\n"
+                "c2,nasdaq_earnings_calendar,SPY earnings,2016-01-21T16:05:00-05:00,2016-01-21,America/New_York,https://example.com/calendar,,SPY\n",
+                encoding="utf-8",
+            )
+
+            runs = successful_feed_runs(storage_root / "monthly_backfill" / "release_calendar" / "2016-01" / "completion_receipt.json")
+
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0]["status"], "succeeded")
+        self.assertEqual(runs[0]["run_id"], "run_001")
+        self.assertEqual(runs[0]["row_counts"], {"release_calendar": 2})
+        self.assertEqual(runs[0]["receipt_reconstruction"], "saved_artifact_fallback")
+
+    def test_successful_feed_runs_keeps_failed_receipt_authoritative(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            month_dir = storage_root / "monthly_backfill" / "release_calendar" / "2016-01"
+            artifact = month_dir / "runs" / "run_001" / "saved" / "release_calendar.csv"
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text(
+                "event_id,calendar_source,event_name,release_time,event_date,timezone,source_url,raw_summary,symbol\n"
+                "c1,nasdaq_earnings_calendar,XLF earnings,2016-01-20T16:05:00-05:00,2016-01-20,America/New_York,https://example.com/calendar,,XLF\n",
+                encoding="utf-8",
+            )
+            receipt = month_dir / "completion_receipt.json"
+            receipt.write_text(json.dumps({"runs": [{"status": "failed", "row_counts": {"release_calendar": 1}}]}), encoding="utf-8")
+
+            runs = successful_feed_runs(receipt)
+
+        self.assertEqual(runs, ())
+
+    def test_successful_feed_runs_reads_compact_receipt_manifest_after_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            manifest = storage_root / "90_lifecycle" / "maintenance" / "compact_contracts" / "event_feed_monthly_receipt_compaction_manifest.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "storage_event_feed_monthly_receipt_compaction_manifest",
+                        "source_month_summaries": [
+                            {
+                                "source_id": "alpaca_news",
+                                "month": "2016-01",
+                                "row_counts": {"equity_news": 405},
+                                "receipt_ref": "storage/01_source_data/monthly_backfill/alpaca_news/2016-01/completion_receipt.json",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            runs = successful_feed_runs(storage_root / "01_source_data" / "monthly_backfill" / "alpaca_news" / "2016-01" / "completion_receipt.json")
+
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0]["status"], "succeeded")
+        self.assertEqual(runs[0]["row_counts"], {"equity_news": 405})
+        self.assertEqual(runs[0]["receipt_reconstruction"], "compact_provenance_manifest")
 
     def test_release_calendar_sql_receipt_is_included_as_m03_event_input(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
