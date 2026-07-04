@@ -16,6 +16,7 @@ from trading_manager_tasks.dashboard_read_models import (
     _attach_task_error_context,
     _close_global_nonblocking_agent_errors,
     _agent_error_summary,
+    _aggregate_model_task_stages,
     _compatible_replay_run_ids,
     _mark_active_task_running,
     _mark_superseded_agent_errors,
@@ -33,8 +34,30 @@ from trading_manager_tasks.task_progress import write_task_progress_node
 
 
 class DashboardReadModelProducerTests(unittest.TestCase):
-    def test_alpha_confidence_checkpoint_uses_m04_public_identity(self):
-        self.assertEqual(_model_task_label("model_05_alpha_confidence", layer=4), "M04 Alpha Confidence Checkpoint")
+    def test_alpha_confidence_checkpoint_rolls_into_unified_decision_public_task(self):
+        self.assertEqual(_model_task_label("model_05_alpha_confidence", layer=4), "M04 Unified Decision Model")
+        rows = _aggregate_model_task_stages(
+            [
+                {
+                    "stage_id": "model_04_unified_decision.model_generation.train",
+                    "layer": 4,
+                    "layer_key": "model_04_unified_decision",
+                    "stage_type": "model_generation",
+                    "status": "succeeded",
+                },
+                {
+                    "stage_id": "model_05_alpha_confidence.model_generation.checkpoint",
+                    "layer": 5,
+                    "layer_key": "model_05_alpha_confidence",
+                    "stage_type": "model_generation",
+                    "status": "running",
+                },
+            ]
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["layer_key"], "model_04_unified_decision")
+        self.assertEqual(rows[0]["task_label"], "M04 Unified Decision Model")
+        self.assertEqual(rows[0]["active_stage_id"], "model_05_alpha_confidence.model_generation.checkpoint")
 
     def test_scheduler_backoff_runtime_activity_blocks_ready_task_instead_of_running(self):
         status = SimpleNamespace(

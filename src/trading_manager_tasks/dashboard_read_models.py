@@ -1787,10 +1787,11 @@ def _public_active_task_from_runtime(
     selected_work = str(runtime_activity.get("selected_work") or runtime_active_work.get("stage_id") or "")
     if not selected_work:
         return None
-    layer_key = selected_work.split(".", 1)[0]
+    internal_layer_key = selected_work.split(".", 1)[0]
+    layer_key = _public_layer_key(internal_layer_key)
     selected_work_stage = selected_work.split(".", 1)[1] if "." in selected_work else "runtime"
     stage_type = str(runtime_activity.get("next_internal_stage") or selected_work_stage)
-    layer = PUBLIC_LAYER_BY_LAYER_KEY.get(layer_key, MODEL_NUMBER_BY_LAYER_KEY.get(layer_key))
+    layer = PUBLIC_LAYER_BY_LAYER_KEY.get(internal_layer_key, MODEL_NUMBER_BY_LAYER_KEY.get(layer_key))
     label = _model_task_label(layer_key, layer) if layer_key.startswith("model_") else _public_stage_name(selected_work, stage_type)
     latest_decision = status.latest_decision if isinstance(status.latest_decision, Mapping) else {}
     daemon_state = status.daemon_state if isinstance(status.daemon_state, Mapping) else {}
@@ -1835,6 +1836,7 @@ def _public_active_task_from_runtime(
         "reason": runtime_activity.get("activity_summary") or runtime_activity.get("reason"),
         "detail": {
             "live": runtime_activity,
+            "internal_layer_key": internal_layer_key,
             "runtime_projection": True,
         },
     }
@@ -2756,6 +2758,13 @@ MODEL_NUMBER_BY_LAYER_KEY = {
 PUBLIC_LAYER_BY_LAYER_KEY = {
     "model_05_alpha_confidence": 4,
 }
+PUBLIC_LAYER_KEY_BY_LAYER_KEY = {
+    "model_05_alpha_confidence": "model_04_unified_decision",
+}
+
+
+def _public_layer_key(layer_key: str) -> str:
+    return PUBLIC_LAYER_KEY_BY_LAYER_KEY.get(layer_key, layer_key)
 
 
 def _spaced_model_name(model_name: str) -> str:
@@ -2765,6 +2774,7 @@ def _spaced_model_name(model_name: str) -> str:
 
 
 def _model_task_label(layer_key: str, layer: int | None = None) -> str:
+    layer_key = _public_layer_key(layer_key)
     model_name = MODEL_NAME_BY_LAYER_KEY.get(layer_key)
     if model_name:
         model_label = _spaced_model_name(model_name)
@@ -3900,10 +3910,11 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
     for raw_stage in raw_stages:
         if not isinstance(raw_stage, Mapping):
             continue
-        layer_key = str(raw_stage.get("layer_key") or "")
-        if not layer_key:
+        internal_layer_key = str(raw_stage.get("layer_key") or "")
+        if not internal_layer_key:
             passthrough.append(raw_stage)
             continue
+        layer_key = _public_layer_key(internal_layer_key)
         if layer_key not in grouped:
             grouped[layer_key] = []
             order.append(layer_key)
