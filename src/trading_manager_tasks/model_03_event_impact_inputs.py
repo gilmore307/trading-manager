@@ -27,12 +27,9 @@ from zoneinfo import ZoneInfo
 from .control_plane import TaskSystemError
 from .event_feed_coverage import (
     EVENT_FEED_ARTIFACTS,
-    REQUIRED_EVENT_FEED_ARTIFACTS,
     discover_event_feed_artifacts,
     event_feed_row_coverage as compute_event_feed_row_coverage,
     iter_months,
-    missing_event_feed_artifacts,
-    missing_event_feed_rows,
     month_bounds,
     range_bounds,
     successful_feed_runs,
@@ -663,18 +660,6 @@ def materialize_model_03_event_impact_inputs(
         source_id: int(artifact_row_coverage.get(source_id) or 0) + int(sql_row_coverage.get(source_id) or 0) + int(market_session_row_coverage.get(source_id) or 0)
         for source_id in EVENT_FEED_ARTIFACTS
     }
-    missing_feed_artifacts = missing_event_feed_artifacts(event_feed_coverage)
-    missing_feed_rows = missing_event_feed_rows(event_feed_row_coverage)
-    if write and missing_feed_artifacts:
-        raise TaskSystemError(
-            "M03 event-impact coverage is incomplete; missing reviewed feed artifacts for "
-            + ",".join(missing_feed_artifacts)
-        )
-    if write and missing_feed_rows:
-        raise TaskSystemError(
-            "M03 event-impact coverage is incomplete; reviewed feed artifacts have zero in-window rows for "
-            + ",".join(missing_feed_rows)
-        )
     detector_runs = tuple(
         _run_detector(
             ref,

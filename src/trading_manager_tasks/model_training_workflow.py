@@ -18,15 +18,6 @@ from pathlib import Path
 from typing import Any, Literal, TextIO
 
 from .fold_naming import model_worker_fold_id
-from .event_feed_coverage import (
-    EVENT_FEED_ARTIFACTS,
-    discover_event_feed_artifacts,
-    event_feed_row_coverage,
-    iter_months,
-    missing_event_feed_artifacts,
-    missing_event_feed_rows,
-    successful_feed_runs,
-)
 from .monthly_backfill import LAYER_ONE_MODEL_LAYER, LAYER_TWO_MODEL_LAYER, load_market_regime_universe
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root, model_runtime_root
@@ -70,12 +61,6 @@ MODEL_GROUP_CUMULATIVE_CHECKPOINT_STAGE_ID = "model_05_alpha_confidence.model_ge
 MODEL_GROUP_REPLAY_REVIEW_COMPLETE_BLOCKER = "model_group_replay_review_complete"
 NO_LISTED_OPTION_STATUSES = {"confirmed_no_listed_options", "no_listed_options", "no_listed_options_or_unverified"}
 NO_OPTION_ASSET_CLASSES = {"crypto_spot", "spot_crypto", "crypto"}
-MODEL_THREE_SQL_EVENT_FEED_SOURCE_IDS = (
-    "alpaca_news",
-    "gdelt_news",
-    "sec_company_financials",
-    "release_calendar",
-)
 
 
 @dataclass(frozen=True)
@@ -619,32 +604,7 @@ def _upstream_model_ready_blockers(depends_on_layers: tuple[int, ...], *, founda
 
 
 def _model_three_event_observation_blockers(*, start_month: str, end_month: str, trading_storage_root: Path) -> tuple[str, ...]:
-    paths, artifact_coverage = discover_event_feed_artifacts(
-        trading_storage_root=trading_storage_root,
-        start_month=start_month,
-        end_month=end_month,
-    )
-    row_coverage = event_feed_row_coverage(paths, start_month=start_month, end_month=end_month)
-    coverage = {source_id: int(artifact_coverage.get(source_id) or 0) for source_id in EVENT_FEED_ARTIFACTS}
-    rows = {source_id: int(row_coverage.get(source_id) or 0) for source_id in EVENT_FEED_ARTIFACTS}
-    for month in iter_months(start_month, end_month):
-        for source_id in MODEL_THREE_SQL_EVENT_FEED_SOURCE_IDS:
-            runs = successful_feed_runs(
-                trading_storage_root / "monthly_backfill" / source_id / month / "completion_receipt.json",
-                allow_saved_artifact_fallback=False,
-            )
-            if not runs:
-                continue
-            coverage[source_id] += 1
-            for run in runs:
-                row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), MappingABC) else {}
-                rows[source_id] += sum(int(value or 0) for value in row_counts.values())
-    coverage["market_session_calendar"] = max(coverage["market_session_calendar"], 1)
-    rows["market_session_calendar"] = max(rows["market_session_calendar"], 1)
-    blockers = ["model_01_background_context.feature_or_input_ready"]
-    if missing_event_feed_artifacts(coverage) or missing_event_feed_rows(rows):
-        blockers.append(MODEL_THREE_EVENT_OBSERVATION_COVERAGE_BLOCKER)
-    return tuple(blockers)
+    return ("model_01_background_context.feature_or_input_ready",)
 
 
 def _resolve_event_feed_storage_root(storage_root: Path, trading_storage_root: Path | None) -> Path:

@@ -415,7 +415,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
         self.assertIn("sec_company_financials", {item["kind"] for item in task_key["params"]["event_sql_inputs"]})
         self.assertTrue(any(event["event_category_type"] == "market_structure" for event in task_key["params"]["events"]))
 
-    def test_write_blocks_when_reviewed_event_feed_artifacts_have_zero_in_window_rows(self) -> None:
+    def test_write_records_zero_row_reviewed_event_feeds_without_blocking_m03(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             trading_data_root = tmp / "trading-data"
@@ -436,8 +436,13 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(content, encoding="utf-8")
 
-            with self.assertRaisesRegex(TaskSystemError, "zero in-window rows.*gdelt_news"):
-                materialize_model_03_event_impact_inputs(
+            class Result:
+                returncode = 0
+                stdout = json.dumps({"references": [], "row_counts": {"m06_residual_event_governance_data_acquisition": 0}})
+                stderr = ""
+
+            with patch("trading_manager_tasks.model_03_event_impact_inputs.subprocess.run", return_value=Result()):
+                summary = materialize_model_03_event_impact_inputs(
                     start_month="2016-01",
                     end_month="2016-01",
                     manager_storage_root=tmp / "manager-storage",
@@ -447,7 +452,10 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
                     write=True,
                 )
 
-    def test_write_blocks_when_required_event_feed_artifacts_are_missing(self) -> None:
+        self.assertEqual(summary.event_feed_row_coverage["gdelt_news"], 0)
+        self.assertGreater(summary.event_feed_row_coverage["market_session_calendar"], 0)
+
+    def test_write_records_missing_event_feeds_without_blocking_m03(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             trading_data_root = tmp / "trading-data"
@@ -456,7 +464,37 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
             universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
             _write_layer_two_bar_receipt(storage_root, "XLF", "2016-01")
 
-            with self.assertRaisesRegex(TaskSystemError, "event-impact coverage is incomplete"):
+            class Result:
+                returncode = 0
+                stdout = json.dumps({"references": [], "row_counts": {"m06_residual_event_governance_data_acquisition": 0}})
+                stderr = ""
+
+            with patch("trading_manager_tasks.model_03_event_impact_inputs.subprocess.run", return_value=Result()):
+                summary = materialize_model_03_event_impact_inputs(
+                    start_month="2016-01",
+                    end_month="2016-01",
+                    manager_storage_root=tmp / "manager-storage",
+                    trading_data_root=trading_data_root,
+                    trading_storage_root=storage_root,
+                    universe_path=universe_path,
+                    write=True,
+                )
+            task_key = json.loads(Path(summary.source_task_key_path).read_text(encoding="utf-8"))
+
+        self.assertEqual(summary.event_feed_coverage["alpaca_news"], 0)
+        self.assertEqual(summary.event_feed_row_coverage["alpaca_news"], 0)
+        self.assertGreater(summary.event_feed_row_coverage["market_session_calendar"], 0)
+        self.assertTrue(any(event["event_category_type"] == "market_structure" for event in task_key["params"]["events"]))
+
+    def test_write_blocks_when_no_event_inputs_or_market_context_exist(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            trading_data_root = tmp / "trading-data"
+            storage_root = trading_data_root / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,model_layer\nXLF,model_01_sector_context\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(TaskSystemError, "no successful M02 feed artifacts"):
                 materialize_model_03_event_impact_inputs(
                     start_month="2016-01",
                     end_month="2016-01",

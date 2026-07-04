@@ -234,7 +234,6 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
                 "upstream_model_01_model_generation_complete",
                 "upstream_model_02_model_generation_complete",
                 "model_01_background_context.feature_or_input_ready",
-                MODEL_THREE_EVENT_OBSERVATION_COVERAGE_BLOCKER,
             ),
         )
         self.assertIn("scripts/tasks/materialize_model_03_event_impact_inputs.py", stage.command)
