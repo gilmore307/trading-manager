@@ -3333,7 +3333,7 @@ def _operation_component_metric_rows(
     replay_receipt: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
-    output.extend(_target_selection_metric_rows(rows, target_selection_universe_rows))
+    output.extend(_target_selection_metric_rows(rows, target_selection_universe_rows, model_candidate_selection_trace_rows))
     output.extend(_model_candidate_selection_metric_rows(rows, model_candidate_selection_trace_rows))
     output.append(_entry_signal_metric_row(rows))
     output.extend(_lifecycle_metric_rows(replay_receipt))
@@ -3436,8 +3436,11 @@ def _sector_opportunity_packet_path(target_selection_universe_metrics_path: Path
 def _target_selection_metric_rows(
     rows: Sequence[Mapping[str, Any]],
     target_selection_universe_rows: Sequence[Mapping[str, Any]],
+    model_candidate_selection_trace_rows: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     if not target_selection_universe_rows:
+        if model_candidate_selection_trace_rows:
+            return _trace_only_target_selection_metric_rows(rows, model_candidate_selection_trace_rows)
         return [
             _operation_component_metric_row(
                 component_id=component_id,
@@ -3622,6 +3625,108 @@ def _target_selection_metric_rows(
                 result["opportunity_cost_to_median"] for result in selected_target_results
             ),
             value=_mean(result["percentile"] for result in selected_target_results),
+        ),
+    ]
+
+
+def _trace_only_target_selection_metric_rows(
+    rows: Sequence[Mapping[str, Any]],
+    trace_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    scored_rows = [row for row in trace_rows if _truthy(row.get("model_score_available"))]
+    scored_keys = {
+        (
+            str(row.get("replay_time_pointer") or row.get("timestamp") or ""),
+            str(row.get("target_ref") or ""),
+        )
+        for row in scored_rows
+    }
+    selected_present_count = sum(
+        1
+        for row in rows
+        if (
+            str(row.get("timestamp") or ""),
+            str(row.get("target_ref") or ""),
+        )
+        in scored_keys
+    )
+    timestamp_counts = Counter(str(row.get("replay_time_pointer") or row.get("timestamp") or "") for row in scored_rows)
+    selected_trace_rows = [row for row in scored_rows if _truthy(row.get("selected_by_replay"))]
+    selected_rank_values = [
+        _float(row.get("model_rank_within_timestamp"))
+        for row in selected_trace_rows
+        if row.get("model_rank_within_timestamp") not in {None, ""}
+    ]
+    return [
+        _operation_component_metric_row(
+            component_id="C01_intake_operation",
+            metric_family="target_selection_quality",
+            metric_name="visible_universe_integrity",
+            metric_scope="point_in_time_model_candidate_trace",
+            availability_status="computed",
+            reason_codes=["trace_only_visible_universe_membership"],
+            point_in_time_input_fields=["replay_time_pointer", "target_ref", "model_score_available"],
+            future_outcome_fields=[],
+            row_count=len(rows),
+            eligible_row_count=len(scored_rows),
+            selected_count=len(rows),
+            selected_target_present_count=selected_present_count,
+            universe_count_mean=_mean(timestamp_counts.values()),
+            value=(selected_present_count / len(rows)) if rows else None,
+            required_evidence_status="published",
+        ),
+        _operation_component_metric_row(
+            component_id="C01_intake_operation",
+            metric_family="sector_selection_effectiveness",
+            metric_name="selected_sector_bucket_forward_return_rank",
+            metric_scope="decision_time_visible_sector_buckets",
+            availability_status="not_applicable",
+            reason_codes=["target_selection_universe_metrics_not_supplied_for_trace_only_review"],
+            point_in_time_input_fields=["timestamp", "target_ref", "sector_bucket_ref", "visible_universe_membership"],
+            future_outcome_fields=["sector_forward_return_mean"],
+            row_count=len(rows),
+            eligible_row_count=0,
+            selected_count=len(rows),
+            selected_target_present_count=selected_present_count,
+            required_evidence_status="not_required_for_trace_only_review",
+        ),
+        _operation_component_metric_row(
+            component_id="C02_entry_operation",
+            metric_family="target_selection_effectiveness",
+            metric_name="selected_target_forward_return_rank_within_sector",
+            metric_scope="decision_time_selected_sector_bucket",
+            availability_status="not_applicable",
+            reason_codes=["target_selection_universe_metrics_not_supplied_for_trace_only_review"],
+            point_in_time_input_fields=["timestamp", "target_ref", "sector_bucket_ref", "visible_universe_membership"],
+            future_outcome_fields=["forward_return"],
+            row_count=len(rows),
+            eligible_row_count=0,
+            selected_count=len(rows),
+            selected_target_present_count=selected_present_count,
+            required_evidence_status="not_required_for_trace_only_review",
+        ),
+        _operation_component_metric_row(
+            component_id="C02_entry_operation",
+            metric_family="target_selection_effectiveness",
+            metric_name="selected_target_model_rank_from_trace",
+            metric_scope="point_in_time_model_candidate_trace",
+            availability_status="computed",
+            reason_codes=["trace_only_model_rank_review"],
+            point_in_time_input_fields=[
+                "replay_time_pointer",
+                "target_ref",
+                "model_rank_within_timestamp",
+                "selected_by_replay",
+            ],
+            future_outcome_fields=[],
+            row_count=len(trace_rows),
+            eligible_row_count=len(scored_rows),
+            selected_count=len(selected_trace_rows),
+            universe_count_mean=_mean(timestamp_counts.values()),
+            selected_target_present_count=len(selected_trace_rows),
+            selected_forward_return_rank_mean=_mean(selected_rank_values),
+            value=(len(selected_trace_rows) / len(scored_rows)) if scored_rows else None,
+            required_evidence_status="published",
         ),
     ]
 
@@ -4026,6 +4131,10 @@ def _operation_component_metric_effectiveness_review(
                 flags.append("selected_candidates_mean_model_rank_outside_top_25")
             if value is not None and value < 0.01:
                 flags.append("low_selected_share_of_model_option_signal_candidates")
+        elif metric_name == "selected_target_model_rank_from_trace":
+            rank_mean = _float(row.get("selected_forward_return_rank_mean"))
+            if rank_mean is not None and rank_mean > 25:
+                flags.append("selected_targets_mean_model_rank_outside_top_25")
         elif metric_name == "replacement_evaluation_trigger_block_balance":
             blocked = _float(row.get("opportunity_cost_to_best_mean"))
             evaluated = _float(row.get("row_count"))

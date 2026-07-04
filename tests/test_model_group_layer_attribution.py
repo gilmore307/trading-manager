@@ -658,6 +658,87 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 packet_rows["C02_entry_operation"]["missing_review_outputs"],
             )
 
+    def test_operation_component_metrics_use_trace_when_target_universe_is_absent(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            rows_path = tmp / "decision_rows.jsonl"
+            output_dir = tmp / "diagnostic"
+            row = _row(
+                "r1",
+                "accepted",
+                "simulated_filled",
+                1,
+                0.72,
+                0.12,
+                "open_long",
+                "long",
+                "passed",
+                "listed_option_contract",
+            )
+            row["target_ref"] = "MSFT"
+            row["timestamp"] = "2021-01-04T16:00:00-05:00"
+            rows_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            trace_path = tmp / "model_candidate_selection_trace.jsonl"
+            trace_rows = [
+                _model_candidate_trace_row("MSFT", rank=2, selected=True),
+                _model_candidate_trace_row("AAPL", rank=1, selected=False),
+                _model_candidate_trace_row("NVDA", rank=3, selected=False),
+            ]
+            trace_path.write_text("\n".join(json.dumps(row) for row in trace_rows) + "\n", encoding="utf-8")
+
+            report = build_model_group_layer_attribution(
+                decision_rows_path=rows_path,
+                output_dir=output_dir,
+                model_candidate_selection_trace_path=trace_path,
+                now_utc=datetime(2026, 6, 13, 18, 0, tzinfo=UTC),
+            )
+
+            self.assertNotIn(
+                "C01_intake_operation",
+                report["operation_component_metrics_summary"]["components_with_metric_data_gaps"],
+            )
+            self.assertNotIn(
+                "C02_entry_operation",
+                report["operation_component_metrics_summary"]["components_with_metric_data_gaps"],
+            )
+            with (output_dir / "operation_component_metrics.csv").open(encoding="utf-8") as handle:
+                metric_rows = {
+                    (row["operation_component_id"], row["metric_name"]): row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertEqual(
+                metric_rows[("C01_intake_operation", "visible_universe_integrity")]["availability_status"],
+                "computed",
+            )
+            self.assertEqual(
+                metric_rows[("C01_intake_operation", "selected_sector_bucket_forward_return_rank")][
+                    "availability_status"
+                ],
+                "not_applicable",
+            )
+            self.assertEqual(
+                metric_rows[("C02_entry_operation", "selected_target_forward_return_rank_within_sector")][
+                    "availability_status"
+                ],
+                "not_applicable",
+            )
+            rank_metric = metric_rows[("C02_entry_operation", "selected_target_model_rank_from_trace")]
+            self.assertEqual(rank_metric["availability_status"], "computed")
+            self.assertEqual(rank_metric["selected_forward_return_rank_mean"], "2.0")
+            with (output_dir / "operation_component_review_packet.csv").open(encoding="utf-8") as handle:
+                packet_rows = {
+                    row["operation_component_id"]: row
+                    for row in csv.DictReader(handle)
+                }
+            self.assertNotIn(
+                "component_specific_metric_data_gap",
+                packet_rows["C01_intake_operation"]["missing_review_outputs"],
+            )
+            self.assertNotIn(
+                "component_specific_metric_data_gap",
+                packet_rows["C02_entry_operation"]["missing_review_outputs"],
+            )
+
     def test_operation_component_metrics_marks_partial_target_universe_as_gap(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
