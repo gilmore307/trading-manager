@@ -50,6 +50,31 @@ def _write_bar_receipt(storage_root: Path, symbol: str, month: str, *, row_count
     return receipt_path
 
 
+def _write_compact_bar_manifest(storage_root: Path, symbol: str, month: str, *, row_count: int = 1) -> Path:
+    manifest_path = storage_root / "90_lifecycle" / "maintenance" / "compact_contracts" / "alpaca_bars_monthly_source_provenance_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "contract_type": "storage_alpaca_bars_monthly_source_provenance_manifest",
+                "source_month_summaries": [
+                    {
+                        "source_id": "alpaca_bars",
+                        "symbol": symbol,
+                        "month": month,
+                        "status": "succeeded",
+                        "row_counts": {"equity_bar": row_count},
+                        "source_table": "model_01_market_regime_data_acquisition",
+                        "timeframe": "1Min",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path
+
+
 class LayerThreeTargetStateTests(unittest.TestCase):
     def test_cli_accepts_persist_sql_stage_command_alias(self) -> None:
         with (
@@ -93,6 +118,27 @@ class LayerThreeTargetStateTests(unittest.TestCase):
             self.assertEqual(refs[0].row_count, 1)
             self.assertEqual(refs[0].bar_source_ref, "trading_data.model_01_market_regime_data_acquisition")
             self.assertEqual(refs[0].timeframe, "1Min")
+
+    def test_discovers_compact_bar_provenance_after_receipt_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            storage_root = tmp / "storage"
+            universe_path = tmp / "universe.csv"
+            universe_path.write_text("symbol,replay_candidate_status\nXLF,active\n", encoding="utf-8")
+            _write_compact_bar_manifest(storage_root, "XLF", "2016-01", row_count=17)
+
+            refs = discover_target_candidate_feed_artifacts(
+                start_month="2016-01",
+                trading_data_root=tmp / "trading-data",
+                trading_storage_root=storage_root,
+                universe_path=universe_path,
+            )
+
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(refs[0].symbol, "XLF")
+        self.assertEqual(refs[0].row_count, 17)
+        self.assertEqual(refs[0].bar_source_ref, "trading_data.model_01_market_regime_data_acquisition")
+        self.assertIn("compact_provenance", refs[0].run_id)
 
     def test_discovers_timeframe_from_run_manifest_when_task_key_is_absent(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:

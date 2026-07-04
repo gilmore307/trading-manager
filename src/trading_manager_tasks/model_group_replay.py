@@ -20,6 +20,7 @@ from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from .fold_naming import date_range_fold_id, model_worker_fold_id
+from .alpaca_bar_source_provenance import compact_bar_source_run
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import SchedulerDecision
 from .scheduler_locks import SchedulerLockRef, acquire_scheduler_lock, scheduler_lock_plan
@@ -1361,6 +1362,10 @@ def _canonical_alpaca_source_symbols_for_replay_plan(storage_root: Path, *, data
 
 def _alpaca_month_source_ready(month_dir: Path) -> bool:
     if (month_dir / "completion_receipt.json").exists() and _completion_receipt_succeeded(month_dir / "completion_receipt.json"):
+        return True
+    data_root = month_dir.parents[3] if len(month_dir.parents) > 3 else None
+    compact_run = compact_bar_source_run(month_dir.parent.name, month_dir.name, data_storage_root=data_root)
+    if compact_run is not None:
         return True
     return any(month_dir.glob("runs/*/saved/equity_bar.csv"))
 

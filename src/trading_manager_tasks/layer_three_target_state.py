@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TextIO
 
 from .control_plane import TaskSystemError
+from .alpaca_bar_source_provenance import compact_bar_source_run
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .storage_paths import data_storage_root
 
@@ -197,6 +198,9 @@ def _latest_successful_run(receipt: Mapping[str, Any]) -> Mapping[str, Any] | No
 
 
 def _bar_source_ref(run: Mapping[str, Any]) -> str:
+    source_table = str(run.get("source_table") or "").strip()
+    if source_table:
+        return f"trading_data.{source_table}"
     outputs = [item for item in run.get("outputs") or [] if isinstance(item, str)]
     steps = run.get("steps") if isinstance(run.get("steps"), Mapping) else {}
     save_step = steps.get("save") if isinstance(steps.get("save"), Mapping) else {}
@@ -216,6 +220,8 @@ def _source_timeframe(receipt_path: Path) -> str:
             return timeframe
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     run = _latest_successful_run(receipt)
+    if run and run.get("timeframe"):
+        return str(run["timeframe"])
     output_dir = str(run.get("output_dir") or "").strip() if run else ""
     if output_dir:
         manifest_path = Path(output_dir) / "request_manifest.json"
@@ -247,16 +253,22 @@ def discover_target_candidate_feed_artifacts(
     for target_symbol in sorted(allowed_symbols):
         for evidence_symbol in allowed_symbols[target_symbol]:
             receipt_path = trading_storage_root / MONTHLY_BACKFILL_STORAGE_DIR / "alpaca_bars" / evidence_symbol / start_month / "completion_receipt.json"
-            if not receipt_path.exists():
-                continue
-            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-            run = _latest_successful_run(receipt)
+            if receipt_path.exists():
+                receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                run = _latest_successful_run(receipt)
+            else:
+                run = compact_bar_source_run(evidence_symbol, start_month, data_storage_root=trading_storage_root)
             if run is None:
                 continue
             row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
             row_count = int(row_counts.get("equity_bar") or 0)
             if row_count <= 0:
                 continue
+            timeframe = str(run.get("timeframe") or "").strip()
+            if not timeframe and receipt_path.exists():
+                timeframe = _source_timeframe(receipt_path)
+            if not timeframe:
+                timeframe = DEFAULT_TARGET_STATE_SOURCE_TIMEFRAME
             refs.append(
                 FeedArtifactRef(
                     symbol=target_symbol,
@@ -266,7 +278,7 @@ def discover_target_candidate_feed_artifacts(
                     run_id=str(run.get("run_id") or ""),
                     row_count=row_count,
                     evidence_symbol=evidence_symbol,
-                    timeframe=_source_timeframe(receipt_path),
+                    timeframe=timeframe,
                 )
             )
             break

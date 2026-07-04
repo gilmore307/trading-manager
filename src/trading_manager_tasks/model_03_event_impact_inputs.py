@@ -37,6 +37,7 @@ from .event_feed_coverage import (
     range_bounds,
     successful_feed_runs,
 )
+from .alpaca_bar_source_provenance import compact_bar_source_run
 from .layer_three_target_state import BAR_SOURCE_TABLE, FeedArtifactRef, _bar_source_ref, _latest_successful_run, discover_target_candidate_feed_artifacts
 from .request_payloads import DEFAULT_STORAGE_ROOT
 from .scheduler import is_regular_us_equity_trading_day, us_equity_market_holidays
@@ -185,10 +186,11 @@ def _discover_layer_two_feed_artifacts_including_zero_rows(
     zero_refs: list[FeedArtifactRef] = []
     for symbol in _read_layer_two_symbols(universe_path):
         receipt_path = trading_storage_root / "monthly_backfill" / "alpaca_bars" / symbol / start_month / "completion_receipt.json"
-        if not receipt_path.exists():
-            continue
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        run = _latest_successful_run(receipt)
+        if receipt_path.exists():
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            run = _latest_successful_run(receipt)
+        else:
+            run = compact_bar_source_run(symbol, start_month, data_storage_root=trading_storage_root)
         if run is None:
             continue
         row_counts = run.get("row_counts") if isinstance(run.get("row_counts"), Mapping) else {}
