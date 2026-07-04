@@ -70,10 +70,27 @@ class ModelGroupRerunTests(unittest.TestCase):
         root_classes = {row["root_class"] for row in result.plan["controlled_artifact_roots"]}
         self.assertIn("rerun_reset_receipts", root_classes)
         self.assertIn("protected_source_data", root_classes)
+        self.assertTrue(result.plan["requires_physical_clear_before_reentry"])
+        self.assertEqual(
+            result.plan["reset_scope"]["cutpoint"]["cutpoint_stage_id"],
+            "model_02_target_state.data_acquisition",
+        )
+        generated_selector_ids = {row["selector_id"] for row in result.plan["generated_class_selectors"]}
+        self.assertIn("downstream_stage_receipts", generated_selector_ids)
+        self.assertIn("downstream_stage_logs", generated_selector_ids)
+        self.assertIn("downstream_task_progress_sidecars", generated_selector_ids)
+        self.assertIn("downstream_replay_evaluation_settlement_promotion", generated_selector_ids)
+        self.assertIn("downstream_dashboard_read_models", generated_selector_ids)
+        self.assertIn("downstream_sql_rows", generated_selector_ids)
+        protected_selector_ids = {row["selector_id"] for row in result.plan["protected_class_selectors"]}
+        self.assertIn("protected_trading_economics_source", protected_selector_ids)
+        self.assertIn("protected_reset_and_lifecycle_receipts", protected_selector_ids)
         lifecycle_request = result.plan["storage_lifecycle_request"]
         self.assertEqual(lifecycle_request["contract_type"], "storage_lifecycle_request")
         self.assertEqual(lifecycle_request["request_origin"], "model_group_rerun_plan")
         self.assertEqual(lifecycle_request["origin_rerun_id"], result.rerun_id)
+        self.assertEqual(lifecycle_request["requested_action"], "purge_rerun_invalidated_materializations")
+        self.assertTrue(lifecycle_request["requires_physical_clear_before_reentry"])
         self.assertFalse(lifecycle_request["mutation_allowed_by_request"])
         self.assertFalse(lifecycle_request["storage_lifecycle_mutation_performed"])
         self.assertTrue(lifecycle_request["requires_storage_lifecycle_review"])
@@ -137,6 +154,8 @@ class ModelGroupRerunTests(unittest.TestCase):
         self.assertEqual(receipt_payload["contract_type"], "manager_model_group_rerun_reset_receipt")
         self.assertEqual(receipt_payload["rerun_id"], result.rerun_id)
         self.assertEqual(receipt_payload["cutpoint_stage_id"], "model_02_target_state.data_acquisition")
+        self.assertEqual(receipt_payload["physical_clearance"]["owner"], "trading-storage")
+        self.assertEqual(receipt_payload["physical_clearance"]["status"], "required_before_scheduler_reentry")
         receipt_root_classes = {row["root_class"] for row in receipt_payload["controlled_artifact_roots"]}
         self.assertIn("rerun_reset_receipts", receipt_root_classes)
         self.assertIn("protected_source_data", receipt_root_classes)

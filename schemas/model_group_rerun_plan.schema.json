@@ -52,6 +52,7 @@
           "enum": [
             "data_acquisition",
             "feature_generation",
+            "model_training",
             "model_generation",
             "model_evaluation",
             "replay_execution",
@@ -98,6 +99,29 @@
         "type": "object"
       },
       "type": "array"
+    },
+    "cutpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "cutpoint_stage_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "layer_id": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "stage": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "layer_id",
+        "stage",
+        "cutpoint_stage_id"
+      ],
+      "type": "object"
     },
     "created_at_utc": {
       "minLength": 20,
@@ -155,9 +179,100 @@
       "type": "array",
       "uniqueItems": true
     },
+    "generated_class_selectors": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "action": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "artifact_class": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "final_handling_method": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "root_class": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "root_path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope": {
+            "type": "object"
+          },
+          "selector_id": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector_id",
+          "root_class",
+          "artifact_class",
+          "root_path",
+          "action",
+          "final_handling_method",
+          "scope",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
     "plan_id": {
       "minLength": 1,
       "type": "string"
+    },
+    "protected_class_selectors": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "action": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "artifact_class": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "root_class": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "root_path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "selector_id": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector_id",
+          "root_class",
+          "artifact_class",
+          "root_path",
+          "action",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
     },
     "protected_set": {
       "items": {
@@ -224,6 +339,53 @@
     "rerun_id": {
       "minLength": 1,
       "type": "string"
+    },
+    "requires_physical_clear_before_reentry": {
+      "const": true
+    },
+    "reset_scope": {
+      "additionalProperties": true,
+      "properties": {
+        "cutpoint": {
+          "type": "object"
+        },
+        "end_month": {
+          "minLength": 7,
+          "type": "string"
+        },
+        "fold_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope_type": {
+          "const": "model_group_fold"
+        },
+        "start_month": {
+          "minLength": 7,
+          "type": "string"
+        },
+        "state_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "target_symbols": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "scope_type",
+        "fold_id",
+        "state_path",
+        "start_month",
+        "end_month",
+        "target_symbols",
+        "cutpoint"
+      ],
+      "type": "object"
     },
     "scheduler_reentry_stage": {
       "additionalProperties": false,
@@ -322,6 +484,9 @@
           },
           "type": "array"
         },
+        "generated_class_selectors": {
+          "type": "array"
+        },
         "model_activation_performed": {
           "const": false
         },
@@ -343,6 +508,9 @@
           },
           "type": "array"
         },
+        "protected_class_selectors": {
+          "type": "array"
+        },
         "reason": {
           "minLength": 1,
           "type": "string"
@@ -355,7 +523,10 @@
           "const": "model_group_rerun_plan"
         },
         "requested_action": {
-          "const": "classify_rerun_invalidated_artifacts"
+          "const": "purge_rerun_invalidated_materializations"
+        },
+        "requires_physical_clear_before_reentry": {
+          "const": true
         },
         "requires_artifact_index": {
           "const": true
@@ -376,6 +547,9 @@
           },
           "type": "array"
         },
+        "reset_scope": {
+          "type": "object"
+        },
         "storage_lifecycle_mutation_performed": {
           "const": false
         }
@@ -388,10 +562,14 @@
         "origin_rerun_id",
         "requested_action",
         "reason",
+        "reset_scope",
+        "generated_class_selectors",
+        "protected_class_selectors",
         "candidate_refs",
         "protected_refs",
         "retained_refs",
         "controlled_artifact_roots",
+        "requires_physical_clear_before_reentry",
         "requires_storage_lifecycle_review",
         "requires_artifact_index",
         "requires_protected_set_clearance",
@@ -413,9 +591,14 @@
     "dry_run",
     "change_origin",
     "affected_scope",
+    "reset_scope",
+    "cutpoint",
+    "requires_physical_clear_before_reentry",
     "source_data_delete",
     "delete_set",
+    "generated_class_selectors",
     "protected_set",
+    "protected_class_selectors",
     "retained_set",
     "controlled_artifact_roots",
     "storage_lifecycle_request",

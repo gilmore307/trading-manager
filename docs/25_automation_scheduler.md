@@ -126,11 +126,24 @@ the accepted source surface already covers the month.
 
 ## Model Group Reruns
 
-The scheduler does not treat a rerun as "start the same tasks again." A rerun begins by determining the affected scope: target symbols, fold windows, and the earliest affected `layer.stage` cutpoint. The `model_group_rerun_plan` records that scope, concrete downstream generated-artifact candidates, protected and retained sets, controlled artifact roots, source-data lifecycle requirements, an embedded `storage_lifecycle_request`, and the scheduler reentry stage.
+The scheduler does not treat a rerun as "start the same tasks again." A rerun begins by determining the affected scope: target symbols, fold windows, and the earliest affected `layer.stage` cutpoint. The `model_group_rerun_plan` records `reset_scope`, `cutpoint`, concrete downstream generated-artifact candidates, generated file-class selectors, protected file-class selectors, protected and retained sets, controlled artifact roots, source-data lifecycle requirements, an embedded `storage_lifecycle_request`, and the scheduler reentry stage.
 
 For ordinary architecture changes after acquisition, reusable source data stays protected and the scheduler reenters at `feature_generation`, `model_generation`, or a later lifecycle stage. If the required source data itself changed, the rerun cutpoint is `data_acquisition`; matching source partitions may become storage lifecycle candidates only within the plan's bounded provider/source/target/month/timeframe scope and only after artifact-index, storage lifecycle, protected-set, quarantine/recheck, and receipt gates allow any mutation.
 
 Before reentry, reset must physically clear downstream generated artifacts for the accepted scope, not merely hide them from dashboards. For a scope such as all folds after M02, this includes generated outputs, diagnostics, explainability byproducts, downstream stage receipts, generated task receipts, stage logs/progress sidecars, replay execution outputs, post-replay review/attribution/failure-triage outputs, fold settlements, promotion-review outputs, and dashboard/read-model artifacts derived from stale evidence. Protected source evidence, reset receipts, lifecycle decision receipts, tombstones, and compact deletion receipts remain retained.
+
+The manager is the logical owner of reset scope, not the physical deleter. It emits generated selectors for every downstream class:
+
+- `workflow_state`: reset in place by manager, not deleted.
+- `stage_receipts`, `stage_logs`, `task_progress_sidecars`: delete matching downstream stage-key directories/files.
+- `provider_task_sidecars`: blocked until task-key status proves the files are generated residue rather than acquisition authority.
+- `explicit_artifact_refs`: delete concrete storage refs named by affected downstream stages when unprotected.
+- `model_artifacts`: delete only scope-matched unpromoted generated artifacts.
+- `replay_datasets`: delete scope-matched replay execution, post-replay review/attribution/failure-triage, fold-settlement, evaluation, and promotion-review run directories.
+- `dashboard_cache`: delete stale timestamped snapshots and refresh latest read models instead of keeping excluded rows.
+- `sql_rows`: blocked until the owning SQL/table executor clears generated rows; SQL is not handled by filesystem deletion.
+
+Storage executes the filesystem portion through `trading-storage/scripts/lifecycle/execute_rerun_reset_lifecycle.py`. Dry-run classification is the default; `--apply` is allowed only after the accepted reset scope is clear and writes storage lifecycle receipts and tombstones. Any unmatched, protected, provider-task, or SQL class remains explicit in the receipt and blocks clean reentry when it affects the requested scope.
 
 Workflow state after the cutpoint must also be invalidated so completed rows do not cause false progress. A single-state reset writes `storage/02_control_plane/runtime/model_group_rerun_resets/<rerun_id>/...reset_receipt.json` as audit drill-down evidence for the cutpoint, deleted downstream classes, preserved source roots, retained inherited artifacts, and allowed intermediate roots. A multi-state reset should also write one human-facing batch receipt under `storage/02_control_plane/runtime/model_group_rerun_resets/batches/`; operators should inspect the batch receipt first and open per-state receipts only when repairing a specific month or fold. During reentry, one resident scheduler owns the scope through its normal locks; launching a second same-scope daemon is invalid.
 

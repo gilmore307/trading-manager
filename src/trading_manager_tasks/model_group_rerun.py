@@ -93,6 +93,10 @@ def _stage_ref(state_path: Path, stage_id: str) -> str:
     return f"storage://02_control_plane/runtime/{state_path.name}#{stage_id}"
 
 
+def _stage_key(stage_id: str) -> str:
+    return stage_id.replace(".", "__")
+
+
 def _artifact_class_for_stage(stage: StageProgress) -> str:
     if stage.stage_type == "data_acquisition":
         return "runtime_state"
@@ -104,8 +108,12 @@ def _artifact_class_for_stage(stage: StageProgress) -> str:
         return "model_output"
     if stage.stage_type == "model_evaluation":
         return "evaluation_artifact"
+    if stage.stage_type in {"replay_execution", "post_replay_attribution", "fold_settlement"}:
+        return "replay_artifact"
     if stage.stage_type == "promotion_review":
         return "promotion_artifact"
+    if stage.stage_type == "read_model_refresh":
+        return "read_model"
     return "runtime_state"
 
 
@@ -178,6 +186,214 @@ def _controlled_artifact_roots(storage_root: Path) -> list[dict[str, str]]:
     ]
 
 
+def _reset_scope(
+    *,
+    state: WorkflowState,
+    state_path: Path,
+    layer_id: int,
+    stage: RerunStage,
+    target_symbols: tuple[str, ...],
+    cutpoint_stage_id: str,
+) -> dict[str, Any]:
+    return {
+        "scope_type": "model_group_fold",
+        "fold_id": f"fold_{state.start_month}_{state.end_month}",
+        "state_path": str(state_path),
+        "start_month": state.start_month,
+        "end_month": state.end_month,
+        "target_symbols": list(target_symbols),
+        "cutpoint": {
+            "layer_id": layer_id,
+            "stage": stage,
+            "cutpoint_stage_id": cutpoint_stage_id,
+        },
+    }
+
+
+def _generated_class_selectors(
+    *,
+    storage_root: Path,
+    state: WorkflowState,
+    state_path: Path,
+    affected: tuple[StageProgress, ...],
+    target_symbols: tuple[str, ...],
+    layer_id: int,
+    stage: RerunStage,
+    reason: str,
+) -> list[dict[str, Any]]:
+    """Declare every downstream materialization class storage must clear or refresh."""
+
+    stage_ids = [row.stage_id for row in affected if row.status != "not_applicable"]
+    stage_keys = [_stage_key(stage_id) for stage_id in stage_ids]
+    candidate_refs = [
+        str(ref)
+        for row in affected
+        for ref in (*row.artifact_refs, *row.receipt_refs)
+        if str(ref).strip()
+    ]
+    candidate_model_refs = [
+        f"storage://trading-manager/model_group/{symbol.lower()}/{state.start_month}_{state.end_month}"
+        for symbol in target_symbols
+    ]
+    scope = {
+        "state_path": str(state_path),
+        "start_month": state.start_month,
+        "end_month": state.end_month,
+        "target_symbols": list(target_symbols),
+        "cutpoint_layer_id": layer_id,
+        "cutpoint_stage": stage,
+        "stage_ids": stage_ids,
+        "stage_keys": stage_keys,
+        "candidate_model_refs": candidate_model_refs,
+    }
+    model_root = _component_root_for_manager_storage(storage_root, "03_model_artifacts")
+    replay_root = _component_root_for_manager_storage(storage_root, "05_replay_datasets")
+    dashboard_root = _component_root_for_manager_storage(storage_root, "06_dashboard_cache")
+    selector_rows = [
+        {
+            "selector_id": "workflow_state_cutpoint_reset",
+            "root_class": "workflow_state",
+            "artifact_class": "workflow_state",
+            "root_path": str(storage_root / "runtime"),
+            "action": "reset_state",
+            "final_handling_method": "not_applicable",
+            "scope": scope,
+            "reason": reason,
+        },
+        {
+            "selector_id": "downstream_stage_receipts",
+            "root_class": "stage_receipts",
+            "artifact_class": "runtime_evidence",
+            "root_path": str(storage_root / "runtime" / "model_training_stage_receipts"),
+            "action": "delete",
+            "final_handling_method": "delete",
+            "scope": scope,
+            "reason": reason,
+        },
+        {
+            "selector_id": "downstream_stage_logs",
+            "root_class": "stage_logs",
+            "artifact_class": "runtime_evidence",
+            "root_path": str(storage_root / "runtime" / "model_training_stage_logs"),
+            "action": "delete",
+            "final_handling_method": "delete",
+            "scope": scope,
+            "reason": reason,
+        },
+        {
+            "selector_id": "downstream_task_progress_sidecars",
+            "root_class": "task_progress_sidecars",
+            "artifact_class": "runtime_evidence",
+            "root_path": str(storage_root / "runtime" / "task_progress"),
+            "action": "delete",
+            "final_handling_method": "delete",
+            "scope": scope,
+            "reason": reason,
+        },
+        {
+            "selector_id": "downstream_provider_task_sidecars",
+            "root_class": "provider_task_sidecars",
+            "artifact_class": "runtime_evidence",
+            "root_path": str(storage_root / "runtime" / "provider_task_keys"),
+            "action": "blocked_pending_explicit_task_key_status",
+            "final_handling_method": "not_applicable",
+            "scope": scope,
+            "reason": "provider task keys can represent acquisition authority; storage must not delete them unless a narrower task-key status proves they are generated residue",
+        },
+        {
+            "selector_id": "downstream_explicit_artifact_refs",
+            "root_class": "explicit_artifact_refs",
+            "artifact_class": "generated_artifact",
+            "root_path": str(storage_root),
+            "action": "delete",
+            "final_handling_method": "delete",
+            "candidate_refs": candidate_refs,
+            "scope": scope,
+            "reason": reason,
+        },
+        {
+            "selector_id": "downstream_model_artifacts",
+            "root_class": "model_artifacts",
+            "artifact_class": "model_artifact",
+            "root_path": str(model_root / "runtime"),
+            "action": "delete_if_scope_matched_and_unpromoted",
+            "final_handling_method": "delete",
+            "scope": scope,
+            "reason": reason,
+        },
+        {
+            "selector_id": "downstream_replay_evaluation_settlement_promotion",
+            "root_class": "replay_datasets",
+            "artifact_class": "replay_artifact",
+            "root_path": str(replay_root / "promotion_replay_candidate_policy"),
+            "action": "delete_if_scope_matched",
+            "final_handling_method": "delete",
+            "scope": scope,
+            "reason": reason,
+        },
+        {
+            "selector_id": "downstream_dashboard_read_models",
+            "root_class": "dashboard_cache",
+            "artifact_class": "derived_read_model",
+            "root_path": str(dashboard_root),
+            "action": "delete_snapshots_and_refresh_latest",
+            "final_handling_method": "rolling_retention",
+            "scope": scope,
+            "reason": reason,
+        },
+        {
+            "selector_id": "downstream_sql_rows",
+            "root_class": "sql_rows",
+            "artifact_class": "derived_or_generated_sql_rows",
+            "root_path": "sql://trading-data/trading-model/trading-manager",
+            "action": "blocked_pending_sql_executor",
+            "final_handling_method": "not_applicable",
+            "scope": scope,
+            "reason": "SQL rows are not filesystem artifacts; reset must use the owning table executor before reentry when affected rows exist",
+        },
+    ]
+    return selector_rows
+
+
+def _protected_class_selectors(storage_root: Path) -> list[dict[str, Any]]:
+    lifecycle_root = _component_root_for_manager_storage(storage_root, "90_lifecycle")
+    model_root = _component_root_for_manager_storage(storage_root, "03_model_artifacts")
+    return [
+        {
+            "selector_id": "protected_alpaca_source",
+            "root_class": "protected_source_data",
+            "artifact_class": "source_evidence",
+            "root_path": str(_component_root_for_manager_storage(storage_root, "01_source_data") / "monthly_backfill" / "alpaca_bars"),
+            "action": "retain",
+            "reason": PROTECTED_SOURCE_POLICIES["storage://01_source_data/monthly_backfill/alpaca_bars/"],
+        },
+        {
+            "selector_id": "protected_trading_economics_source",
+            "root_class": "protected_source_data",
+            "artifact_class": "source_evidence",
+            "root_path": str(_component_root_for_manager_storage(storage_root, "01_source_data") / "monthly_backfill" / "trading_economics_calendar_web"),
+            "action": "retain",
+            "reason": PROTECTED_SOURCE_POLICIES["storage://01_source_data/monthly_backfill/trading_economics_calendar_web/"],
+        },
+        {
+            "selector_id": "protected_reset_and_lifecycle_receipts",
+            "root_class": "lifecycle_evidence",
+            "artifact_class": "decision_evidence",
+            "root_path": str(lifecycle_root),
+            "action": "retain",
+            "reason": "reset, lifecycle, delete, quarantine, archive, restore receipts and tombstones are audit evidence",
+        },
+        {
+            "selector_id": "protected_promoted_model_bodies",
+            "root_class": "promoted_model_artifacts",
+            "artifact_class": "decision_evidence",
+            "root_path": str(model_root / "runtime"),
+            "action": "retain_if_promoted_or_activation_lineage",
+            "reason": "promoted model bodies and activation/deactivation lineage are protected from ordinary rerun cleanup",
+        },
+    ]
+
+
 def _empty_provider_task_key_dirs(storage_root: Path) -> list[str]:
     root = storage_root / "runtime" / "provider_task_keys"
     if not root.exists():
@@ -219,6 +435,9 @@ def _storage_lifecycle_request(
     *,
     rerun_id: str,
     plan_id: str,
+    reset_scope: dict[str, Any],
+    generated_class_selectors: list[dict[str, Any]],
+    protected_class_selectors: list[dict[str, Any]],
     delete_set: list[dict[str, Any]],
     protected_set: list[dict[str, str]],
     retained_set: list[dict[str, Any]],
@@ -231,12 +450,16 @@ def _storage_lifecycle_request(
         "request_origin": "model_group_rerun_plan",
         "origin_ref": plan_id,
         "origin_rerun_id": rerun_id,
-        "requested_action": "classify_rerun_invalidated_artifacts",
+        "requested_action": "purge_rerun_invalidated_materializations",
         "reason": reason,
+        "reset_scope": reset_scope,
+        "generated_class_selectors": generated_class_selectors,
+        "protected_class_selectors": protected_class_selectors,
         "candidate_refs": [str(row["ref"]) for row in delete_set],
         "protected_refs": [str(row["ref"]) for row in protected_set],
         "retained_refs": [str(row["ref"]) for row in retained_set],
         "controlled_artifact_roots": controlled_artifact_roots,
+        "requires_physical_clear_before_reentry": True,
         "requires_storage_lifecycle_review": True,
         "requires_artifact_index": True,
         "requires_protected_set_clearance": True,
@@ -304,6 +527,25 @@ def build_model_group_rerun_plan(
     stages = tuple(state.stages)
     cutpoint_index = _stage_order_index(stages, layer_id=layer_id, stage_type=stage)
     affected = stages[cutpoint_index:]
+    reset_scope = _reset_scope(
+        state=state,
+        state_path=state_path,
+        layer_id=layer_id,
+        stage=stage,
+        target_symbols=target_symbols,
+        cutpoint_stage_id=stages[cutpoint_index].stage_id,
+    )
+    generated_class_selectors = _generated_class_selectors(
+        storage_root=storage_root,
+        state=state,
+        state_path=state_path,
+        affected=tuple(affected),
+        target_symbols=target_symbols,
+        layer_id=layer_id,
+        stage=stage,
+        reason=reason,
+    )
+    protected_class_selectors = _protected_class_selectors(storage_root)
     delete_set: list[dict[str, Any]] = []
     for affected_stage in affected:
         delete_set.append(
@@ -350,18 +592,26 @@ def build_model_group_rerun_plan(
             "end_month": state.end_month,
             "target_symbols": list(target_symbols),
         },
+        "reset_scope": reset_scope,
+        "cutpoint": reset_scope["cutpoint"],
+        "requires_physical_clear_before_reentry": True,
         "source_data_delete": {
             "required": False,
             "reason": None,
             "scope_refs": list(source_data_delete_scope_refs),
         },
         "delete_set": delete_set,
+        "generated_class_selectors": generated_class_selectors,
         "protected_set": protected_set,
+        "protected_class_selectors": protected_class_selectors,
         "retained_set": retained_set,
         "controlled_artifact_roots": controlled_artifact_roots,
         "storage_lifecycle_request": _storage_lifecycle_request(
             rerun_id=rerun_id_value,
             plan_id=plan_id_value,
+            reset_scope=reset_scope,
+            generated_class_selectors=generated_class_selectors,
+            protected_class_selectors=protected_class_selectors,
             delete_set=delete_set,
             protected_set=protected_set,
             retained_set=retained_set,
@@ -417,6 +667,16 @@ def _write_reset_receipt(
         "changed_stage_count": result_summary["changed_stage_count"],
         "preserved_stage_count": result_summary["preserved_stage_count"],
         "source_data_delete_required": result_summary["source_data_delete_required"],
+        "requires_physical_clear_before_reentry": result_summary["plan"].get("requires_physical_clear_before_reentry", True),
+        "physical_clearance": {
+            "status": "required_before_scheduler_reentry",
+            "owner": "trading-storage",
+            "storage_lifecycle_request_id": result_summary["plan"]["storage_lifecycle_request"]["request_id"],
+            "storage_lifecycle_mutation_performed_by_manager": False,
+        },
+        "reset_scope": result_summary["plan"]["reset_scope"],
+        "generated_class_selectors": result_summary["plan"]["generated_class_selectors"],
+        "protected_class_selectors": result_summary["plan"]["protected_class_selectors"],
         "protected_set": result_summary["plan"]["protected_set"],
         "retained_set": result_summary["plan"]["retained_set"],
         "controlled_artifact_roots": result_summary["plan"]["controlled_artifact_roots"],
