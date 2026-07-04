@@ -136,7 +136,7 @@ The manager is the logical owner of reset scope, not the physical deleter. It em
 
 - `workflow_state`: reset in place by manager, not deleted.
 - `stage_receipts`, `stage_logs`, `task_progress_sidecars`: delete matching downstream stage-key directories/files.
-- `provider_task_sidecars`: blocked until task-key status proves the files are generated residue rather than acquisition authority.
+- `provider_task_sidecars`: delete scope-matched provider task keys and sidecars so stale task identity cannot collide with rerun output; unmatched keys are reported instead of guessed.
 - `explicit_artifact_refs`: delete concrete storage refs named by affected downstream stages when unprotected.
 - `model_artifacts`: delete only scope-matched unpromoted generated artifacts.
 - `replay_datasets`: delete scope-matched replay execution, post-replay review/attribution/failure-triage, fold-settlement, evaluation, and promotion-review run directories.

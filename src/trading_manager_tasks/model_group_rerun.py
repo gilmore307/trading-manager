@@ -295,10 +295,10 @@ def _generated_class_selectors(
             "root_class": "provider_task_sidecars",
             "artifact_class": "runtime_evidence",
             "root_path": str(storage_root / "runtime" / "provider_task_keys"),
-            "action": "blocked_pending_explicit_task_key_status",
-            "final_handling_method": "not_applicable",
+            "action": "delete_if_scope_matched",
+            "final_handling_method": "delete",
             "scope": scope,
-            "reason": "provider task keys can represent acquisition authority; storage must not delete them unless a narrower task-key status proves they are generated residue",
+            "reason": "provider task keys inside the accepted reset scope are generated task identity and must be removed before rerun to avoid stale provider/output conflicts",
         },
         {
             "selector_id": "downstream_explicit_artifact_refs",
