@@ -1790,7 +1790,7 @@ def _public_active_task_from_runtime(
     layer_key = selected_work.split(".", 1)[0]
     selected_work_stage = selected_work.split(".", 1)[1] if "." in selected_work else "runtime"
     stage_type = str(runtime_activity.get("next_internal_stage") or selected_work_stage)
-    layer = MODEL_NUMBER_BY_LAYER_KEY.get(layer_key)
+    layer = PUBLIC_LAYER_BY_LAYER_KEY.get(layer_key, MODEL_NUMBER_BY_LAYER_KEY.get(layer_key))
     label = _model_task_label(layer_key, layer) if layer_key.startswith("model_") else _public_stage_name(selected_work, stage_type)
     latest_decision = status.latest_decision if isinstance(status.latest_decision, Mapping) else {}
     daemon_state = status.daemon_state if isinstance(status.daemon_state, Mapping) else {}
@@ -2739,6 +2739,7 @@ MODEL_NAME_BY_LAYER_KEY.update(
         "model_01_market_context": "MarketRegimeModel",
         "model_01_sector_context": "SectorContextModel",
         "model_02_target_state": "TargetStateVectorModel",
+        "model_05_alpha_confidence": "AlphaConfidenceCheckpoint",
         "model_06_residual_event_governance": "EventRiskGovernor",
     }
 )
@@ -2748,8 +2749,12 @@ MODEL_NUMBER_BY_LAYER_KEY = {
     "model_02_target_state": 2,
     "model_03_event_state": 3,
     "model_04_unified_decision": 4,
+    "model_05_alpha_confidence": 4,
     "model_05_option_expression": 5,
     "model_06_residual_event_governance": 6,
+}
+PUBLIC_LAYER_BY_LAYER_KEY = {
+    "model_05_alpha_confidence": 4,
 }
 
 
@@ -3916,6 +3921,7 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
             layer = int(first_stage.get("layer"))
         except (TypeError, ValueError):
             layer = None
+        public_layer = PUBLIC_LAYER_BY_LAYER_KEY.get(layer_key, layer)
         receipt_refs: list[str] = []
         for stage in stages:
             refs = stage.get("receipt_refs")
@@ -3935,9 +3941,9 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
             {
                 "stage_id": layer_key,
                 "stage_type": "model_task",
-                "task_label": _model_task_label(layer_key, layer=layer),
+                "task_label": _model_task_label(layer_key, layer=public_layer),
                 "status": status,
-                "layer": layer,
+                "layer": public_layer,
                 "layer_key": layer_key,
                 "dataset_unit": dataset_unit,
                 "blockers": list(active_stage.get("blockers") or []),
@@ -3950,7 +3956,7 @@ def _aggregate_model_task_stages(raw_stages: list[Any]) -> list[Any]:
                 "active_stage_type": active_stage.get("stage_type"),
                 "model_name": MODEL_NAME_BY_LAYER_KEY.get(layer_key),
                 "model_display_name": _spaced_model_name(MODEL_NAME_BY_LAYER_KEY.get(layer_key) or ""),
-                "layer_label": f"M{layer:02d}" if layer is not None else None,
+                "layer_label": f"M{public_layer:02d}" if public_layer is not None else None,
                 "dashboard_progress": active_dashboard_progress or _model_task_progress(layer_key, stages, status),
                 "internal_stages": [
                     {

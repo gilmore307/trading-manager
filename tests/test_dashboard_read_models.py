@@ -20,6 +20,7 @@ from trading_manager_tasks.dashboard_read_models import (
     _mark_active_task_running,
     _mark_superseded_agent_errors,
     _model_group_replay_timeline_tasks,
+    _model_task_label,
     _public_task_period_for_training_month,
     _runtime_activity_decision,
     _scheduler_decision_runtime_activity,
@@ -32,6 +33,9 @@ from trading_manager_tasks.task_progress import write_task_progress_node
 
 
 class DashboardReadModelProducerTests(unittest.TestCase):
+    def test_alpha_confidence_checkpoint_uses_m04_public_identity(self):
+        self.assertEqual(_model_task_label("model_05_alpha_confidence", layer=4), "M04 Alpha Confidence Checkpoint")
+
     def test_scheduler_backoff_runtime_activity_blocks_ready_task_instead_of_running(self):
         status = SimpleNamespace(
             lock=SimpleNamespace(status="active"),
