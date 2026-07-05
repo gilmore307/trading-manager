@@ -35,7 +35,6 @@ MODEL_ID_ALIASES_BY_LAYER: dict[int, tuple[str, ...]] = {
     1: ("market_regime_model",),
     2: ("sector_context_model", "target_state_vector_model"),
     5: ("option_expression_model",),
-    6: ("event_risk_governor_model",),
 }
 LAYER_KEYS_BY_LAYER: dict[int, str] = {
     int(meta["layer"]): workflow_layer_key(int(meta["layer"]), str(meta["slug"])) for meta in LAYER_METADATA
