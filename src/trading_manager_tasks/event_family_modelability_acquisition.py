@@ -21,10 +21,10 @@ from .request_payloads import DEFAULT_STORAGE_ROOT
 
 MODELABILITY_ACQUISITION_CONTRACT_TYPE = "model_06_event_family_modelability_acquisition_plan"
 DEFAULT_MINIMUM_SAME_FAMILY_OBSERVATIONS = 8
-EVENT_ONTOLOGY_POLICY = (
-    "M03 uses a hierarchical event ontology: source/category and domain nodes support routing and priors; "
-    "mechanism families are the default modelability unit; evidence-gated child families or specific dossiers "
-    "may override ancestor priors while preserving taxonomy version, lineage, and fallback behavior."
+EVENT_TAXONOMY_POLICY = (
+    "M03 uses a fixed event taxonomy: semantic classification assigns the finest PIT-identifiable "
+    "Domain/Kingdom/Phylum/Class/Order/Family/Genus/Species node; modelability uses the deepest "
+    "evidence-supported effect-model node with conservative parent fallback."
 )
 SPECIFIC_EVENT_DOSSIER_POLICY = (
     "Ticker/company/theme-specific behavior belongs in a reviewed specific_event_dossier or child-family profile, "
@@ -149,7 +149,7 @@ class EventFamilyModelabilityAcquisitionPlan:
     minimum_same_family_observations: int
     same_family_evidence_policy: str
     event_family_generalization_policy: str
-    event_ontology_policy: str
+    event_taxonomy_policy: str
     specific_event_dossier_policy: str
     single_observation_policy: str
     required_feed_ids: tuple[str, ...]
@@ -236,7 +236,7 @@ def plan_event_family_modelability_acquisition(
         minimum_same_family_observations=minimum_same_family_observations,
         same_family_evidence_policy="M03 event-family modelability review must use multiple PIT-valid same-family or same-dossier observations with coverage, controls, and leakage evidence.",
         event_family_generalization_policy="Event families are defined by reusable mechanism first; low-evidence events inherit ancestor families, while reviewed child families or specific dossiers can specialize recurring entity/theme behavior.",
-        event_ontology_policy=EVENT_ONTOLOGY_POLICY,
+        event_taxonomy_policy=EVENT_TAXONOMY_POLICY,
         specific_event_dossier_policy=SPECIFIC_EVENT_DOSSIER_POLICY,
         single_observation_policy="A single event is only a candidate seed; it cannot establish event-family probability-function type.",
         required_feed_ids=required_feed_ids,

@@ -40,28 +40,33 @@ M03 does not start from selected trades or replay failures. It starts from the
 full point-in-time event universe inside the fold/window:
 
 1. Materialize every PIT-visible candidate event for the fold/window.
-2. Standardize event semantics and assign the reviewed multi-level taxonomy:
-   source category, domain node, mechanism family, optional child family, and
-   optional dossier.
-3. For the active family/dossier, test whether PIT event parameters can support
-   an identifiable probability function for later market, sector, target,
-   option, or execution impact.
-4. If identifiable, train distribution-parameter mappings only inside the
-   channels allowed by the reviewed family profile.
-5. If not identifiable, keep the event as risk shape/context only. It may widen
+2. Standardize event semantics and assign the finest PIT-identifiable reviewed
+   taxonomy node on the fixed
+   `Domain -> Kingdom -> Phylum -> Class -> Order -> Family -> Genus -> Species`
+   spine. This is the `semantic_node`.
+3. Select the deepest evidence-supported `effect_model_node`. It may be the
+   semantic node or a conservative ancestor when the semantic leaf is too
+   sparse.
+4. For the effect-model node, test whether PIT event parameters can support an
+   identifiable probability function for later market, sector, target, option,
+   or execution impact.
+5. If identifiable, train distribution-parameter mappings only inside the
+   channels owned by the reviewed `event_effect_model`.
+6. If not identifiable, keep the event as risk shape/context only. It may widen
    variance, thicken tails, discount confidence, or raise gates, but it must not
    move mean/mode or directional contribution.
 
 This route lets M03 combine the existing semantic event model with probability
 functions without turning every event into a direction bet.
 
-## Effect Profiles
+## Event Effect Models
 
-Each mechanism family or dossier owns an `allowed_effect_profile`. This profile
-is a permission mask that constrains training; it is not itself the estimated
-effect.
+Each effect-model node owns an `event_effect_model`. This is an impact-mode
+contract, not a permission mask. The taxonomy node defines the homogeneous event
+pool; the effect model defines which distribution channels the node can train
+and emit after review.
 
-Default risk-shape permissions:
+Default risk-shape model:
 
 | Channel | Default | Meaning |
 |---|---:|---|
@@ -71,23 +76,25 @@ Default risk-shape permissions:
 | `skew_delta` | allowed | The event can skew the distribution without moving its center. |
 | `confidence_discount` | allowed | The event can lower certainty in other signals. |
 | `gate_pressure` | allowed | The event can raise entry/no-trade or exposure gates. |
-| `mean_shift` | forbidden | The event cannot move expected return by default. |
-| `mode_shift` | forbidden | The event cannot move the most likely outcome by default. |
-| `directional_contribution` | forbidden | The event cannot add alpha/edge by default. |
+| `mean_shift` | absent | The event cannot move expected return by default. |
+| `mode_shift` | absent | The event cannot move the most likely outcome by default. |
+| `directional_contribution` | absent | The event cannot add alpha/edge by default. |
 
-Directional permissions are opt-in and review-gated. A family may enable
+Directional effect models are opt-in and review-gated. A node may own
 `mean_shift`, `mode_shift`, or `directional_contribution` only after
 fold-separated evidence shows a stable signed residual effect after M01/M02
 controls. Without that review, even severe events remain variance/tail/gate
 inputs rather than center-moving signals.
 
-M03 training must therefore be masked multi-head training:
+M03 training must therefore be channelized multi-head training:
 
 ```text
-event_family_profile -> allowed heads
-event instance       -> learned magnitude per allowed head
-M03 output           -> distribution-effect scores + validation evidence
-M04                  -> final fusion, threshold, calibration, and sizing
+semantic_node      -> finest PIT-identifiable event classification
+effect_model_node  -> evidence-supported node for modelability/fallback
+event_effect_model -> distribution channels and probability-function class
+event instance     -> learned magnitude per owned channel
+M03 output         -> distribution-effect scores + validation evidence
+M04                -> final fusion, threshold, calibration, and sizing
 ```
 
 An unrestricted `event_delta_probability` is not a valid M03 output because it
@@ -117,22 +124,31 @@ state process cannot be separated but the standardized input-to-outcome mapping
 is validated. `context_only_projection` is a risk-control output only: it says
 the event matters, not how much or in which direction.
 
-## Event Ontology Boundary
+## Event Taxonomy Boundary
 
-M03 classifies events through a hierarchical event ontology, not a flat
-single-level family list. The purpose of the hierarchy is to let low-evidence or
-first-seen events inherit a coarse prior while preserving a path to finer,
-mechanism-specific analysis once enough point-in-time evidence exists.
+M03 classifies events through a fixed event taxonomy, not a flat single-level
+family list. The purpose of the hierarchy is to classify each event to the
+finest point-in-time semantic node while allowing modelability to fall back to
+the deepest evidence-supported ancestor.
 
-The ontology separates these concepts:
+The taxonomy spine is:
 
-| Concept | Role |
+```text
+Domain -> Kingdom -> Phylum -> Class -> Order -> Family -> Genus -> Species
+```
+
+Rank roles:
+
+| Rank | Role |
 |---|---|
-| `source_category` | How the evidence arrived, such as news, report, SEC filing, official disclosure, or macro calendar. It supports routing and source precedence, but is not a modelable family by itself. |
-| `domain_node` | Broad topic or venue, such as corporate, macro, political, regulatory, technology, financial-system, or market-structure. It is a coarse prior and acquisition guide. |
-| `mechanism_family` | Repeated scenario with comparable mechanics, clocks, required fields, and risk channels. This is the default M03 modelability unit. |
-| `submechanism_family` | A narrower child with stricter inclusion/exclusion rules, such as guidance reset, AI capex repricing, customer concentration, dilution, or policy repricing. |
-| `specific_event_dossier` | Evidence-gated entity/theme/profile record for a recurring high-impact pattern such as NVDA earnings sector read-through. It can override ancestor priors for account-risk state, but must preserve fallback lineage. |
+| `domain` | Whether the row belongs in the market-event universe at all. |
+| `kingdom` | Broad market system such as macro, corporate, regulatory, political/geopolitical, financial-system, market-structure, commodity/energy, or technology/industry. |
+| `phylum` | Information or institutional form such as official release, central-bank action, company disclosure, SEC filing, regulatory action, court/legal process, news report, market-microstructure event, analyst action, or capital-market transaction. |
+| `class` | Affected scope such as broad market, sector/industry, theme/factor, single target, supply-chain network, option surface, liquidity/execution, or credit/funding. |
+| `order` | Mechanism class such as inflation/growth release, monetary-policy repricing, earnings-information event, guidance reset, regulatory constraint, legal liability, capital-structure change, product-market competition, supply/demand shock, liquidity/flow shock, volatility-surface event, or credit-stress event. |
+| `family` | Reusable event family with common PIT fields, clocks, scope, and channels. |
+| `genus` | Finer PIT-identifiable mechanism subtype inside a family. |
+| `species` | Specific reusable pattern or dossier with PIT-identifiable repeated mechanics and stronger explanatory value than the parent. |
 
 Coarse nodes are useful when the system has not studied an event deeply enough.
 For example, the first AAOI earnings event may inherit from
@@ -142,11 +158,11 @@ earnings have a stable mega-cap technology/AI-sector read-through profile, M03
 should split or attach specific dossiers instead of forcing both into one
 undifferentiated earnings pattern.
 
-The hierarchy is not a strict exclusive tree. An event may carry multiple
-mechanism tags and risk channels. The primary mechanism family owns the packet
-and default gates, while additional tags describe scope, theme, channel, and
-uncertainty. Source/category and domain labels may be ancestors, but they are
-not sufficient for modelability review.
+The taxonomy is not a strict exclusive tree. An event may carry multiple
+mechanism tags and risk channels. The primary semantic node owns the packet and
+lineage, while additional tags describe scope, theme, channel, and uncertainty.
+Low-level source/category labels may be ancestors, but they are not sufficient
+for modelability review.
 
 Event-family IDs used for modelability packets should name the currently
 accepted mechanism family or submechanism family. Tickers, company names,
@@ -297,19 +313,19 @@ distribution.
 
 ## M03 Responsibilities
 
-M03 owns pre-replay event-universe materialization, event ontology governance,
-event-family/dossier modelability, and event-state projection:
+M03 owns pre-replay event-universe materialization, event taxonomy governance,
+taxonomy-node/effect-model-node modelability, and event-state projection:
 
 - acquire or materialize the full fold point-in-time event universe before
   replay;
-- define event ontology, event-family, child-family, and dossier boundaries;
-- preserve taxonomy version, ancestor chain, active node, and fallback lineage;
-- decide whether the family can be modeled at all;
+- define event taxonomy, node boundaries, child-node rules, and dossier boundaries;
+- preserve taxonomy version, ancestor chain, semantic node, effect-model node, and fallback lineage;
+- decide whether the effect-model node can be modeled at all;
 - choose `projection_mode`;
 - choose allowed `probability_function_class`;
 - define required clocks, scales, phase vocabulary, scope vocabulary, and
   channel vocabulary;
-- require multiple PIT-valid same-family or same-dossier observations before
+- require multiple PIT-valid same-node or same-dossier observations before
   assigning a probability-function class;
 - verify source coverage, dedupe, matched controls, overlap/confounder status,
   and leakage gates before Codex semantic review.
