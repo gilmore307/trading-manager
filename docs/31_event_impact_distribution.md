@@ -101,6 +101,27 @@ An unrestricted `event_delta_probability` is not a valid M03 output because it
 hides whether the event changed risk shape, confidence, gates, or the center of
 the distribution.
 
+## M04 Absorption Contract
+
+M04 consumes M03 through two explicit routes:
+
+1. `center_shift` route. If the effect-model node has an identifiable
+   probability function and approved center channels, M04 may absorb
+   `mean_shift`, `mode_shift`, and `directional_contribution` into the
+   distribution center: edge direction, expected return, thesis mean/mode, and
+   action confidence after calibration.
+2. `risk_shape` route. If the semantic node is too sparse or unstable for a
+   center-moving probability function, M03 keeps the fine semantic
+   classification but falls back to the deepest evidence-supported
+   effect-model node. M04 may absorb only variance, tail, skew, confidence, and
+   gate channels. These channels widen or skew the distribution, lower
+   confidence, raise thresholds, reduce exposure permission, or block entries;
+   they must not move the most likely direction by themselves.
+
+Events that cannot support either route remain `context_only_projection` or
+`do_not_model` and may only produce display/audit context or no downstream
+model use.
+
 ## Projection Modes
 
 M03 assigns exactly one projection mode for an event family after deterministic
