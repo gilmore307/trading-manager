@@ -10,7 +10,7 @@ SQL table names, storage paths, and registry rows.
 | M01 | BackgroundContextModel | `model_01_background_context`, `background_context_model`, `background_context_state` |
 | M02 | TargetStateModel | `model_02_target_state`, `target_state_model`, `target_context_state` |
 | M03 | EventStateModel | `model_03_event_state`, `event_state_model`, `event_state_vector` |
-| M04 | UnifiedDecisionModel | `model_04_unified_decision`, `unified_decision_model`, `unified_decision_vector` |
+| M04 | UnifiedDecisionModel | `model_04_unified_decision`, `unified_decision_model`, `thesis_distribution_surface`, derived `unified_decision_vector` |
 | M05 | OptionExpressionModel | `model_05_option_expression`, `option_expression_model`, `option_expression_plan` |
 
 ## Compatibility Physical Tokens

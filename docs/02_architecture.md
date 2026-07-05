@@ -20,7 +20,7 @@ contract lives in `docs/31_event_impact_distribution.md`.
 | M01 | `BackgroundContextModel` | `model_01_background_context`, `background_context_model` | Broad market, sector, and industry background context | `background_context_state` | No target/action/option/event-family choice. |
 | M02 | `TargetStateModel` | `model_02_target_state`, `target_state_model` | Anonymous target state and tradability context | `target_context_state` | No final action, sizing, or option contract. |
 | M03 | `EventStateModel` | `model_03_event_state`, `event_state_model` | Accepted event-family exposure, uncertainty, and event-conditioned response context | `event_state_vector` | Does not mutate event-family identity, impact-window definitions, or action policy. |
-| M04 | `UnifiedDecisionModel` | `model_04_unified_decision`, `unified_decision_model` | Direct-underlying utility decision, no-trade probability, exposure intent, and action heads | `unified_decision_vector` | Not broker routing, order construction, or account mutation. |
+| M04 | `UnifiedDecisionModel` | `model_04_unified_decision`, `unified_decision_model` | Final direct-underlying posterior probability surface plus derived decision summary | `thesis_distribution_surface`, derived `unified_decision_vector` | Not broker routing, order construction, or account mutation. |
 | M05 | `OptionExpressionModel` | `model_05_option_expression`, `option_expression_model` | Conditional option-expression context after M04 direct-underlying intent | `option_expression_plan` | Not execution and not broker/account mutation. |
 
 ## Physical Surface Rule

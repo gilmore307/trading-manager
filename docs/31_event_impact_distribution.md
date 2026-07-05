@@ -30,9 +30,11 @@ Y_t = impact_scale_t * direction_state_t * magnitude_state_t
 - `time_scale_t` owns the x-axis unit, such as minutes, hours, trading days, or
   event-family phase clocks.
 
-M04 and M05 consume distribution summaries such as mean, quantiles, sign
-probabilities, uncertainty mass, and adverse/favorable tail probabilities. They
-do not consume raw event text.
+M04 consumes distribution summaries such as mean, quantiles, sign probabilities,
+uncertainty mass, and adverse/favorable tail probabilities. It uses M03 as an
+event distribution operator inside the final direct-underlying posterior
+probability function. M05 consumes the resulting M04 thesis surface for
+expression translation. Neither layer consumes raw event text.
 
 ## End-To-End Event Route
 
@@ -102,6 +104,17 @@ hides whether the event changed risk shape, confidence, gates, or the center of
 the distribution.
 
 ## M04 Absorption Contract
+
+M04's primary model output is the final posterior probability function:
+
+```text
+D4(y, tau) = calibrate(A03(A01(D2(y, tau))))
+```
+
+- `D2`: M02 target base distribution.
+- `A01`: M01 market/sector background distribution operator.
+- `A03`: M03 event distribution operator.
+- `D4`: M04 `thesis_distribution_surface`.
 
 M04 consumes M03 through two explicit routes:
 
