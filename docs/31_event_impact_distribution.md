@@ -108,12 +108,12 @@ the distribution.
 M04's primary model output is the final posterior probability function:
 
 ```text
-D4(y, tau) = calibrate(A03(A01(D2(y, tau))))
+D4(y, tau) = calibrate(A3(A1(D2(y, tau))))
 ```
 
 - `D2`: M02 target base distribution.
-- `A01`: M01 market/sector background distribution operator.
-- `A03`: M03 event distribution operator.
+- `A1`: M01 market/sector background distribution operator.
+- `A3`: M03 event distribution operator.
 - `D4`: M04 `thesis_distribution_surface`.
 
 M04 consumes M03 through two explicit routes:
