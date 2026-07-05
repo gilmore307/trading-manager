@@ -356,12 +356,22 @@ class ModelGroupAttributionTests(unittest.TestCase):
             self.assertEqual(first_layer_row["target_ref"], "")
             self.assertEqual(first_layer_row["correctness_class"], "indeterminate")
             self.assertEqual(first_layer_row["acceptability_class"], "indeterminate")
-            self.assertEqual(first_layer_row["scoring_status"], "full_trace_unscored_pending_outcome_label_join")
+            self.assertEqual(first_layer_row["scoring_status"], "missing_independent_layer_review_label")
             self.assertIsNone(first_layer_row["regret_to_best_available"])
             self.assertIsNone(first_layer_row["impact_normalized_severity_score"])
             self.assertEqual(
                 first_layer_row["classification_basis"],
-                "M01 background state is reviewed at replay-time granularity; joined context outcome label is not published yet",
+                "M01 independent review requires a joined context outcome label for the same replay-time "
+                "background state before M04 can inherit responsibility",
+            )
+            self.assertEqual(
+                first_layer_row["factor_ownership_policy"],
+                "M01 owns market/background factor evidence only; it must not include M02 target, "
+                "M03 event, M04 decision, or M05 expression evidence.",
+            )
+            self.assertIn(
+                "independently reviewed",
+                first_layer_row["fusion_responsibility_policy"],
             )
             self.assertEqual(
                 sum(1 for row in layer_review_rows if row["layer_id"] == "model_01_background_context"),

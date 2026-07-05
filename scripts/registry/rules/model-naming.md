@@ -81,11 +81,11 @@ Core scalar score tokens that are shared across repositories belong in `state_ve
 ## Boundary Rules
 
 - M01 conditions downstream work; it does not rank sectors, targets, strategies, positions, options, or actions.
-- M02 conditions target construction; it does not select final symbols or actions.
-- M02 builds target context; it does not emit alpha, exposure, option choice, or action.
-- M03 event-state produces the unified direct-underlying decision thesis; it does not route orders or mutate broker/account state.
-- M04 decision produces optional offline option-expression plans; it does not execute or mutate broker/account state.
-- M04 risk produces residual event governance/intervention evidence from the M04 thesis, with M05 expression context optional; it may warn/block/cap/review/propose promotion but cannot trade or auto-promote.
+- M02 owns target-state construction and candidate-ranking evidence; it does not choose final actions, option contracts, or broker routes.
+- M03 owns event-state and event-impact evidence; it does not produce the unified direct-underlying decision thesis, choose actions, or mutate event-family parameters.
+- M04 owns calibrated fusion of M01-M03 factors, direct-underlying decision thesis, no-trade thresholding, and action eligibility; it does not execute or mutate broker/account state.
+- M05 owns optional offline option-expression/payoff guidance after the M04 thesis; it does not relitigate M04 target direction, execute orders, or mutate broker/account state.
+- Replay review owns post-replay residual attribution and event-attribution diagnostics; it is not a separate model layer and must not mutate same-fold M03 inputs.
 
 ## Registry Review Checklist
 

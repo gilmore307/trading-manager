@@ -46,6 +46,23 @@ All model groups use the same model-task lifecycle vocabulary: data acquisition,
 
 Manager owns the lifecycle state machine, gap discovery, provider-dispatch boundary, retry/stop routing, artifact references, point-in-time/leakage gates, and readiness projection. Model-group code owns domain-specific implementation behind those declared contracts. M03 owns the pre-replay event-universe and event-impact lifecycle stages. Replay review owns post-replay event attribution as a diagnostic sub-surface, not as a separate model lifecycle.
 
+## D006B - M01-M03 require independent factor review before M04 blame
+
+M01, M02, and M03 are independently reviewable probabilistic factors, not a
+hidden serial mutation of one decision curve. M01 owns market/background factor
+evidence, M02 owns target residual factor evidence, and M03 owns event residual
+factor evidence. M04 owns calibrated fusion, interaction, final posterior,
+no-trade thresholding, and direct-underlying action eligibility.
+
+Replay review must publish M01-M05 layer rows with layer-local correctness given
+the fixed point-in-time inputs each layer actually received. M01-M03 rows need
+their own post-replay label joins before their local factor output can be called
+acceptable. Missing M01/M02/M03 joined labels are upstream review evidence gaps,
+not proof that M04 is responsible. Once M01, M02, and M03 are independently
+acceptable, poor final selected performance is attributed first to M04 fusion,
+weighting, calibration, thresholding, or timing unless an explicit interface or
+handoff defect is shown earlier.
+
 ## D007 - Reusable foundation catch-up is priority
 
 The scheduler should first advance reusable targetless foundation substrate before ordinary target-specific substrate work. Foundation substrate includes M01 market/cross-asset context, M02 broad sector-anchor and crypto-context evidence, and fold-scoped global or sector-scoped M03 event-observation context. M03 event-impact substrate must be collected for each fold because the accepted event observation pool can change across folds. Valid point-in-time provider data and deterministic features may be reused; dependent replay, attribution, evaluation, and promotion artifacts must be rebuilt when their substrate changes.

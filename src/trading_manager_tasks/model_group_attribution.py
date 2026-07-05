@@ -51,7 +51,11 @@ EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS = ("model_06_residual_event_governance",)
 REPLAY_LAYER_REVIEW_METHODS = {
     "model_01_background_context": {
         "metric_family": "background_context_state_quality",
-        "analysis_method": "replay_time_background_context_state_review_pending_joined_outcome_labels",
+        "analysis_method": "independent_background_factor_review_with_joined_outcome_labels",
+        "factor_ownership_policy": (
+            "M01 owns market/background factor evidence only; it must not include M02 target, "
+            "M03 event, M04 decision, or M05 expression evidence."
+        ),
         "decision_time_input_fields": [
             "state_quality_score",
             "market_risk_stress_score",
@@ -61,7 +65,11 @@ REPLAY_LAYER_REVIEW_METHODS = {
     },
     "model_02_target_state": {
         "metric_family": "target_candidate_selection_quality",
-        "analysis_method": "full_trace_same_timestamp_candidate_selection_review_pending_joined_outcome_labels",
+        "analysis_method": "independent_target_factor_review_with_same_timestamp_candidate_labels",
+        "factor_ownership_policy": (
+            "M02 owns target residual factor evidence only; upstream M01 state may condition "
+            "applicability but must not be re-counted as target alpha."
+        ),
         "decision_time_input_fields": [
             "model_rank_within_timestamp",
             "target_direction_score_1D",
@@ -72,7 +80,11 @@ REPLAY_LAYER_REVIEW_METHODS = {
     },
     "model_03_event_state": {
         "metric_family": "event_state_risk_pressure_quality",
-        "analysis_method": "event_pool_event_state_review_pending_joined_outcome_labels",
+        "analysis_method": "independent_event_factor_review_with_event_outcome_labels",
+        "factor_ownership_policy": (
+            "M03 owns event residual factor evidence only; M01/M02 state may condition applicability "
+            "but market and target base effects must not be re-counted."
+        ),
         "decision_time_input_fields": [
             "event_ref",
             "normalized_event_type",
@@ -88,6 +100,10 @@ REPLAY_LAYER_REVIEW_METHODS = {
     "model_04_unified_decision": {
         "metric_family": "underlying_action_quality",
         "analysis_method": "post_replay_directional_underlying_label_review",
+        "factor_ownership_policy": (
+            "M04 owns calibrated fusion, interaction, final action probability, and thresholding "
+            "after M01-M03 factor review."
+        ),
         "decision_time_input_fields": [
             "resolved_underlying_action_type",
             "resolved_action_side",
@@ -98,6 +114,10 @@ REPLAY_LAYER_REVIEW_METHODS = {
     "model_05_option_expression": {
         "metric_family": "option_expression_quality",
         "analysis_method": "selected_option_expression_return_and_direction_consistency_review",
+        "factor_ownership_policy": (
+            "M05 owns expression/payoff translation after the M04 thesis; it must not relitigate "
+            "target-level M04 direction."
+        ),
         "decision_time_input_fields": [
             "selected_expression_type",
             "selected_contract_ref",
@@ -1208,7 +1228,7 @@ def _layer_review_row(
     return {
         "contract_type": REPLAY_LAYER_REVIEW_ROW_CONTRACT_TYPE,
         "stage_id": "model_group.replay_review",
-        "review_policy_version": "m01_m03_full_trace_m04_m05_reached_layer_review_v1",
+        "review_policy_version": "m01_m03_independent_factor_m04_fusion_review_v1",
         "review_id": f"replay_layer_review_{source_index:08d}_{layer_order:02d}",
         "source_decision_id": source_id,
         "source_decision_index": source_index,
@@ -1232,6 +1252,19 @@ def _layer_review_row(
         "downstream_review_input_policy": "judge_layer_only_against_received_decision_time_inputs",
         "upstream_error_isolation_scope": "attribute_upstream_defects_to_earliest_layer_or_boundary",
         "responsibility_assignment_policy": "layer_local_correctness_given_received_inputs",
+        "factor_ownership_policy": method.get(
+            "factor_ownership_policy",
+            "layer output must stay within its declared evidence boundary",
+        ),
+        "fusion_responsibility_policy": (
+            "M04 is responsible for fusion/interaction/final threshold errors only after "
+            "M01-M03 independent factor rows are acceptable"
+        )
+        if layer_id == "model_04_unified_decision"
+        else (
+            "This layer is independently reviewed for its own factor output; downstream M04 may "
+            "consume it but must not hide or duplicate its evidence contribution"
+        ),
         "layer_id": layer_id,
         "layer_label": layer_label,
         "layer_order": layer_order,
@@ -1298,13 +1331,13 @@ def _layer_review_classification(
 
 def _m01_background_context_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
     if _is_m01_background_context_time_state_row(row):
-        return _unscored_full_trace_classification(
+        return _missing_independent_factor_label_classification(
             candidate_set_scope="point_in_time_background_context_state",
             chosen_action="accept_background_context_state",
-            basis="M01 background state is reviewed at replay-time granularity; joined context outcome label is not published yet",
+            basis="M01 independent review requires a joined context outcome label for the same replay-time background state before M04 can inherit responsibility",
         )
     if _is_model_candidate_trace_row(row):
-        return _unscored_full_trace_classification(
+        return _invalid_layer_trace_classification(
             candidate_set_scope="invalid_m01_target_candidate_trace",
             chosen_action="invalid_target_expanded_background_context_row",
             basis="M01 must not be target-expanded; candidate trace rows belong to M02 or later",
@@ -1336,10 +1369,10 @@ def _m02_target_state_classification(
     trace_row: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     if _is_model_candidate_trace_row(row):
-        return _unscored_full_trace_classification(
+        return _missing_independent_factor_label_classification(
             candidate_set_scope="point_in_time_visible_candidate_trace",
             chosen_action=f"score_visible_candidate:{row.get('target_ref') or row.get('target_symbol') or 'not_reported'}",
-            basis="M02 full trace row is not filtered by downstream selection; joined candidate forward-return label is not published yet",
+            basis="M02 independent review requires same-timestamp candidate forward-return labels before M04 can inherit responsibility",
         )
     rank = _safe_float((trace_row or {}).get("model_rank_within_timestamp"))
     score_available = _truthy((trace_row or {}).get("model_score_available"))
@@ -1383,13 +1416,13 @@ def _m02_target_state_classification(
 def _m03_event_state_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
     if _is_m03_event_pool_row(row):
         event_ref = str(diagnostics.get("event_ref") or row.get("event_ref") or "not_reported")
-        return _unscored_full_trace_classification(
+        return _missing_independent_factor_label_classification(
             candidate_set_scope="point_in_time_event_pool_event",
             chosen_action=f"publish_event_state:{event_ref}",
-            basis="M03 event state is reviewed one event-pool event per row; joined event outcome label is not published yet",
+            basis="M03 independent review requires joined event outcome labels for each point-in-time event-pool row before M04 can inherit responsibility",
         )
     if _is_model_candidate_trace_row(row):
-        return _unscored_full_trace_classification(
+        return _invalid_layer_trace_classification(
             candidate_set_scope="invalid_m03_target_candidate_trace",
             chosen_action="invalid_target_candidate_event_state_row",
             basis="M03 must be event-pool driven; candidate trace rows belong to M02 target state",
@@ -1493,22 +1526,43 @@ def _is_m03_event_pool_row(row: Mapping[str, Any]) -> bool:
     return str(row.get("contract_type") or "").strip() == "model_03_event_pool_event_row"
 
 
-def _unscored_full_trace_classification(*, candidate_set_scope: str, chosen_action: str, basis: str) -> dict[str, Any]:
+def _missing_independent_factor_label_classification(
+    *, candidate_set_scope: str, chosen_action: str, basis: str
+) -> dict[str, Any]:
     return {
         "candidate_set_scope": candidate_set_scope,
-        "effective_decision_status": "diagnostic_only",
+        "effective_decision_status": "missing_evidence",
         "chosen_action": chosen_action,
         "available_action": [chosen_action],
-        "best_available_action_by_future_outcome": "pending_joined_outcome_label",
+        "best_available_action_by_future_outcome": "missing_independent_layer_outcome_label",
         "chosen_action_return": None,
         "best_available_action_return": None,
         "correctness_class": "indeterminate",
-        "scoring_status": "full_trace_unscored_pending_outcome_label_join",
+        "scoring_status": "missing_independent_layer_review_label",
         "classification_basis": basis,
         "regret_to_best_available": None,
         "impact_normalized_severity_score": None,
-        "failure_type": "pending_joined_outcome_label",
-        "first_gap_mechanism": "pending_outcome_label_join",
+        "failure_type": "missing_independent_layer_review_label",
+        "first_gap_mechanism": "missing_independent_layer_label_join",
+    }
+
+
+def _invalid_layer_trace_classification(*, candidate_set_scope: str, chosen_action: str, basis: str) -> dict[str, Any]:
+    return {
+        "candidate_set_scope": candidate_set_scope,
+        "effective_decision_status": "missing_evidence",
+        "chosen_action": chosen_action,
+        "available_action": [chosen_action],
+        "best_available_action_by_future_outcome": "invalid_layer_trace",
+        "chosen_action_return": None,
+        "best_available_action_return": None,
+        "correctness_class": "incorrect",
+        "scoring_status": "invalid_layer_review_boundary",
+        "classification_basis": basis,
+        "regret_to_best_available": None,
+        "impact_normalized_severity_score": None,
+        "failure_type": "invalid_layer_review_boundary",
+        "first_gap_mechanism": "wrong_layer_evidence_boundary",
     }
 
 
