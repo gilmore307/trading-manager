@@ -450,6 +450,12 @@ def _build_settlement_run(
     predictive_diagnostics = _predictive_diagnostics(scored_rows)
     calibration_diagnostics = _calibration_diagnostics(scored_rows)
     economic_diagnostics = _economic_diagnostics(net_returns=net_returns, realized_returns=realized_returns, costs=costs)
+    return_semantics_diagnostics = _return_semantics_diagnostics(
+        decision_rows=decision_rows,
+        realized_returns=realized_returns,
+        costs=costs,
+        net_returns=net_returns,
+    )
     data_integrity_diagnostics = _data_integrity_diagnostics(raw_decision_rows=raw_decision_rows, decision_rows=decision_rows)
     benchmark_returns_by_month, benchmark_diagnostics = _benchmark_returns_by_month(
         scored_rows,
@@ -473,6 +479,14 @@ def _build_settlement_run(
         economic_diagnostics=economic_diagnostics,
     )
     high_score_tail_risk_diagnostics = _high_score_tail_risk_diagnostics(
+        decision_rows=decision_rows,
+        net_returns=net_returns,
+    )
+    m05_expression_mechanics_diagnostics = _m05_expression_mechanics_diagnostics(
+        decision_rows=decision_rows,
+        net_returns=net_returns,
+    )
+    m04_m05_bridge_diagnostics = _m04_m05_bridge_diagnostics(
         decision_rows=decision_rows,
         net_returns=net_returns,
     )
@@ -563,12 +577,15 @@ def _build_settlement_run(
         "economic_diagnostics": economic_diagnostics,
         "data_integrity_diagnostics": data_integrity_diagnostics,
         "decision_variable_schema_diagnostics": decision_variable_schema_diagnostics,
+        "return_semantics_diagnostics": return_semantics_diagnostics,
         "scorecards": scorecards,
         "evaluation_disagreement_report": disagreement_report,
         "temporal_stability_diagnostics": temporal_stability_diagnostics,
         "benchmark_diagnostics": benchmark_diagnostics,
         "baseline_comparison_diagnostics": baseline_comparison_diagnostics,
         "high_score_tail_risk_diagnostics": high_score_tail_risk_diagnostics,
+        "m05_expression_mechanics_diagnostics": m05_expression_mechanics_diagnostics,
+        "m04_m05_bridge_diagnostics": m04_m05_bridge_diagnostics,
         "uncertainty_diagnostics": {
             "available": False,
             "reason": "block bootstrap confidence intervals require multiple completed comparable folds",
@@ -1424,6 +1441,77 @@ def _economic_diagnostics(*, net_returns: Sequence[float], realized_returns: Seq
     }
 
 
+def _return_semantics_diagnostics(
+    *,
+    decision_rows: Sequence[Mapping[str, Any]],
+    realized_returns: Sequence[float],
+    costs: Sequence[float],
+    net_returns: Sequence[float],
+) -> dict[str, Any]:
+    gross_priority = ("net_return", "realized_return", "candidate_return")
+    cost_priority = ("cost", "trading_cost", "cost_drag")
+    capital_fields = ("capital_return", "capital_pnl", "capital_return_total", "portfolio_return", "portfolio_pnl")
+    gross_source_counts = _value_counts(_first_present_key(row, gross_priority) or "missing" for row in decision_rows)
+    cost_source_counts = _value_counts(_first_present_key(row, cost_priority) or "missing" for row in decision_rows)
+    capital_field_counts = {
+        field: sum(1 for row in decision_rows if row.get(field) not in (None, ""))
+        for field in capital_fields
+    }
+    rows_using_net_return_as_gross = sum(1 for row in decision_rows if _first_present_key(row, gross_priority) == "net_return")
+    rows_with_net_return_and_cost = sum(
+        1
+        for row in decision_rows
+        if row.get("net_return") not in (None, "") and _first_float(row, *cost_priority) not in (None, 0.0)
+    )
+    gross_total = sum(realized_returns)
+    cost_total = sum(costs)
+    recomputed_net_total = gross_total - cost_total
+    published_net_total = sum(net_returns)
+    issues: list[dict[str, Any]] = []
+    if rows_with_net_return_and_cost:
+        issues.append(
+            {
+                "issue_code": "net_return_field_with_nonzero_cost",
+                "row_count": rows_with_net_return_and_cost,
+                "severity": "warning",
+                "detail": "evaluation treats the first available return field as gross and subtracts cost; net_return source rows need audit for possible double cost subtraction",
+            }
+        )
+    if not any(capital_field_counts.values()):
+        issues.append(
+            {
+                "issue_code": "capital_return_fields_missing",
+                "row_count": len(decision_rows),
+                "severity": "notice",
+                "detail": "this replay evaluation cannot validate UI or external capital-return summaries from decision rows",
+            }
+        )
+    delta = published_net_total - recomputed_net_total
+    if abs(delta) > 1e-9:
+        issues.append({"issue_code": "net_return_recompute_mismatch", "delta": _round_metric(delta), "severity": "warning"})
+    status = "warning" if any(issue.get("severity") == "warning" for issue in issues) else "passed"
+    return {
+        "contract_type": "return_semantics_diagnostic",
+        "status": status,
+        "row_count": len(decision_rows),
+        "return_formula": "first_available(net_return, realized_return, candidate_return) - first_available(cost, trading_cost, cost_drag)",
+        "gross_return_source_priority": list(gross_priority),
+        "cost_source_priority": list(cost_priority),
+        "gross_return_source_counts": gross_source_counts,
+        "cost_source_counts": cost_source_counts,
+        "capital_field_counts": capital_field_counts,
+        "capital_return_status": "available" if any(capital_field_counts.values()) else "unavailable",
+        "rows_using_net_return_as_gross": rows_using_net_return_as_gross,
+        "potential_double_cost_row_count": rows_with_net_return_and_cost,
+        "gross_return_total": _round_metric(gross_total),
+        "cost_total": _round_metric(cost_total),
+        "published_net_return_total": _round_metric(published_net_total),
+        "recomputed_net_return_total": _round_metric(recomputed_net_total),
+        "recompute_delta": _round_metric(delta),
+        "issues": issues,
+    }
+
+
 def _high_score_tail_risk_diagnostics(
     *,
     decision_rows: Sequence[Mapping[str, Any]],
@@ -1499,6 +1587,163 @@ def _high_score_tail_risk_diagnostics(
             "regime_event_miss": ["m06_event_overlay", "regime_state", "co_event_controls"],
         },
         "gate_failures": gate_failures,
+        "material_regressions": material_regressions,
+    }
+
+
+def _m05_expression_mechanics_diagnostics(
+    *,
+    decision_rows: Sequence[Mapping[str, Any]],
+    net_returns: Sequence[float],
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for row, net_return in zip(decision_rows, net_returns, strict=True):
+        diag = _nested_mapping(row, "model_layer_diagnostics", "model_05_option_expression")
+        if not diag:
+            continue
+        before = _finite_float(diag.get("candidate_count_before_filter"))
+        after = _finite_float(diag.get("candidate_count_after_filter"))
+        eligible = _finite_float(diag.get("eligible_candidate_count"))
+        score = _score(row)
+        rows.append(
+            {
+                "before": before,
+                "after": after,
+                "eligible": eligible,
+                "net_return": float(net_return),
+                "score": score,
+                "expression_type": str(diag.get("selected_expression_type") or row.get("selected_option_expression_type") or "unknown"),
+                "route": str(diag.get("asset_expression_route") or "unknown"),
+                "surface_status": str(diag.get("option_surface_status") or row.get("option_surface_status") or "unknown"),
+                "selection_gate_status": str(diag.get("selection_gate_status") or "unknown"),
+                "source_unavailable_reason": str(diag.get("source_unavailable_reason") or "none"),
+                "selected_contract_available": bool(diag.get("selected_contract_ref") or row.get("selected_option_contract_ref")),
+                "dte": _selected_option_contract_dte(row),
+                "selected_mid": _finite_float(diag.get("selected_contract_mid_price")),
+            }
+        )
+    row_count = len(rows)
+    singleton_rows = [row for row in rows if row["after"] is not None and row["after"] <= 1]
+    zero_eligible_rows = [row for row in rows if row["eligible"] is not None and row["eligible"] <= 0]
+    high_score_rows = [row for row in rows if row["score"] is not None and row["score"] >= HIGH_SCORE_TAIL_RISK_THRESHOLD]
+    high_score_losses = [row for row in high_score_rows if row["net_return"] < 0]
+    high_score_singleton_losses = [row for row in high_score_losses if row["after"] is not None and row["after"] <= 1]
+    expression_counts = _value_counts(row["expression_type"] for row in rows)
+    dominant_expression, dominant_expression_count = _dominant_count(expression_counts)
+    singleton_rate = len(singleton_rows) / row_count if row_count else 0.0
+    dominant_expression_rate = dominant_expression_count / row_count if row_count else 0.0
+    material_regressions: list[str] = []
+    if row_count and singleton_rate >= 0.75:
+        material_regressions.append("M05 filters collapse most optionable selections to one or zero eligible contracts")
+    if row_count and dominant_expression_rate >= 0.90 and dominant_expression != "unknown":
+        material_regressions.append(f"M05 expression selection is dominated by {dominant_expression}")
+    if len(high_score_singleton_losses) >= MIN_HIGH_SCORE_TAIL_LOSS_COUNT:
+        material_regressions.append("high-score losses frequently occur after M05 singleton filtering")
+    return {
+        "contract_type": "m05_expression_mechanics_diagnostic",
+        "row_count": row_count,
+        "diagnostic_status": "available" if row_count else "unavailable",
+        "candidate_count_before_filter": _numeric_summary(row["before"] for row in rows),
+        "candidate_count_after_filter": _numeric_summary(row["after"] for row in rows),
+        "eligible_candidate_count": _numeric_summary(row["eligible"] for row in rows),
+        "filter_elimination_rate": _numeric_summary(
+            1.0 - (float(row["after"]) / float(row["before"]))
+            for row in rows
+            if row["before"] not in (None, 0.0) and row["after"] is not None
+        ),
+        "singleton_after_filter_count": len(singleton_rows),
+        "singleton_after_filter_rate": _round_metric(singleton_rate) if row_count else None,
+        "zero_eligible_count": len(zero_eligible_rows),
+        "zero_eligible_rate": _round_metric(len(zero_eligible_rows) / row_count) if row_count else None,
+        "selected_contract_available_count": sum(1 for row in rows if row["selected_contract_available"]),
+        "expression_type_counts": expression_counts,
+        "dominant_expression_type": dominant_expression,
+        "dominant_expression_rate": _round_metric(dominant_expression_rate) if row_count else None,
+        "asset_expression_route_counts": _value_counts(row["route"] for row in rows),
+        "option_surface_status_counts": _value_counts(row["surface_status"] for row in rows),
+        "selection_gate_status_counts": _value_counts(row["selection_gate_status"] for row in rows),
+        "source_unavailable_reason_counts": _value_counts(row["source_unavailable_reason"] for row in rows),
+        "selected_contract_dte": _numeric_summary(row["dte"] for row in rows),
+        "selected_contract_mid_price": _numeric_summary(row["selected_mid"] for row in rows),
+        "high_score_row_count": len(high_score_rows),
+        "high_score_loss_count": len(high_score_losses),
+        "high_score_singleton_loss_count": len(high_score_singleton_losses),
+        "material_regressions": material_regressions,
+    }
+
+
+def _m04_m05_bridge_diagnostics(
+    *,
+    decision_rows: Sequence[Mapping[str, Any]],
+    net_returns: Sequence[float],
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    for row, net_return in zip(decision_rows, net_returns, strict=True):
+        m04 = _nested_mapping(row, "model_layer_diagnostics", "model_04_unified_decision")
+        m05 = _nested_mapping(row, "model_layer_diagnostics", "model_05_option_expression")
+        if not m04 or not m05:
+            continue
+        m04_scores = m04.get("dominant_horizon_scores")
+        if not isinstance(m04_scores, Mapping):
+            m04_scores = {}
+        score = _score(row)
+        rows.append(
+            {
+                "net_return": float(net_return),
+                "score": score,
+                "m04_action": str(m04.get("resolved_underlying_action_type") or row.get("action") or "unknown"),
+                "m04_side": str(m04.get("resolved_action_side") or _decision_intended_side(row)),
+                "m04_horizon": str(m04.get("dominant_horizon") or "unknown"),
+                "m05_expression_type": str(m05.get("selected_expression_type") or row.get("selected_option_expression_type") or "unknown"),
+                "m05_after": _finite_float(m05.get("candidate_count_after_filter")),
+                "m05_eligible": _finite_float(m05.get("eligible_candidate_count")),
+                "m05_mid": _finite_float(m05.get("selected_contract_mid_price")),
+                "m04_action_confidence_score": _finite_float(m04_scores.get("action_confidence_score")),
+                "m04_action_direction_score": _finite_float(m04_scores.get("action_direction_score")),
+                "m04_downside_risk_score": _finite_float(m04_scores.get("downside_risk_score")),
+                "m04_entry_quality_score": _finite_float(m04_scores.get("entry_quality_score")),
+                "m04_expected_return_score": _finite_float(m04_scores.get("expected_return_score")),
+                "m04_materiality_adjusted_action_score": _finite_float(m04_scores.get("materiality_adjusted_action_score")),
+                "m04_no_trade_probability_score": _finite_float(m04_scores.get("no_trade_probability_score")),
+                "m04_trade_intensity_score": _finite_float(m04_scores.get("trade_intensity_score")),
+            }
+        )
+    high_score_rows = [row for row in rows if row["score"] is not None and row["score"] >= HIGH_SCORE_TAIL_RISK_THRESHOLD]
+    high_score_losses = [row for row in high_score_rows if row["net_return"] < 0]
+    high_score_winners = [row for row in high_score_rows if row["net_return"] >= 0]
+    high_score_singleton_losses = [
+        row for row in high_score_losses if row["m05_after"] is not None and row["m05_after"] <= 1
+    ]
+    score_fields = (
+        "m04_action_confidence_score",
+        "m04_action_direction_score",
+        "m04_downside_risk_score",
+        "m04_entry_quality_score",
+        "m04_expected_return_score",
+        "m04_materiality_adjusted_action_score",
+        "m04_no_trade_probability_score",
+        "m04_trade_intensity_score",
+        "m05_mid",
+    )
+    high_score_score_gap = {field: _winner_loss_gap(high_score_winners, high_score_losses, field) for field in score_fields}
+    material_regressions: list[str] = []
+    if len(high_score_losses) >= MIN_HIGH_SCORE_TAIL_LOSS_COUNT:
+        material_regressions.append("M04 high-score decisions still produce material losses after M05 expression")
+    if len(high_score_singleton_losses) >= MIN_HIGH_SCORE_TAIL_LOSS_COUNT:
+        material_regressions.append("M04 high-score losses are coupled to M05 singleton contract selection")
+    return {
+        "contract_type": "m04_m05_bridge_diagnostic",
+        "row_count": len(rows),
+        "diagnostic_status": "available" if rows else "unavailable",
+        "m04_action_counts": _value_counts(row["m04_action"] for row in rows),
+        "m04_side_counts": _value_counts(row["m04_side"] for row in rows),
+        "m04_horizon_counts": _value_counts(row["m04_horizon"] for row in rows),
+        "m05_expression_type_counts": _value_counts(row["m05_expression_type"] for row in rows),
+        "high_score_row_count": len(high_score_rows),
+        "high_score_loss_count": len(high_score_losses),
+        "high_score_winner_count": len(high_score_winners),
+        "high_score_singleton_loss_count": len(high_score_singleton_losses),
+        "high_score_score_gap": high_score_score_gap,
         "material_regressions": material_regressions,
     }
 
@@ -2317,6 +2562,9 @@ def _build_promotion_review_packet(
     if gate_failures:
         blocking_issues.append("settlement gate failures: " + ", ".join(gate_failures))
     high_score_tail_risk = metrics.get("high_score_tail_risk_diagnostics")
+    m05_mechanics = metrics.get("m05_expression_mechanics_diagnostics")
+    m04_m05_bridge = metrics.get("m04_m05_bridge_diagnostics")
+    return_semantics = metrics.get("return_semantics_diagnostics")
     tail_risk_followups: list[str] = []
     tail_risk_regressions: list[str] = []
     if isinstance(high_score_tail_risk, Mapping):
@@ -2326,6 +2574,8 @@ def _build_promotion_review_packet(
             for cause_name, evidence_codes in unknown_evidence.items():
                 codes = ", ".join(_string_list(evidence_codes))
                 tail_risk_followups.append(f"attach {cause_name} evidence: {codes}")
+    m05_regressions = _string_list(m05_mechanics.get("material_regressions")) if isinstance(m05_mechanics, Mapping) else []
+    bridge_regressions = _string_list(m04_m05_bridge.get("material_regressions")) if isinstance(m04_m05_bridge, Mapping) else []
     blocking_issues.extend(
         [
             "missing anonymous comparison model result on the same benchmark contract",
@@ -2364,7 +2614,10 @@ def _build_promotion_review_packet(
             "baseline_return_total": metrics.get("baseline_return_total"),
             "excess_return_total": metrics.get("excess_return_total"),
             "max_drawdown": metrics.get("max_drawdown"),
+            "return_semantics_diagnostics": return_semantics,
             "high_score_tail_risk_diagnostics": high_score_tail_risk,
+            "m05_expression_mechanics_diagnostics": m05_mechanics,
+            "m04_m05_bridge_diagnostics": m04_m05_bridge,
             "hit_rate": metrics.get("hit_rate"),
             "payoff_ratio": metrics.get("payoff_ratio"),
             "turnover_proxy_count": metrics.get("turnover_proxy_count"),
@@ -2387,12 +2640,14 @@ def _build_promotion_review_packet(
             "evaluation_disagreement_report": metrics.get("evaluation_disagreement_report"),
         },
         "material_improvements": [f"settlement row count {metrics.get('decision_row_count')} is available"],
-        "material_regressions": gate_failures + tail_risk_regressions,
+        "material_regressions": gate_failures + tail_risk_regressions + m05_regressions + bridge_regressions,
         "blocking_issues": blocking_issues,
         "required_followups": [
             "provide blinded model_a/model_b comparison evidence on the frozen replay contract",
             "attach candidate config and rollback refs before shadow-readiness review",
             "attach first-run/query-count evidence for this candidate lineage",
+            "review M05 contract filtering, DTE, liquidity/spread, and singleton-selection mechanics",
+            "review M04 score calibration after M05 option-expression realization",
         ]
         + tail_risk_followups,
         "rationale": (
@@ -3144,12 +3399,74 @@ def _first_text(row: Mapping[str, Any], *names: str) -> str:
     return ""
 
 
+def _first_present_key(row: Mapping[str, Any], names: Sequence[str]) -> str | None:
+    for name in names:
+        if row.get(name) not in (None, ""):
+            return name
+    return None
+
+
 def _first_float(row: Mapping[str, Any], *names: str) -> float | None:
     for name in names:
         parsed = _finite_float(row.get(name))
         if parsed is not None:
             return parsed
     return None
+
+
+def _nested_mapping(row: Mapping[str, Any], *names: str) -> Mapping[str, Any]:
+    current: Any = row
+    for name in names:
+        if not isinstance(current, Mapping):
+            return {}
+        current = current.get(name)
+    return current if isinstance(current, Mapping) else {}
+
+
+def _finite_values(values: Iterable[Any]) -> tuple[float, ...]:
+    parsed: list[float] = []
+    for value in values:
+        finite = _finite_float(value)
+        if finite is not None:
+            parsed.append(finite)
+    return tuple(parsed)
+
+
+def _numeric_summary(values: Iterable[Any]) -> dict[str, Any]:
+    parsed = _finite_values(values)
+    if not parsed:
+        return {"count": 0, "min": None, "max": None, "mean": None}
+    ordered = sorted(parsed)
+    return {
+        "count": len(ordered),
+        "min": _round_metric(ordered[0]),
+        "max": _round_metric(ordered[-1]),
+        "mean": _round_metric(sum(ordered) / len(ordered)),
+        "median": _round_metric(ordered[len(ordered) // 2]),
+    }
+
+
+def _dominant_count(counts: Mapping[str, int]) -> tuple[str, int]:
+    if not counts:
+        return "unknown", 0
+    key, count = max(counts.items(), key=lambda item: (item[1], item[0]))
+    return str(key), int(count)
+
+
+def _winner_loss_gap(
+    winners: Sequence[Mapping[str, Any]],
+    losses: Sequence[Mapping[str, Any]],
+    field: str,
+) -> dict[str, Any]:
+    winner_mean = _mean(_finite_values(row.get(field) for row in winners))
+    loss_mean = _mean(_finite_values(row.get(field) for row in losses))
+    return {
+        "winner_mean": _round_metric(winner_mean) if winner_mean is not None else None,
+        "loss_mean": _round_metric(loss_mean) if loss_mean is not None else None,
+        "winner_minus_loss": _round_metric(winner_mean - loss_mean)
+        if winner_mean is not None and loss_mean is not None
+        else None,
+    }
 
 
 def _normalize_side(value: str) -> str:

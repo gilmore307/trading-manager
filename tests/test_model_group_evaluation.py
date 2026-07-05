@@ -485,6 +485,7 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertEqual(roc_curve[-1]["true_positive_rate"], 1.0)
             self.assertIn("calibration_diagnostics", metrics)
             self.assertIn("economic_diagnostics", metrics)
+            self.assertIn("return_semantics_diagnostics", metrics)
             self.assertIn("data_integrity_diagnostics", metrics)
             self.assertIn("decision_variable_schema_diagnostics", metrics)
             variable_diagnostics = metrics["decision_variable_schema_diagnostics"]
@@ -499,6 +500,8 @@ class ModelGroupEvaluationTests(unittest.TestCase):
             self.assertIn("scorecards", metrics)
             self.assertFalse(settlement["gate_failures"])
             self.assertEqual(metrics["high_score_tail_risk_diagnostics"]["high_score_filled_loss_count"], 0)
+            self.assertIn("m05_expression_mechanics_diagnostics", metrics)
+            self.assertIn("m04_m05_bridge_diagnostics", metrics)
             self.assertFalse(metrics["evaluation_disagreement_report"]["promotion_gate_basis"]["auroc_is_hard_gate"])
             self.assertIn("score_decile_return", metrics["scorecards"]["ranking_calibration"])
             self.assertEqual(metrics["scorecards"]["selection_quality"]["taken_good_count"], 20)
@@ -1012,6 +1015,98 @@ class ModelGroupEvaluationTests(unittest.TestCase):
 
         self.assertEqual(eligibility["guardrail_status"], "failed")
         self.assertEqual(eligibility["decision_status"], "rejected")
+
+    def test_m05_singleton_filter_and_m04_bridge_diagnostics_are_published(self):
+        rows = []
+        for index in range(6):
+            rows.append(
+                {
+                    "decision_id": f"m05_loss{index}",
+                    "timestamp": f"2021-01-0{index + 1}T16:00:00-05:00",
+                    "realized_return": -0.20,
+                    "baseline_return": 0.0,
+                    "cost": 0.001,
+                    "outcome_label": 0,
+                    "prediction_score": 0.86,
+                    "action": "open_long",
+                    "decision_status": "approved",
+                    "fill_status": "simulated_filled",
+                    "selected_option_contract_ref": "AAPL_2021-01-08_C_130",
+                    "selected_option_expression_type": "long_call",
+                    "model_layer_diagnostics": {
+                        "model_04_unified_decision": {
+                            "dominant_horizon": "10min",
+                            "resolved_action_side": "long",
+                            "resolved_underlying_action_type": "open_long",
+                            "dominant_horizon_scores": {
+                                "action_confidence_score": 0.65,
+                                "action_direction_score": 0.10,
+                                "downside_risk_score": 0.18,
+                                "entry_quality_score": 0.88,
+                                "expected_return_score": 0.04,
+                                "materiality_adjusted_action_score": 0.31,
+                                "no_trade_probability_score": 0.32,
+                                "trade_intensity_score": 0.07,
+                            },
+                        },
+                        "model_05_option_expression": {
+                            "asset_expression_route": "listed_option_contract",
+                            "candidate_count_before_filter": 16,
+                            "candidate_count_after_filter": 1,
+                            "eligible_candidate_count": 1,
+                            "option_surface_status": "optionable_chain_available",
+                            "selection_gate_status": "passed",
+                            "selected_contract_mid_price": 2.50,
+                            "selected_contract_ref": "AAPL_2021-01-08_C_130",
+                            "selected_expression_type": "long_call",
+                        },
+                    },
+                }
+            )
+        for index in range(6):
+            row = dict(rows[-1])
+            row["decision_id"] = f"m05_win{index}"
+            row["timestamp"] = f"2021-02-0{index + 1}T16:00:00-05:00"
+            row["realized_return"] = 0.25
+            row["outcome_label"] = 1
+            row["prediction_score"] = 0.861
+            row["selected_option_contract_ref"] = "AAPL_2021-02-05_C_130"
+            row["model_layer_diagnostics"] = json.loads(json.dumps(row["model_layer_diagnostics"]))
+            row["model_layer_diagnostics"]["model_05_option_expression"]["selected_contract_ref"] = "AAPL_2021-02-05_C_130"
+            rows.append(row)
+
+        settlement = _build_settlement_run(
+            fold_id="fold_m05_singleton",
+            target_symbol="AAPL",
+            candidate_model_ref="storage://candidate/m05-singleton",
+            replay_contract_ref="trading-evaluation/replays/promotion_replay_candidate_policy.json",
+            replay_result_ref="storage://replay/m05-singleton",
+            decision_rows=rows,
+            created_at_utc="2026-07-04T13:00:00+00:00",
+        )
+
+        metrics = settlement["metrics"]
+        return_semantics = metrics["return_semantics_diagnostics"]
+        self.assertEqual(return_semantics["capital_return_status"], "unavailable")
+        self.assertEqual(return_semantics["potential_double_cost_row_count"], 0)
+        m05 = metrics["m05_expression_mechanics_diagnostics"]
+        self.assertEqual(m05["singleton_after_filter_count"], 12)
+        self.assertEqual(m05["dominant_expression_type"], "long_call")
+        self.assertIn("high-score losses frequently occur after M05 singleton filtering", m05["material_regressions"])
+        bridge = metrics["m04_m05_bridge_diagnostics"]
+        self.assertEqual(bridge["high_score_singleton_loss_count"], 6)
+        self.assertIn("M04 high-score losses are coupled to M05 singleton contract selection", bridge["material_regressions"])
+
+        packet = _build_promotion_review_packet(
+            settlement=settlement,
+            settlement_ref="/tmp/fold_settlement_run.json",
+            benchmark_contract_ref="trading-evaluation/replays/promotion_replay_candidate_policy.json",
+            event_attribution_summary_ref="/tmp/event_attribution_summary.json",
+            created_at_utc="2026-07-04T13:00:00+00:00",
+        )
+        self.assertIn("m05_expression_mechanics_diagnostics", packet["metrics_summary"])
+        self.assertIn("m04_m05_bridge_diagnostics", packet["metrics_summary"])
+        self.assertIn("high-score losses frequently occur after M05 singleton filtering", packet["material_regressions"])
 
     def test_high_score_tail_loss_inverted_score_gap_blocks_even_with_sufficient_sample(self):
         rows = []
