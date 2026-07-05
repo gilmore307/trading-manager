@@ -260,7 +260,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             )
             self.assertEqual(
                 report["decision_surface_summary"]["first_limiting_surface_counts"][
-                    "C09_settled_prediction_quality_surface"
+                    "C08_settled_prediction_quality_surface"
                 ],
                 2,
             )
@@ -454,7 +454,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     row["decision_id"]: row
                     for row in csv.DictReader(handle)
                 }
-            self.assertEqual(surface_rows["r1"]["first_limiting_surface"], "C09_settled_prediction_quality_surface")
+            self.assertEqual(surface_rows["r1"]["first_limiting_surface"], "C08_settled_prediction_quality_surface")
             self.assertEqual(surface_rows["r3"]["first_limiting_surface"], "C05_option_expression_surface")
             self.assertEqual(surface_rows["r4"]["first_limiting_surface"], "C04_underlying_decision_surface")
             self.assertEqual(surface_rows["r1"]["settled_metric_eligible"], "True")
@@ -471,18 +471,18 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 "diagnostic_or_decision_surface_without_explicit_ref",
             )
             self.assertEqual(mapping_rows["C04_underlying_decision_surface"]["first_limiting_surface_count"], "2")
-            self.assertEqual(mapping_rows["C09_settled_prediction_quality_surface"]["mapping_status"], "non_model_surface")
-            self.assertEqual(mapping_rows["C09_settled_prediction_quality_surface"]["first_limiting_surface_count"], "2")
+            self.assertEqual(mapping_rows["C08_settled_prediction_quality_surface"]["mapping_status"], "non_model_surface")
+            self.assertEqual(mapping_rows["C08_settled_prediction_quality_surface"]["first_limiting_surface_count"], "2")
             with (output_dir / "component_survival_quality_flow.csv").open(encoding="utf-8") as handle:
                 flow_rows = {
                     row["component_surface"]: row
                     for row in csv.DictReader(handle)
                 }
             self.assertEqual(flow_rows["C05_option_expression_surface"]["stage_verdict"], "first_observed_deterioration")
-            self.assertEqual(flow_rows["C09_settled_prediction_quality_surface"]["settled_metric_eligible_count"], "2")
-            self.assertEqual(flow_rows["C09_settled_prediction_quality_surface"]["tail_loss_count"], "1")
+            self.assertEqual(flow_rows["C08_settled_prediction_quality_surface"]["settled_metric_eligible_count"], "2")
+            self.assertEqual(flow_rows["C08_settled_prediction_quality_surface"]["tail_loss_count"], "1")
             self.assertEqual(
-                flow_rows["C09_settled_prediction_quality_surface"]["stage_verdict"],
+                flow_rows["C08_settled_prediction_quality_surface"]["stage_verdict"],
                 "insufficient_evidence",
             )
             with (output_dir / "component_review_packet.csv").open(encoding="utf-8") as handle:
@@ -966,7 +966,6 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             row["model_evidence_chain"] = [
                 "model_04_unified_decision",
                 "model_05_option_expression",
-                "model_06_residual_event_governance",
             ]
             row["model_layer_refs"] = {"model_04_unified_decision": "udv_fixture"}
             rows_path.write_text(json.dumps(row) + "\n", encoding="utf-8")
@@ -989,7 +988,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
             self.assertEqual(surface_row["first_limiting_surface"], "C06_selected_option_path_materialization")
             self.assertEqual(surface_row["model_04_unified_decision_ref_status"], "explicit_ref_and_evidence_chain")
             self.assertEqual(surface_row["model_05_option_expression_ref_status"], "evidence_chain_only")
-            self.assertEqual(surface_row["model_06_residual_event_governance_ref_status"], "evidence_chain_only")
+            self.assertFalse(any(key.startswith("model_06_") for key in surface_row))
             with (output_dir / "component_model_mapping.csv").open(encoding="utf-8") as handle:
                 mapping_rows = {
                     row["component_surface"]: row
@@ -999,10 +998,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 mapping_rows["C06_selected_option_path_materialization"]["mapping_status"],
                 "non_model_surface",
             )
-            self.assertEqual(
-                mapping_rows["C08_residual_event_governance_surface"]["mapping_status"],
-                "evidence_chain_only",
-            )
+            self.assertFalse(any("residual_event" in key for key in mapping_rows))
             with (output_dir / "component_survival_quality_flow.csv").open(encoding="utf-8") as handle:
                 flow_rows = {
                     row["component_surface"]: row
@@ -1048,7 +1044,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 ["C06_selected_option_path_materialization"],
             )
 
-    def test_component_review_packet_consumes_m05_and_m06_explicit_refs(self):
+    def test_component_review_packet_consumes_m05_without_retired_event_surface(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             rows_path = tmp / "decision_rows.jsonl"
@@ -1064,7 +1060,6 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     "model_03_event_state": f"m03://{row['decision_id']}",
                     "model_04_unified_decision": f"m04://{row['decision_id']}",
                     "model_05_option_expression": f"m05://{row['decision_id']}",
-                    "model_06_residual_event_governance": f"m06://{row['decision_id']}",
                 }
                 row["model_layer_diagnostics"]["model_01_background_context"] = {
                     "state_quality_score": 0.91,
@@ -1082,11 +1077,6 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                     "selection_gate_status": "passed",
                     "resolved_selection_score": row["prediction_score"],
                     "selected_contract_ref": row["selected_option_contract_ref"],
-                }
-                row["model_layer_diagnostics"]["model_06_residual_event_governance"] = {
-                    "action_surface_status": "measured",
-                    "intervention_action": "allow",
-                    "risk_level": "low",
                 }
             rows_path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
 
@@ -1124,11 +1114,7 @@ class ModelGroupLayerAttributionTests(unittest.TestCase):
                 packet_rows["C05_option_expression_surface"]["missing_review_outputs"],
             )
             self.assertEqual(packet_rows["C05_option_expression_surface"]["missing_review_outputs"], "")
-            self.assertEqual(
-                packet_rows["C08_residual_event_governance_surface"]["attribution_coverage_status"],
-                "explicit_asset_and_internal_diagnostics",
-            )
-            self.assertEqual(packet_rows["C08_residual_event_governance_surface"]["missing_review_outputs"], "")
+            self.assertFalse(any("residual_event" in key for key in packet_rows))
 
     def test_tail_loss_packet_keeps_numeric_zero_label_for_disagreement(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

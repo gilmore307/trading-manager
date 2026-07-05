@@ -1803,7 +1803,7 @@ def _scheduler_waiting_for_known_nonprogress_boundary(state: SchedulerDaemonStat
         "model_group_replay_dataset_acquisition_required",
         "model_group_evaluation_complete",
         "model_group_evaluation_executed",
-        "model_group_m06_event_evidence_missing",
+        "model_group_m03_event_evidence_missing",
         "model_group_residual_event_evidence_missing",
         "model_group_m03_event_feed_backfill_running",
         "model_group_m03_event_feed_provider_required",

@@ -96,7 +96,7 @@ class EventFamilyModelabilityNextActionTests(unittest.TestCase):
             self.assertEqual(route.route_status, "queued_for_program_enrichment")
             self.assertEqual(route.next_action_owner, "program_enrichment")
             payload = json.loads(Path(route.route_plan["action_artifact_path"]).read_text(encoding="utf-8"))
-            self.assertEqual(payload["contract_type"], "model_06_event_family_structured_evidence_enrichment_plan")
+            self.assertEqual(payload["contract_type"], "model_03_event_family_structured_evidence_enrichment_plan")
             self.assertIn("actual/surprise fields when applicable", payload["required_outputs"])
 
     def test_missing_modelability_gates_writes_gate_build_receipt(self) -> None:
@@ -127,7 +127,7 @@ class EventFamilyModelabilityNextActionTests(unittest.TestCase):
             self.assertEqual(route.route_status, "blocked_missing_modelability_gate_inputs")
             self.assertEqual(route.next_action_owner, "program_modelability_gate_builder")
             payload = json.loads(Path(route.route_plan["action_artifact_path"]).read_text(encoding="utf-8"))
-            self.assertEqual(payload["contract_type"], "model_06_event_family_modelability_gate_build_receipt")
+            self.assertEqual(payload["contract_type"], "model_03_event_family_modelability_gate_build_receipt")
             self.assertIn("matched_control_gate", payload["missing_gates"])
             self.assertEqual(payload["gate_results"]["matched_control_gate"], "blocked_missing_gate_input_artifact")
             self.assertFalse(payload["codex_review_allowed"])
@@ -173,7 +173,7 @@ class EventFamilyModelabilityNextActionTests(unittest.TestCase):
 
             self.assertEqual(route.route_status, "parked_missing_expectation_baseline_source")
             payload = json.loads(Path(route.route_plan["action_artifact_path"]).read_text(encoding="utf-8"))
-            self.assertEqual(payload["contract_type"], "model_06_event_family_structured_evidence_gap_receipt")
+            self.assertEqual(payload["contract_type"], "model_03_event_family_structured_evidence_gap_receipt")
             self.assertEqual(payload["macro_release_result_counts"]["actual_value_count"], 1)
             self.assertEqual(payload["macro_release_result_counts"]["consensus_value_count"], 0)
 

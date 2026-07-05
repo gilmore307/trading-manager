@@ -244,7 +244,7 @@ def _recent_task_key(*, start: date, end: date, output_root: str) -> dict[str, A
             "bounded_recent_future_calendar_fetch",
             "append_to_storage_source_only",
             "no_website_url_persistence",
-            "no_m06_sql_materialization",
+            "no_m03_event_state_sql_materialization",
             "no_model_activation",
             "no_broker_execution",
         ],

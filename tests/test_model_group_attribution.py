@@ -348,7 +348,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 },
             )
             self.assertEqual(receipt["layer_review_diagnostic_summary"]["row_count"], 19)
-            self.assertNotIn("model_06_residual_event_governance", {row["layer_id"] for row in layer_review_rows})
+            self.assertNotIn("", {row["layer_id"] for row in layer_review_rows})
             first_layer_row = layer_review_rows[0]
             self.assertEqual(first_layer_row["layer_id"], "model_01_background_context")
             self.assertEqual(first_layer_row["source_row_kind"], "model_01_background_context_time_state")

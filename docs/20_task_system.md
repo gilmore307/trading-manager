@@ -122,14 +122,14 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    overblock/underblock behavior, option-expression drag, and event attribution.
    It consumes the fixed pre-replay M03 event ledger and writes event-attribution
    subartifacts inside the replay review run. It must not acquire provider data,
-   mutate the M03 ledger, or open a separate M06 scheduler stage.
+   mutate the M03 ledger, or open a separate event scheduler stage.
 6. Event-family modelability acquisition and evidence generation. When M03 must
    judge whether an event family can be described by an impact probability
    function, it uses the shared model-task lifecycle vocabulary: acquisition
    materializes bounded PIT event inputs, feature/evidence generation builds
    deterministic modelability gate inputs, and semantic review runs only after
    program gates make the packet admissible. It first creates a
-   `model_06_event_family_modelability_acquisition_plan`. The plan declares the
+   `model_03_event_family_modelability_acquisition_plan`. The plan declares the
    concrete event-family seed, same-family sample threshold, required canonical
    feeds, PIT window, and provider task keys. Source/category buckets such as
    `news`, `target_news_or_disclosure`, `scheduled_macro_release`, and `macro`
@@ -144,7 +144,7 @@ model-worker lane has no owner instead of falling back to a targetless fold.
    observation labels, acquisition filters, or dossier refs until reviewed
    evidence promotes a narrower child/dossier.
    Provider calls remain in the reviewed dispatcher. After acquisition, code
-   builds `model_06_event_family_modelability_evidence_packet` from acquired
+   builds `model_03_event_family_modelability_evidence_packet` from acquired
    same-family PIT observations. The packet must pass deterministic
    admissibility gates before Codex modelability review; mixed-family packets,
    packets missing structured event parameters, and packets missing

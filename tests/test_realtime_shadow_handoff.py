@@ -23,19 +23,19 @@ def _decision_input_snapshot() -> dict[str, object]:
             "C02",
             "Entry",
             ("model_03_event_state", "model_04_unified_decision"),
-            ("model_06_residual_event_governance",),
+            (),
         ),
         (
             "component_03_lifecycle",
             "C03",
             "Lifecycle",
             ("model_03_event_state", "model_04_unified_decision"),
-            ("model_06_residual_event_governance",),
+            (),
         ),
-        ("component_04_option_review", "C04", "Option Review", (), ("model_05_option_expression", "model_06_residual_event_governance")),
+        ("component_04_option_review", "C04", "Option Review", (), ("model_05_option_expression",)),
         ("component_05_order_intent", "C05", "Order Intent", (), ()),
         ("component_06_execution_gate", "C06", "Execution Gate", (), ()),
-        ("component_07_failure_review", "C07", "Failure Review", (), ("model_06_residual_event_governance",)),
+        ("component_07_failure_review", "C07", "Failure Review", (), ()),
     ]
     return {
         "contract_type": "execution_model_decision_input_snapshot",

@@ -21,7 +21,7 @@ from .request_payloads import DEFAULT_STORAGE_ROOT, build_request_task_payload, 
 
 DEFAULT_TARGET_SYMBOL = "AAPL"
 DEFAULT_TARGET_CIK = "0000320193"
-DEFAULT_REQUESTED_BY = "trading-manager.residual_event_governance_event_feed_backfill"
+DEFAULT_REQUESTED_BY = "trading-manager.m03_event_state_event_feed_backfill"
 REQUIRED_EVENT_FEED_IDS = (
     "03_feed_alpaca_news",
     "05_feed_gdelt_news",
@@ -203,7 +203,7 @@ def prepare_event_feed_backfill(
             )
         )
     return EventFeedBackfillSummary(
-        contract_type="manager_residual_event_governance_event_feed_backfill_preparation",
+        contract_type="manager_model_03_event_state_event_feed_backfill_preparation",
         start_month=start_month,
         end_month=end_month,
         target_symbol=target_symbol.upper(),

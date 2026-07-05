@@ -206,7 +206,6 @@ DECISION_SURFACE_COMPONENT_MATRIX_FIELDNAMES = [
     "model_03_event_state_ref_status",
     "model_04_unified_decision_ref_status",
     "model_05_option_expression_ref_status",
-    "model_06_residual_event_governance_ref_status",
     "model_04_score_coverage_count",
     "model_04_resolved_action",
     "model_04_reason_codes",
@@ -239,8 +238,7 @@ COMPONENT_SURFACE_ORDER = [
     "C05_option_expression_surface",
     "C06_selected_option_path_materialization",
     "C07_portfolio_execution_surface",
-    "C08_residual_event_governance_surface",
-    "C09_settled_prediction_quality_surface",
+    "C08_settled_prediction_quality_surface",
 ]
 COMPONENT_SURVIVAL_QUALITY_FLOW_FIELDNAMES = [
     "component_index",
@@ -304,8 +302,7 @@ COMPONENT_ROLE_BY_SURFACE = {
     "C05_option_expression_surface": "option_expression_selection",
     "C06_selected_option_path_materialization": "selected_contract_path_materialization",
     "C07_portfolio_execution_surface": "portfolio_execution_and_fill",
-    "C08_residual_event_governance_surface": "residual_event_governance",
-    "C09_settled_prediction_quality_surface": "settled_outcome_quality",
+    "C08_settled_prediction_quality_surface": "settled_outcome_quality",
 }
 OPERATION_COMPONENT_SPECS = [
     {
@@ -403,7 +400,7 @@ OPERATION_COMPONENT_ANALYSIS_METHODS = {
     "C07_failure_review_operation": {
         "analysis_method": "settled_failure_review_and_residual_gap_explanation_review",
         "evidence_role": "post_action_failure_review_and_settlement_evidence",
-        "label_role": "settled_outcomes_are_review_labels_not_m06_decision_inputs",
+        "label_role": "settled_outcomes_are_review_labels_not_model_decision_inputs",
     },
 }
 OPERATION_COMPONENT_OBJECTIVES = {
@@ -455,12 +452,7 @@ OPERATION_REVIEW_PROJECTION_BY_SURFACE = {
         "review_projection": "execution_fill",
         "review_projection_role": "fill_and_execution_gate",
     },
-    "C08_residual_event_governance_surface": {
-        "operation_component_id": "C07_failure_review_operation",
-        "review_projection": "residual_event_governance",
-        "review_projection_role": "post_action_event_governance_review",
-    },
-    "C09_settled_prediction_quality_surface": {
+    "C08_settled_prediction_quality_surface": {
         "operation_component_id": "C07_failure_review_operation",
         "review_projection": "settled_prediction_quality",
         "review_projection_role": "retrospective_settlement_quality",
@@ -1972,10 +1964,6 @@ def _m05_option_expression_diagnostics(row: Mapping[str, Any]) -> Mapping[str, A
     return ((row.get("model_layer_diagnostics") or {}).get("model_05_option_expression") or {})
 
 
-def _m06_diagnostics(row: Mapping[str, Any]) -> Mapping[str, Any]:
-    return ((row.get("model_layer_diagnostics") or {}).get("model_06_residual_event_governance") or {})
-
-
 def _m04_state(row: Mapping[str, Any]) -> str:
     diag = _m04_diagnostics(row)
     action = str(diag.get("resolved_underlying_action_type") or "unknown")
@@ -2181,10 +2169,6 @@ def _decision_surface_component_matrix_rows(rows: Sequence[Mapping[str, Any]]) -
                 "model_03_event_state_ref_status": _model_ref_status(row, "model_03_event_state"),
                 "model_04_unified_decision_ref_status": _model_ref_status(row, "model_04_unified_decision"),
                 "model_05_option_expression_ref_status": _model_ref_status(row, "model_05_option_expression"),
-                "model_06_residual_event_governance_ref_status": _model_ref_status(
-                    row,
-                    "model_06_residual_event_governance",
-                ),
                 "model_04_score_coverage_count": len(scores),
                 "model_04_resolved_action": _m04_state(row),
                 "model_04_reason_codes": ";".join(str(value) for value in (m04.get("reason_codes") or [])),
@@ -2217,7 +2201,7 @@ def _first_limiting_surface(row: Mapping[str, Any]) -> tuple[str, str]:
         return "C06_selected_option_path_materialization", "selected_option_contract_path_missing"
     if row.get("fill_status") != "simulated_filled":
         return "C07_portfolio_execution_surface", "selected_contract_not_filled"
-    return "C09_settled_prediction_quality_surface", "filled_and_settled"
+    return "C08_settled_prediction_quality_surface", "filled_and_settled"
 
 
 def _model_ref_status(row: Mapping[str, Any], model_layer: str) -> str:
@@ -2340,34 +2324,7 @@ def _component_model_mapping_rows(
                 "fixed_input_only": True,
             },
             {
-                "component_surface": "C08_residual_event_governance_surface",
-                "model_layer": "model_06_residual_event_governance",
-                "explicit_ref_count": _explicit_ref_count(rows, "model_06_residual_event_governance"),
-                "evidence_chain_count": sum(
-                    1 for row in rows if "model_06_residual_event_governance" in (row.get("model_evidence_chain") or [])
-                ),
-                "diagnostic_surface_count": _diagnostic_surface_count(rows, "model_06_residual_event_governance"),
-                "decision_surface_count": _decision_surface_count(rows, "model_06_residual_event_governance"),
-                "first_limiting_surface_count": sum(
-                    1
-                    for row in decision_surface_rows
-                    if row.get("first_limiting_surface") == "C08_residual_event_governance_surface"
-                ),
-                "settled_metric_eligible_count": _settled_metric_eligible_count(decision_surface_rows),
-                "mapping_status": _component_mapping_status(
-                    explicit_ref_count=_explicit_ref_count(rows, "model_06_residual_event_governance"),
-                    evidence_chain_count=sum(
-                        1
-                        for row in rows
-                        if "model_06_residual_event_governance" in (row.get("model_evidence_chain") or [])
-                    ),
-                    diagnostic_surface_count=_diagnostic_surface_count(rows, "model_06_residual_event_governance"),
-                    decision_surface_count=_decision_surface_count(rows, "model_06_residual_event_governance"),
-                ),
-                "fixed_input_only": True,
-            },
-            {
-                "component_surface": "C09_settled_prediction_quality_surface",
+                "component_surface": "C08_settled_prediction_quality_surface",
                 "model_layer": "",
                 "explicit_ref_count": 0,
                 "evidence_chain_count": 0,
@@ -2376,7 +2333,7 @@ def _component_model_mapping_rows(
                 "first_limiting_surface_count": sum(
                     1
                     for row in decision_surface_rows
-                    if row.get("first_limiting_surface") == "C09_settled_prediction_quality_surface"
+                    if row.get("first_limiting_surface") == "C08_settled_prediction_quality_surface"
                 ),
                 "settled_metric_eligible_count": _settled_metric_eligible_count(decision_surface_rows),
                 "mapping_status": "non_model_surface",
@@ -2411,8 +2368,6 @@ def _diagnostic_surface_count(rows: Sequence[Mapping[str, Any]], model_layer: st
         return sum(1 for row in rows if bool(_m04_diagnostics(row)))
     if model_layer == "model_05_option_expression":
         return sum(1 for row in rows if bool(_m05_diagnostics(row)))
-    if model_layer == "model_06_residual_event_governance":
-        return sum(1 for row in rows if bool(_m06_diagnostics(row)))
     return 0
 
 
@@ -2426,8 +2381,6 @@ def _decision_surface_count(rows: Sequence[Mapping[str, Any]], model_layer: str)
             if str(row.get("selected_option_contract_ref") or "").strip()
             or str(row.get("asset_expression_route") or "") == "option_expression_unfilled"
         )
-    if model_layer == "model_06_residual_event_governance":
-        return sum(1 for row in rows if bool(_m06_diagnostics(row)))
     return _explicit_ref_count(rows, model_layer)
 
 
@@ -2514,13 +2467,13 @@ def _component_survival_quality_flow_rows(
             for row in entered_rows
             if str(row.get("first_limiting_surface") or "") == component_surface
         ]
-        blocked_count = 0 if component_surface == "C09_settled_prediction_quality_surface" else len(first_limiting_rows)
+        blocked_count = 0 if component_surface == "C08_settled_prediction_quality_surface" else len(first_limiting_rows)
         censored_count = (
             len(first_limiting_rows)
             if component_surface == "C06_selected_option_path_materialization"
             else 0
         )
-        passed_rows = entered_rows if component_surface == "C09_settled_prediction_quality_surface" else [
+        passed_rows = entered_rows if component_surface == "C08_settled_prediction_quality_surface" else [
             row
             for row in entered_rows
             if str(row.get("first_limiting_surface") or "") != component_surface
@@ -2611,7 +2564,7 @@ def _component_survival_quality_flow_report(rows: Sequence[Mapping[str, Any]]) -
                     (
                         row.get("stage_verdict")
                         for row in rows
-                        if row.get("component_surface") == "C09_settled_prediction_quality_surface"
+                        if row.get("component_surface") == "C08_settled_prediction_quality_surface"
                     ),
                     "",
                 )
@@ -4428,11 +4381,6 @@ def _operation_component_missing_review_outputs(
     if component_id == "C06_execution_gate_operation" and not replay_receipt_available:
         missing.append("replay_execution_receipt")
     if component_id == "C07_failure_review_operation":
-        m06_mapping = mapping_by_surface.get("C08_residual_event_governance_surface") or {}
-        if int(m06_mapping.get("explicit_ref_count") or 0) <= 0:
-            missing.append("explicit_model_06_residual_event_governance_ref")
-        if int(m06_mapping.get("diagnostic_surface_count") or 0) <= 0:
-            missing.append("model_06_action_surface_diagnostics")
         if settled_metric_eligible_count <= 0:
             missing.append("settled_outcome_rows")
     return missing
@@ -4528,8 +4476,7 @@ def _component_internal_review_refs(*, component_surface: str, m05_unfilled_avai
             "portfolio_capacity_counterfactual_report.json",
             "row_counterfactual_attribution.csv",
         ],
-        "C08_residual_event_governance_surface": ["decision_surface_component_matrix.csv"],
-        "C09_settled_prediction_quality_surface": [
+        "C08_settled_prediction_quality_surface": [
             "component_survival_quality_flow.csv",
             "filled_score_bins.csv",
             "tail_loss_rows.csv",
@@ -4565,11 +4512,6 @@ def _component_missing_review_outputs(
             missing.append("model_05_alpha_or_selection_score_diagnostics")
         if int(mapping_row.get("diagnostic_surface_count") or 0) <= 0 and not m05_unfilled_available:
             missing.append("m05_candidate_set_and_selection_delta")
-    if component_surface == "C08_residual_event_governance_surface":
-        if int(mapping_row.get("explicit_ref_count") or 0) <= 0:
-            missing.append("explicit_model_06_residual_event_governance_ref")
-        if int(mapping_row.get("diagnostic_surface_count") or 0) <= 0:
-            missing.append("model_06_action_surface_diagnostics")
     if component_surface == "C07_portfolio_execution_surface" and int(mapping_row.get("decision_surface_count") or 0) <= 0:
         missing.append("portfolio_capacity_and_sizing_delta")
     return missing
@@ -4607,7 +4549,6 @@ def _component_changed_or_transformed_count(component_surface: str, input_count:
         "C05_option_expression_surface",
         "C06_selected_option_path_materialization",
         "C07_portfolio_execution_surface",
-        "C08_residual_event_governance_surface",
     }:
         return input_count
     return 0
@@ -4677,7 +4618,7 @@ def _component_flow_verdict(
         return "first_observed_deterioration", "rows_first_limited_at_component"
     if settled_count < 5 or post_bad_rate is None:
         return "insufficient_evidence", "too_few_settled_rows_for_quality_flow"
-    if component_surface == "C09_settled_prediction_quality_surface":
+    if component_surface == "C08_settled_prediction_quality_surface":
         if post_bad_rate > 0.5:
             return "first_observed_deterioration", "settled_survivor_cohort_bad_rate_above_half"
         if mean_realized_return is not None and mean_realized_return < 0:
@@ -7100,7 +7041,7 @@ def _tail_loss_row_classification(
     requires = [
         "feature_timing_or_leakage_requires_pit_feature_trace",
         "liquidity_spread_fill_realism_requires_bid_ask_depth_and_fill_model",
-        "regime_event_miss_requires_m06_event_overlay",
+        "regime_event_miss_requires_m03_event_state_trace",
     ]
     if label_return_disagreement:
         return "label_target_definition", secondary, requires
@@ -7153,7 +7094,7 @@ def _tail_loss_classification_summary(
         },
         "regime_event_miss": {
             "status": "unknown_requires_evidence",
-            "requires_evidence_codes": ["m06_event_overlay", "regime_state", "co_event_controls"],
+            "requires_evidence_codes": ["m03_event_state_trace", "regime_state", "co_event_controls"],
         },
         "model_overconfidence": {
             "status": "supported"

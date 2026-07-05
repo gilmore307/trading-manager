@@ -38,7 +38,7 @@ competing for host capacity.
 
 ## D006 - The manager model stack has five pre-replay models
 
-Manager recognizes the current pre-replay model stack as M01 BackgroundContext, M02 TargetState, M03 EventState, M04 UnifiedDecision, and M05 OptionExpression. Former M06 residual-event functions are no longer an independent model/task lane; their useful event-attribution role is embedded in replay review.
+Manager recognizes the current pre-replay model stack as M01 BackgroundContext, M02 TargetState, M03 EventState, M04 UnifiedDecision, and M05 OptionExpression. Event attribution is embedded in M03 event-state and replay review rather than an independent model/task lane.
 
 ## D006A - Model tasks share lifecycle stage semantics
 
@@ -96,7 +96,7 @@ normal review and acceptance route completes.
 
 ## D010 - Replay review owns post-replay event attribution
 
-Replay review governs post-replay event attribution only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It consumes replay-review evidence plus the fixed pre-replay M03 event-impact ledger to explain residual failures, missed events, overblocks, underblocks, and path deviations. It must not own pre-replay event-universe discovery, event-family modelability gates, event-impact training, provider acquisition, or a separate M06 scheduler stage. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
+Replay review governs post-replay event attribution only after concentrated live-flow replay has produced settled replay traces, failures, residuals, misses, or path deviations. It consumes replay-review evidence plus the fixed pre-replay M03 event-impact ledger to explain residual failures, missed events, overblocks, underblocks, and path deviations. It must not own pre-replay event-universe discovery, event-family modelability gates, event-impact training, provider acquisition, or a separate scheduler stage. M05 guidance/expression context is optional attribution context when available; crypto/direct-underlying-only routes must not require option-chain or option-expression refs.
 
 ## D011 - Agent model review is advisory and blinded
 

@@ -45,8 +45,8 @@ DEFAULT_TRADING_STORAGE_ROOT = data_storage_root()
 DEFAULT_TRADING_STORAGE_UNIVERSE = Path("/root/projects/trading-storage/main/shared/model_01_background_context_etf_universe.csv")
 DEFAULT_OUTPUT_ROOT = Path("runtime") / "model_03_event_impact" / "input_materialization"
 LAYER_TWO_MODEL_LAYER = "model_01_sector_context"
-DETECTOR_SOURCE = "m06_residual_event_governance_data_acquisition.equity_abnormal_activity"
-SOURCE = "m06_residual_event_governance_data_acquisition"
+DETECTOR_SOURCE = "m03_event_state_data_acquisition.equity_abnormal_activity"
+SOURCE = "m03_event_state_data_acquisition"
 EVENT_FEED_SQL_INPUTS = {
     "alpaca_news": {
         "table": "feed_03_alpaca_news",
@@ -262,7 +262,7 @@ def _run_detector(
     event_count = 0
     status = "prepared"
     if write:
-        command = [sys.executable, "-m", "data_source.m06_residual_event_governance_data_acquisition.equity_abnormal_activity", str(task_key_path), "--run-id", f"{run_id}_{symbol.lower()}"]
+        command = [sys.executable, "-m", "data_source.m03_event_state_data_acquisition.equity_abnormal_activity", str(task_key_path), "--run-id", f"{run_id}_{symbol.lower()}"]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs" / "detectors"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -688,7 +688,7 @@ def materialize_model_03_event_impact_inputs(
     source_receipt_path: str | None = None
     source_event_count = len(events)
     if write:
-        command = [sys.executable, "-m", "data_source.m06_residual_event_governance_data_acquisition", str(source_task_key_path), "--run-id", run_id]
+        command = [sys.executable, "-m", "data_source.m03_event_state_data_acquisition", str(source_task_key_path), "--run-id", run_id]
         result = subprocess.run(command, cwd=trading_data_root, env={**os.environ, "PYTHONPATH": "src"}, text=True, capture_output=True, check=False)
         log_dir = output_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)

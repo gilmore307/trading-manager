@@ -25,7 +25,7 @@ class EventFamilyModelabilityAcquisitionTests(unittest.TestCase):
                 write_files=True,
             )
 
-            self.assertEqual(plan.contract_type, "model_06_event_family_modelability_acquisition_plan")
+            self.assertEqual(plan.contract_type, "model_03_event_family_modelability_acquisition_plan")
             self.assertEqual(plan.event_family_id, "company_earnings_or_financial_results")
             self.assertEqual(plan.minimum_same_family_observations, 8)
             self.assertEqual(plan.provider_calls, 0)

@@ -31,9 +31,9 @@ from .event_family_modelability_evidence import (
 )
 from .storage_paths import manager_storage_root
 
-MODELABILITY_NEXT_ACTION_ROUTE_CONTRACT_TYPE = "model_06_event_family_modelability_next_action_route"
-MODELABILITY_NEXT_ACTION_SUMMARY_CONTRACT_TYPE = "model_06_event_family_modelability_next_action_summary"
-DEFAULT_NEXT_ACTION_ROOT = manager_storage_root() / "runtime" / "model_06_event_family_modelability" / "next_action_routes"
+MODELABILITY_NEXT_ACTION_ROUTE_CONTRACT_TYPE = "model_03_event_family_modelability_next_action_route"
+MODELABILITY_NEXT_ACTION_SUMMARY_CONTRACT_TYPE = "model_03_event_family_modelability_next_action_summary"
+DEFAULT_NEXT_ACTION_ROOT = manager_storage_root() / "runtime" / "model_03_event_family_modelability" / "next_action_routes"
 DEFAULT_EVENT_FAMILIES = (
     "company_earnings_or_financial_results",
     "target_product_price_change_news",
@@ -121,7 +121,7 @@ def _structured_enrichment_payload(packet: EventFamilyModelabilityEvidencePacket
     earnings_gap_counts = _earnings_structured_gap_counts(packet)
     if earnings_gap_counts:
         return {
-            "contract_type": "model_06_event_family_structured_evidence_gap_receipt",
+            "contract_type": "model_03_event_family_structured_evidence_gap_receipt",
             "source_contract_type": packet.contract_type,
             "event_family_id": packet.event_family_id,
             "target_symbol": packet.target_symbol,
@@ -140,7 +140,7 @@ def _structured_enrichment_payload(packet: EventFamilyModelabilityEvidencePacket
     macro_release_result_counts = _macro_release_result_counts(packet)
     if macro_release_result_counts and macro_release_result_counts["actual_value_count"] > 0:
         return {
-            "contract_type": "model_06_event_family_structured_evidence_gap_receipt",
+            "contract_type": "model_03_event_family_structured_evidence_gap_receipt",
             "source_contract_type": packet.contract_type,
             "event_family_id": packet.event_family_id,
             "target_symbol": packet.target_symbol,
@@ -157,7 +157,7 @@ def _structured_enrichment_payload(packet: EventFamilyModelabilityEvidencePacket
             "completion_gate": "add or materialize PIT consensus/forecast baseline source, then rebuild evidence packet",
         }
     return {
-        "contract_type": "model_06_event_family_structured_evidence_enrichment_plan",
+        "contract_type": "model_03_event_family_structured_evidence_enrichment_plan",
         "source_contract_type": packet.contract_type,
         "event_family_id": packet.event_family_id,
         "target_symbol": packet.target_symbol,
@@ -216,7 +216,7 @@ def _macro_release_result_counts(packet: EventFamilyModelabilityEvidencePacket) 
 def _modelability_gate_payload(packet: EventFamilyModelabilityEvidencePacket) -> dict[str, Any]:
     missing_gates = list(packet.next_action_plan.get("missing_gates") or ())
     return {
-        "contract_type": "model_06_event_family_modelability_gate_build_receipt",
+        "contract_type": "model_03_event_family_modelability_gate_build_receipt",
         "source_contract_type": packet.contract_type,
         "event_family_id": packet.event_family_id,
         "target_symbol": packet.target_symbol,
@@ -238,7 +238,7 @@ def _semantic_review_handoff_payload(packet: EventFamilyModelabilityEvidencePack
     review_kind = str(packet.next_action_plan.get("action_type") or "")
     required_skill = str(packet.next_action_plan.get("required_skill") or "")
     return {
-        "contract_type": "model_06_event_family_semantic_review_handoff",
+        "contract_type": "model_03_event_family_semantic_review_handoff",
         "source_contract_type": packet.contract_type,
         "event_family_id": packet.event_family_id,
         "target_symbol": packet.target_symbol,
@@ -298,7 +298,7 @@ def route_packet_next_action(
         route_status = str(payload["route_status"])
         artifact_name = (
             "structured_evidence_gap_receipt.json"
-            if payload["contract_type"] == "model_06_event_family_structured_evidence_gap_receipt"
+            if payload["contract_type"] == "model_03_event_family_structured_evidence_gap_receipt"
             else "structured_evidence_enrichment_plan.json"
         )
         route_plan = {
@@ -328,7 +328,7 @@ def route_packet_next_action(
     else:
         route_status = "queued_for_program_triage"
         route_plan = {
-            "action_artifact_type": "model_06_event_family_program_triage_plan",
+            "action_artifact_type": "model_03_event_family_program_triage_plan",
             "action_artifact_path": str(route_dir / "program_triage_plan.json"),
             "route_status": route_status,
             "next_action_plan": dict(packet.next_action_plan),

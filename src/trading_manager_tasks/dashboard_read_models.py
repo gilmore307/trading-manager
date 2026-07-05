@@ -61,7 +61,7 @@ FOLD_MODEL_STAGE_TYPES = {
     "model_generation",
     "replay",
     "replay_review",
-    "model_06_event_risk_governor",
+    "model_03_event_state",
     "model_evaluation",
     "post_replay_attribution",
     "promotion_review",
@@ -75,8 +75,8 @@ MODEL_GROUP_EVALUATION_TESTS = (
     "replay_metrics",
     "guardrail_checks",
     "incumbent_comparison",
-    "m06_event_risk_governor",
-    "m06_event_focus_proposal",
+    "m03_event_state",
+    "m03_event_focus_proposal",
 )
 MODEL_GROUP_PROMOTION_TESTS = (
     "fixed_benchmark",
@@ -115,7 +115,7 @@ TASK_STAGE_SORT_ORDER = {
     "replay": 40,
     "replay_review": 42,
     "post_replay_attribution": 45,
-    "model_06_event_risk_governor": 45,
+    "model_03_event_state": 45,
     "model_evaluation": 48,
     "promotion_review_preparation": 45,
     "promotion_review": 50,
@@ -595,17 +595,17 @@ def _filter_agent_errors_for_target_queue(
 
 def _mark_superseded_agent_errors(agent_errors: list[dict[str, Any]], task_timeline: list[dict[str, Any]]) -> list[dict[str, Any]]:
     current_task_ids = {str(task.get("task_id") or "") for task in task_timeline}
-    has_current_residual_event_governance = any(
-        task_id == "model_06_residual_event_governance" or task_id.startswith("model_06_residual_event_governance.")
+    has_current_replay_event_attribution = any(
+        task_id == "model_03_event_state" or task_id.startswith("model_03_event_state.")
         for task_id in current_task_ids
     )
     updated_rows: list[dict[str, Any]] = []
     for row in agent_errors:
         text = " ".join(str(row.get(field) or "") for field in ("summary", "root_cause", "retry_recommendation"))
         if (
-            has_current_residual_event_governance
-            and "m06_residual_event_governance" in text
-            and "m06_residual_event_governance.data_acquisition" not in current_task_ids
+            has_current_replay_event_attribution
+            and "m03_event_state" in text
+            and "m03_event_state.data_acquisition" not in current_task_ids
         ):
             updated = dict(row)
             updated["repair_status"] = "superseded"
@@ -1020,7 +1020,7 @@ def _public_active_task(status: HistoricalSchedulerStatus, task_timeline: list[d
         order = {
             "model_group.replay": 10,
             "model_group.replay_review": 20,
-            "model_group.model_06_event_risk_governor": 30,
+            "model_group.model_03_event_state": 30,
             "model_group.evaluation": 40,
             "model_group.promotion": 50,
             "model_group.maintenance": 60,
@@ -1092,7 +1092,7 @@ def _public_terminal_outcome_task(task_timeline: list[dict[str, Any]]) -> dict[s
     order = {
         "model_group.replay": 10,
         "model_group.replay_review": 20,
-        "model_group.model_06_event_risk_governor": 30,
+        "model_group.model_03_event_state": 30,
         "model_group.evaluation": 40,
         "model_group.promotion": 50,
         "model_group.maintenance": 60,
@@ -1703,7 +1703,7 @@ def _scheduler_decision_runtime_activity(latest_decision: Mapping[str, Any]) -> 
 def _scheduler_work_activity_label(selected_work: object, next_internal_stage: object = None) -> str:
     work = str(selected_work or "").strip()
     stage = str(next_internal_stage or "").strip()
-    if work == "model_group.residual_event_governance" or stage == "residual_event_governance":
+    if work == "model_group.replay_event_attribution" or stage == "replay_event_attribution":
         return "Replay Review Event Attribution"
     if work == "model_group.replay_review" or stage == "replay_review":
         return "Replay Review"
@@ -2742,7 +2742,7 @@ MODEL_NAME_BY_LAYER_KEY.update(
         "model_01_sector_context": "SectorContextModel",
         "model_02_target_state": "TargetStateVectorModel",
         "model_05_alpha_confidence": "AlphaConfidenceCheckpoint",
-        "model_06_residual_event_governance": "EventRiskGovernor",
+        "model_03_event_state": "Event State",
     }
 )
 MODEL_NUMBER_BY_LAYER_KEY = {
@@ -2753,7 +2753,7 @@ MODEL_NUMBER_BY_LAYER_KEY = {
     "model_04_unified_decision": 4,
     "model_05_alpha_confidence": 4,
     "model_05_option_expression": 5,
-    "model_06_residual_event_governance": 6,
+    "model_03_event_state": 6,
 }
 PUBLIC_LAYER_BY_LAYER_KEY = {
     "model_05_alpha_confidence": 4,
@@ -3218,7 +3218,7 @@ def _worker_info_for_stage(
         "model_training",
         "model_generation",
         "replay",
-        "model_06_residual_event_governance",
+        "model_03_event_state",
         "model_evaluation",
         "post_replay_attribution",
         "promotion_review",
@@ -4060,7 +4060,7 @@ def _instrument_scope_for_task(layer: object) -> str:
     if layer_number == 5:
         return "option_expression_or_underlying_fallback"
     if layer_number == 6:
-        return "residual_event_governance"
+        return "replay_event_attribution"
     return "not_applicable"
 
 
@@ -5500,7 +5500,7 @@ def _latest_replay_decision_rows_path(
     return Path(decision_rows_ref)
 
 
-def _replay_row_needs_residual_event_governance(row: Mapping[str, Any]) -> bool:
+def _replay_row_needs_replay_event_attribution(row: Mapping[str, Any]) -> bool:
     """Return whether a replay decision row represents an attribution unit.
 
     Replay review owns post-replay event attribution. For the current crypto
@@ -5525,7 +5525,7 @@ def _replay_row_needs_residual_event_governance(row: Mapping[str, Any]) -> bool:
     return False
 
 
-def _residual_event_governance_expected_count(
+def _replay_event_attribution_expected_count(
     dataset_root: Path,
     *,
     training_start_month: str | None = None,
@@ -5540,7 +5540,7 @@ def _residual_event_governance_expected_count(
     )
     if decision_rows_path is None:
         return 0
-    return sum(1 for row in _load_jsonl_objects(decision_rows_path) if _replay_row_needs_residual_event_governance(row))
+    return sum(1 for row in _load_jsonl_objects(decision_rows_path) if _replay_row_needs_replay_event_attribution(row))
 
 
 def _count_jsonl_rows(path: Path) -> int:
@@ -5572,7 +5572,7 @@ def _replay_review_progress(
     selected_target_symbol: str | None = None,
 ) -> dict[str, Any]:
     expected = (
-        _residual_event_governance_expected_count(
+        _replay_event_attribution_expected_count(
             dataset_root,
             training_start_month=training_start_month,
             training_end_month=training_end_month,
@@ -5625,7 +5625,7 @@ def _attribution_ready_count(attribution_artifacts: Mapping[str, Any] | None, *,
     return expected_count
 
 
-def _residual_event_governance_progress(
+def _replay_event_attribution_progress(
     *,
     dataset_root: Path,
     attribution_artifacts: Mapping[str, Any] | None,
@@ -5635,7 +5635,7 @@ def _residual_event_governance_progress(
     selected_target_symbol: str | None = None,
 ) -> dict[str, Any]:
     expected = (
-        _residual_event_governance_expected_count(
+        _replay_event_attribution_expected_count(
             dataset_root,
             training_start_month=training_start_month,
             training_end_month=training_end_month,
@@ -5648,7 +5648,7 @@ def _residual_event_governance_progress(
     pending = max(expected - ready, 0)
     complete = expected > 0 and ready >= expected
     return {
-        "stage_id": "model_group.model_06_event_risk_governor",
+        "stage_id": "model_group.model_03_event_state",
         "status": "complete" if complete else ("ready" if review_complete else "blocked"),
         "unit_label": "failure attributions",
         "expected_count": expected,
@@ -5778,8 +5778,8 @@ def _replay_manifest_refs(manifest: Mapping[str, Any], dataset_root: Path) -> li
 def _latest_promotion_review_artifacts(
     dataset_root: Path,
     *,
-    residual_event_governance_receipt_ref: str | None,
-    residual_event_governance_event_focus_proposals_ref: str | None = None,
+    replay_event_attribution_receipt_ref: str | None,
+    replay_event_attribution_event_focus_proposals_ref: str | None = None,
     replay_validation_ref: str | None = None,
     training_start_month: str | None = None,
     training_end_month: str | None = None,
@@ -5803,15 +5803,15 @@ def _latest_promotion_review_artifacts(
             selected_target_symbol=selected_target_symbol,
         ):
             continue
-        if residual_event_governance_receipt_ref is not None:
+        if replay_event_attribution_receipt_ref is not None:
             if receipt is None:
                 continue
-            if str(receipt.get("residual_event_governance_receipt_ref") or "") != residual_event_governance_receipt_ref:
+            if str(receipt.get("replay_event_attribution_receipt_ref") or "") != replay_event_attribution_receipt_ref:
                 continue
-        if residual_event_governance_event_focus_proposals_ref is not None:
+        if replay_event_attribution_event_focus_proposals_ref is not None:
             if receipt is None:
                 continue
-            if str(receipt.get("residual_event_governance_event_focus_proposals_ref") or "") != residual_event_governance_event_focus_proposals_ref:
+            if str(receipt.get("replay_event_attribution_event_focus_proposals_ref") or "") != replay_event_attribution_event_focus_proposals_ref:
                 continue
         if replay_validation_ref is not None:
             decision_replay_ref = str(decision.get("replay_validation_ref") or "")
@@ -6257,15 +6257,15 @@ def _model_group_replay_timeline_tasks(
     )
     attribution_receipt = attribution_artifacts["receipt"] if attribution_artifacts else {}
     attribution_rows_complete = attribution_artifacts is not None
-    residual_event_governance_event_focus_proposals_ref = str(attribution_receipt.get("event_focus_proposals_ref") or "").strip()
+    replay_event_attribution_event_focus_proposals_ref = str(attribution_receipt.get("event_focus_proposals_ref") or "").strip()
     event_focus_complete = (
         attribution_rows_complete
-        and bool(residual_event_governance_event_focus_proposals_ref)
+        and bool(replay_event_attribution_event_focus_proposals_ref)
         and int(attribution_receipt.get("event_focus_proposal_count") or 0) > 0
-        and Path(residual_event_governance_event_focus_proposals_ref).exists()
+        and Path(replay_event_attribution_event_focus_proposals_ref).exists()
     )
     attribution_complete = attribution_rows_complete and event_focus_complete
-    attribution_progress = _residual_event_governance_progress(
+    attribution_progress = _replay_event_attribution_progress(
         dataset_root=dataset_root,
         attribution_artifacts=attribution_artifacts,
         review_complete=replay_review_complete,
@@ -6286,11 +6286,11 @@ def _model_group_replay_timeline_tasks(
         "trigger_stage": "model_group.replay_review",
         "event_attribution_status": str(attribution_receipt.get("event_attribution_status") or ""),
         "event_attribution_summary_ref": str(attribution_receipt.get("event_attribution_summary_ref") or ""),
-        "event_focus_proposals_ref": residual_event_governance_event_focus_proposals_ref or None,
+        "event_focus_proposals_ref": replay_event_attribution_event_focus_proposals_ref or None,
         "event_focus_proposal_count": int(attribution_receipt.get("event_focus_proposal_count") or 0),
         "attribution_complete": attribution_complete,
     }
-    residual_event_governance_receipt_ref = (
+    replay_event_attribution_receipt_ref = (
         str(attribution_artifacts["receipt_refs"][0])
         if attribution_artifacts and attribution_artifacts.get("receipt_refs")
         else None
@@ -6305,8 +6305,8 @@ def _model_group_replay_timeline_tasks(
     promotion_artifacts = (
         _latest_promotion_review_artifacts(
             dataset_root,
-            residual_event_governance_receipt_ref=residual_event_governance_receipt_ref,
-            residual_event_governance_event_focus_proposals_ref=residual_event_governance_event_focus_proposals_ref,
+            replay_event_attribution_receipt_ref=replay_event_attribution_receipt_ref,
+            replay_event_attribution_event_focus_proposals_ref=replay_event_attribution_event_focus_proposals_ref,
             training_start_month=training_start_month,
             training_end_month=training_end_month,
             selected_target_symbol=selected_target_symbol,
@@ -6317,7 +6317,7 @@ def _model_group_replay_timeline_tasks(
     if promotion_artifacts is None and lifecycle_artifacts_allowed and latest_replay_receipt_ref:
         promotion_artifacts = _latest_promotion_review_artifacts(
             dataset_root,
-            residual_event_governance_receipt_ref=None,
+            replay_event_attribution_receipt_ref=None,
             replay_validation_ref=latest_replay_receipt_ref,
             training_start_month=training_start_month,
             training_end_month=training_end_month,

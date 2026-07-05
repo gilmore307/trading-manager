@@ -47,7 +47,7 @@ TRACE_SCOPED_REPLAY_LAYER_REVIEW_LAYERS = REPLAY_LAYER_REVIEW_LAYERS[:2]
 DECISION_SCOPED_REPLAY_LAYER_REVIEW_LAYERS = REPLAY_LAYER_REVIEW_LAYERS[3:]
 M01_BACKGROUND_CONTEXT_LAYER = "model_01_background_context"
 M03_EVENT_STATE_LAYER = "model_03_event_state"
-EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS = ("model_06_residual_event_governance",)
+EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS: tuple[str, ...] = ()
 REPLAY_LAYER_REVIEW_METHODS = {
     "model_01_background_context": {
         "metric_family": "background_context_state_quality",
@@ -616,7 +616,7 @@ def _write_no_decision_promotion_rejection(
         "agent_review_recommendation": "failed",
         "replay_freeze_status": "frozen",
         "guardrail_status": "failed",
-        "fold_stack_status": "complete_m01_m06_replay_no_decisions",
+        "fold_stack_status": "complete_m01_m05_replay_no_decisions",
         "metric_refs": [],
         "guardrail_refs": [str(replay_receipt_path)],
         "first_model_bootstrap": False,
@@ -2404,7 +2404,6 @@ def _layer_differentiation_summary(
         "model_03_event_state": [],
         "model_04_unified_decision": [],
         "model_05_option_expression": [],
-        "model_06_residual_event_governance": [],
     }
     for row in decisions:
         diagnostics = row.get("model_layer_diagnostics")

@@ -394,7 +394,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
 
             class Result:
                 returncode = 0
-                stdout = json.dumps({"references": [], "row_counts": {"m06_residual_event_governance_data_acquisition": 0}})
+                stdout = json.dumps({"references": [], "row_counts": {"m03_event_state_data_acquisition": 0}})
                 stderr = ""
 
             with patch("trading_manager_tasks.model_03_event_impact_inputs.subprocess.run", return_value=Result()):
@@ -438,7 +438,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
 
             class Result:
                 returncode = 0
-                stdout = json.dumps({"references": [], "row_counts": {"m06_residual_event_governance_data_acquisition": 0}})
+                stdout = json.dumps({"references": [], "row_counts": {"m03_event_state_data_acquisition": 0}})
                 stderr = ""
 
             with patch("trading_manager_tasks.model_03_event_impact_inputs.subprocess.run", return_value=Result()):
@@ -466,7 +466,7 @@ class ResidualEventGovernanceInputTests(unittest.TestCase):
 
             class Result:
                 returncode = 0
-                stdout = json.dumps({"references": [], "row_counts": {"m06_residual_event_governance_data_acquisition": 0}})
+                stdout = json.dumps({"references": [], "row_counts": {"m03_event_state_data_acquisition": 0}})
                 stderr = ""
 
             with patch("trading_manager_tasks.model_03_event_impact_inputs.subprocess.run", return_value=Result()):

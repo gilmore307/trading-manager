@@ -114,7 +114,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "reason_code": "model_group_replay_review_event_attribution_missing",
                 "reason": "replay review is ready, but the fixed M03 event ledger has no local point-in-time event observations or candidates to attribute",
                 "selected_work": "model_group.replay_review",
-                "next_internal_stage": "residual_event_governance",
+                "next_internal_stage": "replay_event_attribution",
                 "now_utc": "2026-06-28T13:30:21.213306+00:00",
                 "execution_summary": {
                     "event_source_summary": {
@@ -698,7 +698,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         receipt_path.write_text(
             json.dumps(
                 {
-                    "contract_type": "post_replay_residual_event_governance_receipt",
+                    "contract_type": "post_replay_replay_event_attribution_receipt",
                     "status": "succeeded",
                     "created_at_utc": "2026-05-22T12:49:00Z",
                     "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
@@ -2913,7 +2913,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertNotIn("replay_dataset_scope_matches_training_fold", replay_task["detail"]["blockers"])
         self.assertNotIn("does not match completed training fold", replay_task["reason"])
 
-    def test_replay_completion_surfaces_residual_event_governance_ready_despite_internal_lifecycle_hold(self):
+    def test_replay_completion_surfaces_replay_event_attribution_ready_despite_internal_lifecycle_hold(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
             service, env, wrapper = self._write_service_files(tmp)
@@ -3512,10 +3512,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                                 },
                             },
                             {
-                                "stage_id": "model_06_residual_event_governance.model_task",
+                                "stage_id": "model_03_event_state.model_task",
                                 "stage_type": "model_task",
                                 "layer": 6,
-                                "layer_key": "model_06_residual_event_governance",
+                                "layer_key": "model_03_event_state",
                                 "status": "succeeded",
                                 "dataset_unit": {
                                     "unit_kind": "target_symbol_walk_forward_12_3_3",
@@ -3565,7 +3565,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(layer_one["target_scope"], "market_context_panel")
         self.assertEqual(layer_one["instrument_scope"], "market_context_proxy_panel")
         self.assertEqual(model_six["target_scope"], "target_symbol")
-        self.assertEqual(model_six["instrument_scope"], "residual_event_governance")
+        self.assertEqual(model_six["instrument_scope"], "replay_event_attribution")
         self.assertEqual(model_five["instrument_scope"], "option_expression_or_underlying_fallback")
         self.assertEqual(payload["chart_payload"]["target_queue"]["enabled_targets"], ["AAPL", "NVDA"])
 
@@ -3948,8 +3948,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "candidate_fold_id": "fold_aapl_2016",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
-                        "residual_event_governance_receipt_ref": str(attribution_receipt_path),
-                        "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
+                        "replay_event_attribution_receipt_ref": str(attribution_receipt_path),
+                        "replay_event_attribution_event_focus_proposals_ref": str(event_focus_proposals_path),
                     }
                 )
                 + "\n",
@@ -4212,8 +4212,8 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "candidate_model_ref": "storage://trading-manager/model_group/aapl/2016-01_2017-06",
                         "candidate_fold_id": "fold_aapl_2016",
                         "replay_execution_receipt_ref": str(replay_run / "replay_execution_receipt.json"),
-                        "residual_event_governance_receipt_ref": str(attribution_receipt_path),
-                        "residual_event_governance_event_focus_proposals_ref": str(event_focus_proposals_path),
+                        "replay_event_attribution_receipt_ref": str(attribution_receipt_path),
+                        "replay_event_attribution_event_focus_proposals_ref": str(event_focus_proposals_path),
                     }
                 )
                 + "\n",
@@ -5286,7 +5286,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                 "review_type": "server_error_repair",
                 "error_ref": "ERR-000006",
                 "diagnosis_status": "repaired_verified",
-                "root_cause": "planner exposed model_06_residual_event_governance.data_acquisition before event-feed coverage",
+                "root_cause": "planner exposed model_03_event_state.data_acquisition before event-feed coverage",
                 "repair": {"repair_status": "repaired", "files_changed": ["/repo/planner.py"]},
                 "retry_recommendation": "manual_review",
                 "blockers": ["reviewed event-feed artifacts are still missing"],
@@ -5327,7 +5327,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage model_06_residual_event_governance.data_acquisition command returned non-zero status",
+                        "summary": "model training stage model_03_event_state.data_acquisition command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-21T12:01:49Z",
                         "created_at_utc": "2026-05-21T12:01:49Z",
@@ -5458,10 +5458,10 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "end_month": "2017-06",
                         "stages": [
                             {
-                                "stage_id": "model_06_residual_event_governance.data_acquisition",
+                                "stage_id": "model_03_event_state.data_acquisition",
                                 "stage_type": "data_acquisition",
                                 "layer": 10,
-                                "layer_key": "model_06_residual_event_governance",
+                                "layer_key": "model_03_event_state",
                                 "status": "blocked",
                                 "last_reason": "waiting for upstream_model_04_evaluation_complete",
                                 "updated_utc": "2026-05-21T10:00:00Z",
@@ -5490,7 +5490,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                             {
                                 "diagnosis_status": "completed",
                                 "repair": {"repair_status": "not_supported"},
-                                "root_cause": "model training stage m06_residual_event_governance.data_acquisition command returned non-zero status",
+                                "root_cause": "model training stage m03_event_state.data_acquisition command returned non-zero status",
                                 "retry_recommendation": "manual review",
                             }
                         ),
@@ -5517,7 +5517,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "error_scope": "server.model_training_stage",
                         "error_kind": "stage_command_failed",
                         "severity": "error",
-                        "summary": "model training stage m06_residual_event_governance.data_acquisition command returned non-zero status",
+                        "summary": "model training stage m03_event_state.data_acquisition command returned non-zero status",
                         "exit_code": 1,
                         "occurred_at_utc": "2026-05-18T10:41:07Z",
                         "created_at_utc": "2026-05-18T10:41:07Z",

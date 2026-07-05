@@ -29,7 +29,7 @@ from .event_family_modelability_evidence import (
 from .event_feed_coverage import parse_event_feed_time
 from .storage_paths import manager_storage_root
 
-STRUCTURED_EVIDENCE_ENRICHMENT_CONTRACT_TYPE = "model_06_event_family_structured_evidence_enrichment_receipt"
+STRUCTURED_EVIDENCE_ENRICHMENT_CONTRACT_TYPE = "model_03_event_family_structured_evidence_enrichment_receipt"
 DEFAULT_TE_SOURCE_ROOT = (
     Path("/root/projects/trading-storage/storage/01_source_data/monthly_backfill")
     / "trading_economics_calendar_web"
@@ -37,7 +37,7 @@ DEFAULT_TE_SOURCE_ROOT = (
 DEFAULT_OUTPUT_ROOT = (
     manager_storage_root()
     / "runtime"
-    / "model_06_event_family_modelability"
+    / "model_03_event_family_modelability"
     / "structured_evidence_enrichment"
 )
 

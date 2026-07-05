@@ -126,7 +126,7 @@ def build_event_model_regeneration_plan(
                 step_id="01_build_acceptance_report",
                 owner_repo="trading-model",
                 action="emit event_model_acceptance_report from accepted final judgment",
-                command_ref="python3 scripts/models/model_06_residual_event_governance/build_event_model_acceptance_report.py",
+                command_ref="python3 scripts/models/model_03_event_state/event_governance/build_event_model_acceptance_report.py",
                 status="ready_offline",
                 mutation_class="report_artifact_only",
                 provider_calls_allowed=False,
@@ -136,7 +136,7 @@ def build_event_model_regeneration_plan(
                 step_id="02_prepare_event_feed_backfill_task_keys",
                 owner_repo="trading-manager",
                 action="prepare required monthly event-feed task keys for the fold without provider calls",
-                command_ref="PYTHONPATH=src python3 scripts/tasks/prepare_residual_event_feed_backfill.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write-files",
+                command_ref="PYTHONPATH=src python3 scripts/tasks/prepare_event_feed_backfill.py --start-month ${START_MONTH} --end-month ${END_MONTH} --write-files",
                 status="ready_offline",
                 mutation_class="manager_task_key_write_only",
                 provider_calls_allowed=False,
@@ -238,7 +238,7 @@ def write_plan_file(plan: EventModelRegenerationPlan, path: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Plan safe EventRiskGovernor regeneration.")
+    parser = argparse.ArgumentParser(description="Plan safe M03 event-state regeneration.")
     parser.add_argument("--start-month", required=True)
     parser.add_argument("--end-month", required=True)
     parser.add_argument("--target-symbol", default=DEFAULT_TARGET_SYMBOL)

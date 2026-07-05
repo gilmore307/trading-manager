@@ -11,7 +11,6 @@ This file owns shared naming rules for model source, feature, and model surfaces
 | 3 | TargetStateVectorModel | `target_state_vector_model` | `trading_model.model_03_target_state_vector` |
 | 4 | UnifiedDecisionModel | `unified_decision_model` | `trading_model.model_04_unified_decision` |
 | 5 | OptionExpressionModel | `option_expression_model` | `trading_model.model_05_option_expression` |
-| 6 | ResidualEventGovernanceModel | `residual_event_governance_model` | `trading_model.model_06_residual_event_governance` |
 
 ## Stable Id Rule
 
@@ -60,8 +59,8 @@ trading_data.model_03_target_state_vector_feature_generation
 trading_data.option_chain_state_source
 trading_data.model_05_option_expression_feature_generation
 trading_data.model_05_option_expression_data_acquisition_contract_path
-trading_data.model_06_residual_event_governance_data_acquisition
-trading_data.model_06_residual_event_governance_feature_generation
+trading_data.model_03_event_state_data_acquisition
+trading_data.model_03_event_state_feature_generation
 ```
 
 The table prefix is not automatic proof of business authority. The registered row and accepted boundary decide ownership.
@@ -71,7 +70,7 @@ The table prefix is not automatic proof of business authority. The registered ro
 Model-owned model score tokens use compact numeric prefixes only when the token is part of a reviewed layer contract:
 
 ```text
-1_* 2_* 3_* 4_* 5_* 6_*
+1_* 2_* 3_* 4_* 5_*
 ```
 
 Generic ids, refs, timestamps, run metadata, receipt metadata, and registry fields stay generic.

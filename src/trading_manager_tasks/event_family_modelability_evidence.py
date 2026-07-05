@@ -30,9 +30,9 @@ from .event_family_modelability_acquisition import (
 from .event_feed_coverage import parse_event_feed_time
 from .storage_paths import manager_storage_root
 
-MODELABILITY_EVIDENCE_PACKET_CONTRACT_TYPE = "model_06_event_family_modelability_evidence_packet"
+MODELABILITY_EVIDENCE_PACKET_CONTRACT_TYPE = "model_03_event_family_modelability_evidence_packet"
 DEFAULT_DB_URL_FILE = Path("/root/secrets/openclaw/database-url")
-DEFAULT_PACKET_ROOT = manager_storage_root() / "runtime" / "model_06_event_family_modelability" / "evidence_packets"
+DEFAULT_PACKET_ROOT = manager_storage_root() / "runtime" / "model_03_event_family_modelability" / "evidence_packets"
 ET = ZoneInfo("America/New_York")
 
 EARNINGS_METRIC_TAGS = {

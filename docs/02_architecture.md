@@ -25,7 +25,7 @@ contract lives in `docs/31_event_impact_distribution.md`.
 
 ## Physical Surface Rule
 
-Active manager code, scripts, registry rows, SQL table names, storage paths, and docs should use the current M01-M05 model numbers above. Existing cross-repository physical `model_06_*` source/table tokens are compatibility surfaces until their owning repositories migrate them; they are not an independent manager workflow lane. SQL migration history is append-only audit material and is not rewritten by documentation cleanup.
+Active manager code, scripts, registry rows, SQL table names, storage paths, and docs use the current M01-M05 model numbers above. Event attribution and event-family governance are embedded in M03 event-state and replay-review diagnostics, not a separate model layer. SQL migration history is append-only audit material and is not rewritten by documentation cleanup.
 
 ## Event Path Rule
 

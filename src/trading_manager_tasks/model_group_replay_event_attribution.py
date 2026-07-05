@@ -132,7 +132,7 @@ INSTANT_EVENT_TOKENS = {
 }
 EVENT_WINDOW_BEFORE = timedelta(days=3)
 EVENT_WINDOW_AFTER = timedelta(days=1)
-M06_SQL_EVENT_FIELDS = [
+M03_EVENT_SQL_FIELDS = [
     "event_id",
     "canonical_event_id",
     "dedup_status",
@@ -446,7 +446,7 @@ def _build_attribution_rows(
             impact_profile["impact_exposure_time"],
             replay_month=str(review_row.get("replay_month") or ""),
         )
-        row_id = f"l6_event_attr_{index:08d}"
+        row_id = f"l3_event_attr_{index:08d}"
         rows.append(
             {
                 "contract_type": REPLAY_REVIEW_EVENT_ATTRIBUTION_ROW_CONTRACT_TYPE,
@@ -596,7 +596,7 @@ def _build_event_focus_proposals(
     )
     proposals: list[dict[str, Any]] = []
     for group in ranked[:max_proposals]:
-        proposal_id = "l6_event_focus_" + _stable_token(group["event_ref"], group["target_symbol"], group["failure_type"])
+        proposal_id = "l3_event_focus_" + _stable_token(group["event_ref"], group["target_symbol"], group["failure_type"])
         support_count = len(group["source_decision_ids"])
         event_summary = dict(event_summaries_by_ref.get(str(group["event_ref"]), {}))
         failure_attention_reason = (
@@ -1568,12 +1568,10 @@ def _load_event_candidates(*, storage_root: Path, fold_scope: Mapping[str, str])
         raw_events.extend(_events_from_observation_payload(payload, source_ref=str(observation_path)))
     input_dirs = (
         storage_root / "runtime" / "model_03_event_impact" / "input_materialization" / _fold_key(start_month, end_month),
-        storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month),
     )
     task_key_filenames = (
         "model_03_event_impact_data_acquisition_task_key.json",
-        "m06_residual_event_governance_data_acquisition_task_key.json",
-        "source_06_task_key.json",
+        "m03_event_state_data_acquisition_task_key.json",
     )
     for input_dir in input_dirs:
         for filename in task_key_filenames:
@@ -1633,7 +1631,7 @@ def _events_from_source_task_key(params: Mapping[str, Any], *, source_ref: str, 
         return rows
     if not _materialization_receipt_ready(materialization_receipt_path):
         return []
-    return _events_from_m06_sql(params, source_ref=source_ref)
+    return _events_from_m03_event_state_sql(params, source_ref=source_ref)
 
 
 def _materialization_receipt_ready(path: Path | None) -> bool:
@@ -1644,13 +1642,12 @@ def _materialization_receipt_ready(path: Path | None) -> bool:
         return False
     if str(payload.get("contract_type") or "") not in {
         "manager_model_03_event_impact_input_materialization",
-        "manager_residual_event_governance_input_materialization",
     }:
         return False
     return int(payload.get("source_event_count") or 0) > 0 and bool(str(payload.get("source_receipt_path") or "").strip())
 
 
-def _events_from_m06_sql(params: Mapping[str, Any], *, source_ref: str) -> list[dict[str, Any]]:
+def _events_from_m03_event_state_sql(params: Mapping[str, Any], *, source_ref: str) -> list[dict[str, Any]]:
     database_url = _trading_storage_database_url()
     if not database_url:
         return []
@@ -1663,7 +1660,7 @@ def _events_from_m06_sql(params: Mapping[str, Any], *, source_ref: str) -> list[
         clauses.append("available_time < %s")
         values.append(params["end"])
     where = " WHERE " + " AND ".join(clauses) if clauses else ""
-    statement = f"SELECT {', '.join(M06_SQL_EVENT_FIELDS)} FROM trading_data.model_06_residual_event_governance_data_acquisition{where} ORDER BY available_time, event_id"
+    statement = f"SELECT {', '.join(M03_EVENT_SQL_FIELDS)} FROM trading_data.model_03_event_state_data_acquisition{where} ORDER BY available_time, event_id"
     try:
         import psycopg  # type: ignore
         from psycopg.rows import dict_row  # type: ignore
@@ -1752,7 +1749,7 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
         "policy_ref": "event_interpretation_standard",
         "policy_version": "1",
         "source_artifact_ref": raw_event.get("source_artifact_ref") or raw_event.get("reference"),
-        "source_name": raw_event.get("source_name") or "residual_event_governance_local_event_candidate",
+        "source_name": raw_event.get("source_name") or "m03_event_state_local_event_candidate",
         "source_type": raw_event.get("reference_type") or "local_structured_event_candidate",
         "published_time": raw_event.get("published_time") or raw_event.get("event_time") or raw_event.get("available_time"),
         "available_time": raw_event.get("available_time") or raw_event.get("event_time") or raw_event.get("effective_time"),
@@ -1760,7 +1757,7 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
         "title": raw_event.get("title"),
         "summary": raw_event.get("summary"),
         "interpreted_at": datetime.now(UTC).isoformat(),
-        "interpreter_agent_id": "trading-manager.residual_event_governance",
+        "interpreter_agent_id": "trading-manager.m03_event_state",
         "interpreter_model_id": "deterministic_event_candidate_standardizer",
         "prompt_policy_hash": "not_applicable_deterministic_structured_event",
         "normalized_event_type": raw_event.get("normalized_event_type") or raw_event.get("event_category_type") or raw_event.get("event_type") or "event_candidate",
@@ -1787,15 +1784,15 @@ def _standardized_event_interpretation(raw_event: Mapping[str, Any], *, index: i
 
 
 def _fill_interpretation_defaults(row: dict[str, Any], *, index: int) -> dict[str, Any]:
-    row.setdefault("source_artifact_ref", f"residual_event_governance_event_candidate:{index}")
+    row.setdefault("source_artifact_ref", f"m03_event_state_event_candidate:{index}")
     row.setdefault("source_artifact_hash", _stable_hash(row.get("source_artifact_ref"), row.get("normalized_event_type"), row.get("available_time"), row.get("affected_entities")))
-    row.setdefault("source_name", "residual_event_governance_local_event_candidate")
+    row.setdefault("source_name", "m03_event_state_local_event_candidate")
     row.setdefault("source_type", "local_structured_event_candidate")
     row.setdefault("published_time", row.get("available_time") or row.get("interpreted_at"))
     row.setdefault("available_time", row.get("published_time") or row.get("interpreted_at"))
     row.setdefault("interpreted_at", datetime.now(UTC).isoformat())
     row.setdefault("information_role_type", "unknown")
-    row.setdefault("interpreter_agent_id", "trading-manager.residual_event_governance")
+    row.setdefault("interpreter_agent_id", "trading-manager.m03_event_state")
     row.setdefault("interpreter_model_id", "deterministic_event_candidate_standardizer")
     row.setdefault("prompt_policy_hash", "not_applicable_deterministic_structured_event")
     row.setdefault("normalized_event_type", "event_candidate")
@@ -1983,12 +1980,10 @@ def _event_candidate_readiness_summary(*, storage_root: Path, fold_scope: Mappin
 
     input_dirs = (
         storage_root / "runtime" / "model_03_event_impact" / "input_materialization" / _fold_key(start_month, end_month),
-        storage_root / "runtime" / "model_06_residual_event_governance" / "input_materialization" / _fold_key(start_month, end_month),
     )
     task_key_filenames = (
         "model_03_event_impact_data_acquisition_task_key.json",
-        "m06_residual_event_governance_data_acquisition_task_key.json",
-        "source_06_task_key.json",
+        "m03_event_state_data_acquisition_task_key.json",
     )
     for input_dir in input_dirs:
         materialization_receipt_path = input_dir / "materialization_receipt.json"

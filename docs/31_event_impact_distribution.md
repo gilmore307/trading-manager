@@ -432,13 +432,13 @@ packets:
 
 The route is:
 
-1. Create `model_06_event_family_modelability_acquisition_plan`.
+1. Create `model_03_event_family_modelability_acquisition_plan`.
 2. Dispatch bounded provider tasks through the reviewed event-feed dispatcher.
-3. Build `model_06_event_family_modelability_evidence_packet` from acquired
+3. Build `model_03_event_family_modelability_evidence_packet` from acquired
    same-family PIT evidence.
 4. Follow the packet's deterministic `required_next_action`.
-   The route runner writes `model_06_event_family_modelability_next_action_route`
-   and `model_06_event_family_modelability_next_action_summary` artifacts so a
+   The route runner writes `model_03_event_family_modelability_next_action_route`
+   and `model_03_event_family_modelability_next_action_summary` artifacts so a
    blocked packet enters the next program queue instead of becoming a human or
    chat-level stopping point.
 5. Run `event-family-modelability-review` only for packets with
@@ -447,8 +447,8 @@ The route is:
 6. If M03 accepts a projection mode and probability-function class, train M03
    parameter mappings through a separate PIT-safe training path.
 
-The evidence packet is not a modelability decision and is not a special M06-only
-workflow stage. Current artifact names may retain `model_06_event_family_*`
+The evidence packet is not a modelability decision and is not a special model-only
+workflow stage. Current artifact names may retain `model_03_event_family_*`
 compatibility tokens, but the lifecycle owner is M03 event impact. Current trial reviews show that sample count alone
 is not enough: impact-function or conditional-effect approval still requires
 subtype homogeneity, matched controls, leakage/overlap checks, and fold-frozen

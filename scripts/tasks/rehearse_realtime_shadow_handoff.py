@@ -24,7 +24,6 @@ MODEL_02_TARGET_STATE = registry_payload("trm_M2TS001")
 MODEL_03_EVENT_STATE = registry_payload("trm_M3ES001")
 MODEL_04_UNIFIED_DECISION = registry_payload("trm_M4UD001")
 MODEL_05_OPTION_EXPRESSION = registry_payload("trm_M5OE002")
-MODEL_06_RESIDUAL_EVENT_GOVERNANCE = registry_payload("trm_M6REG001")
 LOCAL_RUNTIME_COMPONENTS = (
     ("component_01_intake", "C01", "Intake", (MODEL_01_BACKGROUND_CONTEXT, MODEL_02_TARGET_STATE), ()),
     (
@@ -32,19 +31,19 @@ LOCAL_RUNTIME_COMPONENTS = (
         "C02",
         "Entry",
         (MODEL_03_EVENT_STATE, MODEL_04_UNIFIED_DECISION),
-        (MODEL_06_RESIDUAL_EVENT_GOVERNANCE,),
+        (),
     ),
     (
         "component_03_lifecycle",
         "C03",
         "Lifecycle",
         (MODEL_03_EVENT_STATE, MODEL_04_UNIFIED_DECISION),
-        (MODEL_06_RESIDUAL_EVENT_GOVERNANCE,),
+        (),
     ),
-    ("component_04_option_review", "C04", "Option Review", (), (MODEL_05_OPTION_EXPRESSION, MODEL_06_RESIDUAL_EVENT_GOVERNANCE)),
+    ("component_04_option_review", "C04", "Option Review", (), (MODEL_05_OPTION_EXPRESSION,)),
     ("component_05_order_intent", "C05", "Order Intent", (), ()),
     ("component_06_execution_gate", "C06", "Execution Gate", (), ()),
-    ("component_07_failure_review", "C07", "Failure Review", (), (MODEL_06_RESIDUAL_EVENT_GOVERNANCE,)),
+    ("component_07_failure_review", "C07", "Failure Review", (), ()),
 )
 
 AVAILABLE_TIME = registry_payload("fld_STKEX011")

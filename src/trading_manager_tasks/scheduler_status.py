@@ -319,7 +319,7 @@ def _provider_status(latest_decision: Mapping[str, Any] | None, daemon_state: Ma
     }
 
 
-def _m06_scope_from_decision(decision: Mapping[str, Any] | None) -> dict[str, str | None]:
+def _m03_event_scope_from_decision(decision: Mapping[str, Any] | None) -> dict[str, str | None]:
     if not isinstance(decision, Mapping):
         return {"start_month": None, "end_month": None, "target_symbol": None}
     execution_summary = decision.get("execution_summary")

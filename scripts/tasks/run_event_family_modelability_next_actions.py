@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run deterministic next-action routing for M06 modelability packets."""
+"""Run deterministic next-action routing for M03 event-family modelability packets."""
 
 from trading_manager_tasks.event_family_modelability_next_actions import main
 

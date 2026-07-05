@@ -19,7 +19,7 @@ from .control_plane import TaskSystemError
 from .event_feed_backfill import DEFAULT_TARGET_CIK, DEFAULT_TARGET_SYMBOL, EventFeedTaskKey, prepare_event_feed_backfill
 from .request_payloads import DEFAULT_STORAGE_ROOT
 
-MODELABILITY_ACQUISITION_CONTRACT_TYPE = "model_06_event_family_modelability_acquisition_plan"
+MODELABILITY_ACQUISITION_CONTRACT_TYPE = "model_03_event_family_modelability_acquisition_plan"
 DEFAULT_MINIMUM_SAME_FAMILY_OBSERVATIONS = 8
 EVENT_TAXONOMY_POLICY = (
     "M03 uses a fixed event taxonomy: semantic classification assigns the finest PIT-identifiable "
