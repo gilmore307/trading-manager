@@ -34,6 +34,66 @@ M04 and M05 consume distribution summaries such as mean, quantiles, sign
 probabilities, uncertainty mass, and adverse/favorable tail probabilities. They
 do not consume raw event text.
 
+## End-To-End Event Route
+
+M03 does not start from selected trades or replay failures. It starts from the
+full point-in-time event universe inside the fold/window:
+
+1. Materialize every PIT-visible candidate event for the fold/window.
+2. Standardize event semantics and assign the reviewed multi-level taxonomy:
+   source category, domain node, mechanism family, optional child family, and
+   optional dossier.
+3. For the active family/dossier, test whether PIT event parameters can support
+   an identifiable probability function for later market, sector, target,
+   option, or execution impact.
+4. If identifiable, train distribution-parameter mappings only inside the
+   channels allowed by the reviewed family profile.
+5. If not identifiable, keep the event as risk shape/context only. It may widen
+   variance, thicken tails, discount confidence, or raise gates, but it must not
+   move mean/mode or directional contribution.
+
+This route lets M03 combine the existing semantic event model with probability
+functions without turning every event into a direction bet.
+
+## Effect Profiles
+
+Each mechanism family or dossier owns an `allowed_effect_profile`. This profile
+is a permission mask that constrains training; it is not itself the estimated
+effect.
+
+Default risk-shape permissions:
+
+| Channel | Default | Meaning |
+|---|---:|---|
+| `variance_multiplier` | allowed | The event can widen or compress the path distribution. |
+| `left_tail_delta` | allowed | The event can thicken adverse tail risk. |
+| `right_tail_delta` | allowed | The event can thicken favorable tail opportunity. |
+| `skew_delta` | allowed | The event can skew the distribution without moving its center. |
+| `confidence_discount` | allowed | The event can lower certainty in other signals. |
+| `gate_pressure` | allowed | The event can raise entry/no-trade or exposure gates. |
+| `mean_shift` | forbidden | The event cannot move expected return by default. |
+| `mode_shift` | forbidden | The event cannot move the most likely outcome by default. |
+| `directional_contribution` | forbidden | The event cannot add alpha/edge by default. |
+
+Directional permissions are opt-in and review-gated. A family may enable
+`mean_shift`, `mode_shift`, or `directional_contribution` only after
+fold-separated evidence shows a stable signed residual effect after M01/M02
+controls. Without that review, even severe events remain variance/tail/gate
+inputs rather than center-moving signals.
+
+M03 training must therefore be masked multi-head training:
+
+```text
+event_family_profile -> allowed heads
+event instance       -> learned magnitude per allowed head
+M03 output           -> distribution-effect scores + validation evidence
+M04                  -> final fusion, threshold, calibration, and sizing
+```
+
+An unrestricted `event_delta_probability` is not a valid M03 output because it
+hides whether the event changed risk shape, confidence, gates, or the center of
+the distribution.
+
 ## Projection Modes
 
 M03 assigns exactly one projection mode for an event family after deterministic
