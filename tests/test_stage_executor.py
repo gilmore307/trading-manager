@@ -329,11 +329,11 @@ class StageExecutorTests(unittest.TestCase):
         )
         with patch.dict("os.environ", {"TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "1800"}, clear=True):
             self.assertEqual(_stage_timeout_seconds(stage), DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS)
-        with patch.dict("os.environ", {"TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "18000"}, clear=True):
-            self.assertEqual(_stage_timeout_seconds(stage), 18000)
+        with patch.dict("os.environ", {"TRADING_MANAGER_STAGE_EXECUTION_TIMEOUT_SECONDS": "50000"}, clear=True):
+            self.assertEqual(_stage_timeout_seconds(stage), 50000)
 
     def test_long_database_feature_generation_default_timeout_covers_fold_scope(self):
-        self.assertEqual(DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS, 60 * 60 * 4)
+        self.assertEqual(DEFAULT_LONG_DATABASE_STAGE_EXECUTION_TIMEOUT_SECONDS, 60 * 60 * 12)
 
     def test_database_backed_model_generation_uses_dedicated_timeout(self):
         stage = StageProgress(
