@@ -1421,12 +1421,16 @@ class RegistryHelperTests(unittest.TestCase):
 
         self.assertEqual(rows["EXECUTION_ACCOUNT_SLEEVE"]["payload"], "execution_account_sleeve")
         self.assertIn("exactly one sleeve", rows["EXECUTION_ACCOUNT_SLEEVE"]["note"])
-        self.assertEqual(rows["CRYPTO_SPOT_ACCOUNT_SLEEVE"]["payload"], "crypto_spot_account")
-        self.assertIn("fixed BTC, ETH, and SOL candidate pool", rows["CRYPTO_SPOT_ACCOUNT_SLEEVE"]["note"])
+        self.assertIn("no cross-account netting", rows["EXECUTION_ACCOUNT_SLEEVE"]["note"])
+        self.assertEqual(rows["CRYPTO_LEVERAGE_ACCOUNT_SLEEVE"]["payload"], "crypto_leverage_account")
+        self.assertIn("5000 USD independent capital", rows["CRYPTO_LEVERAGE_ACCOUNT_SLEEVE"]["note"])
+        self.assertIn("2x-50x leverage", rows["CRYPTO_LEVERAGE_ACCOUNT_SLEEVE"]["note"])
         self.assertEqual(rows["EQUITY_OPTIONS_ACCOUNT_SLEEVE"]["payload"], "equity_options_account")
         self.assertIn("expression review", rows["EQUITY_OPTIONS_ACCOUNT_SLEEVE"]["note"])
-        self.assertIn("symbols=BTC,ETH,SOL", rows["CRYPTO_SPOT_CANDIDATE_POOL_POLICY"]["payload"])
-        self.assertIn("BTC-USDT,ETH-USDT,SOL-USDT", rows["CRYPTO_SPOT_CANDIDATE_POOL_POLICY"]["payload"])
+        self.assertIn("symbols=BTC,ETH,SOL", rows["CRYPTO_LEVERAGE_CANDIDATE_POOL_POLICY"]["payload"])
+        self.assertIn("BTC-USDT-SWAP,ETH-USDT-SWAP,SOL-USDT-SWAP", rows["CRYPTO_LEVERAGE_CANDIDATE_POOL_POLICY"]["payload"])
+        self.assertIn("starting_capital_usd=5000", rows["CRYPTO_LEVERAGE_CANDIDATE_POOL_POLICY"]["payload"])
+        self.assertIn("leverage_range=2x-50x", rows["CRYPTO_LEVERAGE_CANDIDATE_POOL_POLICY"]["payload"])
 
     def test_agent_decision_skill_rows_are_registered(self):
         with Path("scripts/registry/current.csv").open(newline="") as csv_file:
