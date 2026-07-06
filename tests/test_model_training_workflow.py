@@ -477,5 +477,11 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--source-start", command)
         self.assertIn("--source-end", command)
 
+    def test_m05_model_generation_resumes_existing_rows(self) -> None:
+        command = model_script(5, "option_expression", "generate")
+
+        self.assertIn("--from-database", command)
+        self.assertIn("--resume-existing", command)
+
 if __name__ == "__main__":
     unittest.main()

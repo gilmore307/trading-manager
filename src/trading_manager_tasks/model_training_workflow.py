@@ -316,6 +316,8 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
         ])
+        if layer == 5:
+            command.append("--resume-existing")
     if verb == "evaluate":
         command.extend([
             "--output-json",
