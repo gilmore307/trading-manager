@@ -59,8 +59,8 @@ MODEL_PROMOTION_TARGETS: tuple[ModelPromotionTarget, ...] = (
     ModelPromotionTarget("model_01_background_context", "background_context_model", "BackgroundContextModel", "background_context_state", "background_context_model"),
     ModelPromotionTarget("model_02_target_state", "target_state_model", "TargetStateModel", "target_context_state", "target_state_model"),
     ModelPromotionTarget("model_03_event_state", "event_state_model", "EventStateModel", "event_state_vector", "event_state_model"),
-    ModelPromotionTarget("model_04_unified_decision", "unified_decision_model", "UnifiedDecisionModel", "unified_decision_vector", "unified_decision_model"),
-    ModelPromotionTarget("model_05_option_expression", "option_expression_model", "OptionExpressionModel", "option_expression_plan", "option_expression_model"),
+    ModelPromotionTarget("model_04_unified_decision", "unified_decision_model", "UnifiedDecisionModel", "thesis_distribution_surface", "unified_decision_model"),
+    ModelPromotionTarget("model_05_option_expression", "option_expression_model", "OptionExpressionModel", "expression_probability_surface", "option_expression_model"),
 )
 
 TARGETS_BY_MODEL_ID = {target.model_id: target for target in MODEL_PROMOTION_TARGETS}

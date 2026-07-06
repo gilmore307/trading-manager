@@ -48,7 +48,7 @@ class ModelPromotionRequestTests(unittest.TestCase):
         self.assertEqual(normalized["priority"], "high")
         self.assertEqual(request["model_id"], "option_expression_model")
         self.assertEqual(request["model_layer"], "model_05_option_expression")
-        self.assertEqual(request["output_contract"], "option_expression_plan")
+        self.assertEqual(request["output_contract"], "expression_probability_surface")
         self.assertEqual(request["candidate_ref"], "trading-model://promotion-candidates/mpcand_example")
         self.assertEqual(request["evaluation_run_refs"], ["trading-model://eval-runs/mdevrun_example"])
         self.assertIn("evaluation_primary_replay_policy", request["policy_refs"])

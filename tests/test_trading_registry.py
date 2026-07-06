@@ -1330,7 +1330,7 @@ class RegistryHelperTests(unittest.TestCase):
             "C01_INTAKE_SNAPSHOT_TABLE": "trading_execution.c01_intake_snapshot",
             "C02_ENTRY_DECISION_TABLE": "trading_execution.c02_entry_decision",
             "C03_POSITION_LIFECYCLE_DECISION_TABLE": "trading_execution.c03_position_lifecycle_decision",
-            "C04_OPTION_REEXPRESSION_DECISION_TABLE": "trading_execution.c04_option_reexpression_decision",
+            "C04_EXPRESSION_DECISION_TABLE": "trading_execution.c04_expression_decision",
             "C05_ORDER_INTENT_TABLE": "trading_execution.c05_order_intent",
             "C06_EXECUTION_GATE_RESULT_TABLE": "trading_execution.c06_execution_gate_result",
             "C07_FAILURE_EXPLANATION_PACKET_TABLE": "trading_execution.c07_failure_explanation_packet",
@@ -1404,7 +1404,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertIn("C02 consumes M03/M04 plus optional M05 expression refs and replay-review event-attribution evidence", rows["ENTRY_DECISION"]["note"])
         self.assertEqual(rows["POSITION_LIFECYCLE_DECISION"]["payload"], "position_lifecycle_decision")
         self.assertIn("C03 is M04-driven", rows["POSITION_LIFECYCLE_DECISION"]["note"])
-        self.assertEqual(rows["OPTION_REEXPRESSION_DECISION"]["payload"], "option_reexpression_decision")
+        self.assertEqual(rows["EXPRESSION_DECISION"]["payload"], "expression_decision")
         self.assertEqual(rows["FAILURE_EXPLANATION_PACKET"]["payload"], "failure_explanation_packet")
         self.assertIn("residual event feedback candidates", rows["FAILURE_EXPLANATION_PACKET"]["note"])
         self.assertEqual(rows["EXECUTION_ORDER_INTENT"]["payload"], "execution_order_intent")
@@ -1424,7 +1424,7 @@ class RegistryHelperTests(unittest.TestCase):
         self.assertEqual(rows["CRYPTO_SPOT_ACCOUNT_SLEEVE"]["payload"], "crypto_spot_account")
         self.assertIn("fixed BTC, ETH, and SOL candidate pool", rows["CRYPTO_SPOT_ACCOUNT_SLEEVE"]["note"])
         self.assertEqual(rows["EQUITY_OPTIONS_ACCOUNT_SLEEVE"]["payload"], "equity_options_account")
-        self.assertIn("option re-expression", rows["EQUITY_OPTIONS_ACCOUNT_SLEEVE"]["note"])
+        self.assertIn("expression review", rows["EQUITY_OPTIONS_ACCOUNT_SLEEVE"]["note"])
         self.assertIn("symbols=BTC,ETH,SOL", rows["CRYPTO_SPOT_CANDIDATE_POOL_POLICY"]["payload"])
         self.assertIn("BTC-USDT,ETH-USDT,SOL-USDT", rows["CRYPTO_SPOT_CANDIDATE_POOL_POLICY"]["payload"])
 
