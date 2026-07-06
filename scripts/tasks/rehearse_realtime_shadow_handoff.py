@@ -40,7 +40,7 @@ LOCAL_RUNTIME_COMPONENTS = (
         (MODEL_03_EVENT_STATE, MODEL_04_UNIFIED_DECISION),
         (),
     ),
-    ("component_04_option_review", "C04", "Option Review", (), (MODEL_05_OPTION_EXPRESSION,)),
+    ("component_04_expression_review", "C04", "Expression Review", (), (MODEL_05_OPTION_EXPRESSION,)),
     ("component_05_order_intent", "C05", "Order Intent", (), ()),
     ("component_06_execution_gate", "C06", "Execution Gate", (), ()),
     ("component_07_failure_review", "C07", "Failure Review", (), ()),
