@@ -369,7 +369,49 @@ def _diagnosis_repaired(payload: Mapping[str, Any]) -> bool:
     diagnosis_status = str(payload.get("diagnosis_status") or "").lower()
     repair = payload.get("repair")
     repair_status = str(repair.get("repair_status") if isinstance(repair, Mapping) else "")
-    return diagnosis_status.startswith(("fixed", "repaired")) or repair_status in {"repaired", "no_action_needed"}
+    return diagnosis_status.startswith(("fixed", "repaired")) or diagnosis_status in {
+        "no_action",
+        "no_action_needed",
+        "not_needed",
+        "not_reproducible",
+    } or repair_status in {"repaired", "no_action_needed"}
+
+
+def _scheduler_lock_conflict_needs_no_action(request: Mapping[str, Any], payload: Mapping[str, Any]) -> bool:
+    text = _payload_text(
+        request.get("source_component"),
+        request.get("error_scope"),
+        request.get("error_kind"),
+        request.get("summary"),
+        payload.get("diagnosis_status"),
+        payload.get("root_cause"),
+        payload.get("verification"),
+        payload.get("retry_recommendation"),
+        payload.get("blockers"),
+    )
+    if "scheduler daemon lock is active" not in text:
+        return False
+    if "run_automation_scheduler_daemon.py" not in text:
+        return False
+    if not any(
+        marker in text
+        for marker in (
+            "single-daemon guard correctly rejected",
+            "already held by a running scheduler process",
+            "close_without_retry",
+        )
+    ):
+        return False
+    return any(
+        marker in text
+        for marker in (
+            "service_runtime_ready=true",
+            "lock.status=active",
+            "live pid",
+            "active/running",
+            "active (running)",
+        )
+    )
 
 
 def _automatic_retry_forbidden(payload: Mapping[str, Any]) -> bool:
@@ -697,6 +739,17 @@ def close_agent_repair(
         else:
             closure_status = "pending"
             blockers.append("agent diagnosis is not completed")
+    elif not payload:
+        blockers.append("completed diagnosis did not contain parseable JSON stdout")
+    elif _scheduler_lock_conflict_needs_no_action(request, payload):
+        closure_status = "closed"
+        actions.append(
+            {
+                "action": "no_action_needed",
+                "status": "completed",
+                "reason": "active scheduler daemon lock correctly rejected a duplicate scheduler daemon instance",
+            }
+        )
     elif existing_closure_status == "blocked":
         prior_actions = existing_receipt.get("actions")
         actions = list(prior_actions) if isinstance(prior_actions, list) else []
@@ -713,8 +766,6 @@ def close_agent_repair(
         blockers = list(prior_blockers) if isinstance(prior_blockers, list) else []
         if not blockers:
             blockers.append("existing blocked closure requires new successful retry evidence or manual repair")
-    elif not payload:
-        blockers.append("completed diagnosis did not contain parseable JSON stdout")
     elif not _diagnosis_repaired(payload):
         blockers.append("agent diagnosis did not report a repaired/fixed status")
     elif _automatic_retry_forbidden(payload):

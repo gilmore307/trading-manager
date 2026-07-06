@@ -362,6 +362,25 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(repair_status, "repaired")
         self.assertEqual(handling_status, "closed")
 
+    def test_no_action_closure_receipt_stays_no_action(self):
+        repair_status, handling_status = _apply_agent_repair_closure_receipt(
+            "diagnosed",
+            "open",
+            {
+                "closure_status": "closed",
+                "actions": [
+                    {
+                        "action": "no_action_needed",
+                        "status": "completed",
+                        "reason": "active scheduler daemon lock correctly rejected a duplicate scheduler daemon instance",
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(repair_status, "no_action_needed")
+        self.assertEqual(handling_status, "no_action_required")
+
     def test_supersedes_legacy_layer_nine_option_expression_errors(self):
         rows = [
             {

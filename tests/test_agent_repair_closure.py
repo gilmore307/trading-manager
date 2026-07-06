@@ -618,6 +618,67 @@ class AgentRepairClosureTests(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(receipt["actions"][-1]["action"], "blocked_closure_recheck")
 
+    def test_scheduler_lock_conflict_closes_as_no_action_after_blocked_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            candidate = self._write_candidate(
+                Path(raw_tmp),
+                request_overrides={
+                    "source_component": "trading-manager.historical_scheduler_daemon",
+                    "error_scope": "server_service",
+                    "error_kind": "RuntimeError",
+                    "summary": "historical scheduler daemon failed: scheduler daemon lock is active",
+                },
+                stdout_payload={
+                    "diagnosis_status": "completed",
+                    "root_cause": (
+                        "operator-boundary/concurrency: scheduler daemon lock is active. "
+                        "The single-daemon guard correctly rejected a duplicate startup because "
+                        "the lock was already held by a running scheduler process. Current service status "
+                        "is active/running with service_runtime_ready=true and lock.status=active."
+                    ),
+                    "verification": [
+                        {
+                            "command": "ps -p 897353 -o pid,ppid,stat,etime,cmd",
+                            "status": "passed",
+                            "evidence": "Confirmed PID 897353 is a live run_automation_scheduler_daemon.py process.",
+                        }
+                    ],
+                    "repair_attempted": False,
+                    "files_changed": [],
+                    "retry_recommendation": "close_without_retry_of_the_same_command_while_the_service_is_running",
+                    "blockers": [],
+                },
+            )
+            candidate.receipt_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_repair_closure_receipt",
+                        "closure_status": "blocked",
+                        "actions": [
+                            {
+                                "action": "blocked_closure_recheck",
+                                "status": "skipped",
+                                "reason": "existing blocked closure is not retried automatically without successful retry evidence",
+                            }
+                        ],
+                        "blockers": ["agent diagnosis did not report a repaired/fixed status"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            calls: list[tuple[str, ...]] = []
+
+            def fake_run(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+                calls.append(tuple(argv))
+                return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+            receipt = close_agent_repair(candidate, runner=fake_run)
+
+        self.assertEqual(receipt["closure_status"], "closed")
+        self.assertEqual(receipt["blockers"], [])
+        self.assertEqual(calls, [])
+        self.assertEqual(receipt["actions"][0]["action"], "no_action_needed")
+
     def test_incomplete_provider_diagnosis_closes_when_failure_register_resolved(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             root = Path(raw_tmp) / "storage" / "02_control_plane" / "runtime" / "agent_error_handling"

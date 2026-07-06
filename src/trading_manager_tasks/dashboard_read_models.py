@@ -318,6 +318,12 @@ def _apply_agent_repair_closure_receipt(
 ) -> tuple[str, str]:
     closure_status = str(closure_receipt.get("closure_status") or "").lower()
     if closure_status == "closed":
+        actions = closure_receipt.get("actions")
+        if isinstance(actions, list) and any(
+            isinstance(action, Mapping) and str(action.get("action") or "").lower() == "no_action_needed"
+            for action in actions
+        ):
+            return "no_action_needed", "no_action_required"
         return "repaired", "closed"
     if closure_status == "blocked":
         if handling_status in {"closed", "no_action_required"}:
