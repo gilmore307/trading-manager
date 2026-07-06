@@ -2547,6 +2547,16 @@ def _active_progress_has_counter(progress: Mapping[str, Any] | None) -> bool:
     return progress.get("expected_count") is not None
 
 
+def _active_progress_is_model_generation_row_counter(progress: Mapping[str, Any] | None) -> bool:
+    if not isinstance(progress, Mapping):
+        return False
+    stage_id = str(progress.get("stage_id") or "")
+    unit_label = str(progress.get("unit_label") or "").strip().lower()
+    extra = progress.get("extra")
+    dataset_split = extra.get("dataset_split") if isinstance(extra, Mapping) else None
+    return ".model_generation." in stage_id and unit_label in {"rows", "model rows"} and isinstance(dataset_split, Mapping)
+
+
 def _merge_task_progress_with_active_worker(
     dashboard_progress: Mapping[str, Any],
     active_progress: Mapping[str, Any] | None,
@@ -2555,6 +2565,10 @@ def _merge_task_progress_with_active_worker(
 
     if not isinstance(active_progress, Mapping):
         return dict(dashboard_progress)
+    if _active_progress_is_model_generation_row_counter(active_progress):
+        merged = dict(dashboard_progress)
+        merged["active_worker_progress"] = dict(active_progress)
+        return merged
     merged = dict(active_progress)
     merged["parent_task_progress"] = dict(dashboard_progress)
     merged.setdefault("progress_scope", "active_stage")
@@ -3865,8 +3879,12 @@ def _enrich_internal_stages(
         stage_type = str(stage.get("stage_type") or "")
         is_active = bool(active_stage_id and stage_id == active_stage_id)
         if is_active and _active_progress_has_counter(active_progress):
-            progress = dict(active_progress)  # type: ignore[arg-type]
-            progress.setdefault("progress_scope", "active_stage")
+            if _active_progress_is_model_generation_row_counter(active_progress):
+                progress = _internal_stage_progress(stage, is_active=is_active)
+                progress["active_worker_progress"] = dict(active_progress)  # type: ignore[arg-type]
+            else:
+                progress = dict(active_progress)  # type: ignore[arg-type]
+                progress.setdefault("progress_scope", "active_stage")
         elif stage_type == "data_acquisition":
             progress = _fold_stage_coverage_progress(
                 storage_root=storage_root,
@@ -4492,7 +4510,12 @@ def _task_timeline(
                     storage_root=storage_root,
                     active_stage_id_hint=str(dashboard_stage.get("active_stage_id") or ""),
                 )
-                progress = active_progress if _active_progress_has_counter(active_progress) else None
+                progress = (
+                    active_progress
+                    if _active_progress_has_counter(active_progress)
+                    and not _active_progress_is_model_generation_row_counter(active_progress)
+                    else None
+                )
                 dashboard_progress = (
                     dict(dashboard_stage["dashboard_progress"])
                     if isinstance(dashboard_stage.get("dashboard_progress"), Mapping)

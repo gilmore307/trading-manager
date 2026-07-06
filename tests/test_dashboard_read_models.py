@@ -3763,6 +3763,120 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(validation_stage["runtime_activity"]["activity_summary"], "Stage process started")
         self.assertEqual(validation_stage["runtime_activity"]["progress_label"], "0/3 dataset months")
 
+    def test_active_model_generation_row_counter_does_not_replace_split_month_progress(self):
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            service, env, wrapper = self._write_service_files(tmp)
+            runtime = tmp / "storage" / "02_control_plane" / "runtime"
+            runtime.mkdir(parents=True, exist_ok=True)
+            (runtime / "model_training_fold_state_aapl_2016-01_2017-06.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "manager_model_training_workflow_state",
+                        "start_month": "2016-01",
+                        "end_month": "2017-06",
+                        "stages": [
+                            {
+                                "stage_id": "model_05_option_expression.option_chain_data_acquisition",
+                                "stage_type": "data_acquisition",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
+                                "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "model_05_option_expression.feature_generation",
+                                "stage_type": "feature_generation",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
+                                "status": "succeeded",
+                            },
+                            {
+                                "stage_id": "model_05_option_expression.model_generation.train",
+                                "stage_type": "model_generation",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
+                                "status": "ready",
+                                "started_at_utc": "2026-07-06T08:17:35Z",
+                                "last_reason": "stage execution started by manager stage executor",
+                                "dataset_split": {
+                                    "split_name": "train",
+                                    "split_months": 12,
+                                    "split_start_month": "2016-01",
+                                    "split_end_month": "2016-12",
+                                },
+                                "dataset_unit": {
+                                    "unit_kind": "target_symbol_walk_forward_12_3_3",
+                                    "unit_months": 18,
+                                    "start_month": "2016-01",
+                                    "end_month": "2017-06",
+                                    "target_symbol": "AAPL",
+                                },
+                            },
+                            {
+                                "stage_id": "model_05_option_expression.model_generation.validation",
+                                "stage_type": "model_generation",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
+                                "status": "blocked",
+                                "blockers": ["model_05_option_expression.model_generation.train_complete"],
+                                "dataset_split": {"split_name": "validation"},
+                            },
+                            {
+                                "stage_id": "model_05_option_expression.model_generation.test",
+                                "stage_type": "model_generation",
+                                "layer": 5,
+                                "layer_key": "model_05_option_expression",
+                                "status": "blocked",
+                                "blockers": ["model_05_option_expression.model_generation.validation_complete"],
+                                "dataset_split": {"split_name": "test"},
+                            },
+                        ],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            write_task_progress_node(
+                progress_root=runtime / "task_progress",
+                worker_id="model_worker_1",
+                task_uid="2016-01..2017-06:model_05_option_expression.model_generation.train",
+                stage_id="model_05_option_expression.model_generation.train",
+                unit_label="rows",
+                processed_count=5115,
+                expected_count=1,
+                node_id="generate_model_rows",
+                node_label="Generate model rows",
+                current_activity="Generated 5115 M05 option-expression rows",
+                extra={
+                    "dataset_split": {
+                        "split_name": "train",
+                        "split_policy": "chronological_cumulative_walk_forward_12_3_3",
+                    },
+                    "progress_basis": "chronological 12+3+3 train/validation/test month coverage required by the walk-forward fold",
+                },
+            )
+            status = collect_historical_scheduler_status(
+                storage_root=tmp / "storage" / "02_control_plane",
+                state_path=tmp / "runtime" / "historical_scheduler_state.json",
+                lock_path=tmp / "runtime" / "historical_scheduler.lock",
+                decision_log_path=tmp / "runtime" / "historical_scheduler_decisions.jsonl",
+                service_template_path=service,
+                service_env_path=env,
+                daemon_wrapper_path=wrapper,
+            )
+            payload = build_historical_task_progress_summary(status, generated_at_utc="2026-07-06T08:19:00Z")
+
+        task = next(task for task in payload["chart_payload"]["task_timeline"] if task["task_id"] == "model_05_option_expression")
+        self.assertNotEqual(task["detail"]["progress"]["unit_label"], "rows")
+        self.assertNotEqual(task["detail"]["progress"].get("expected_count"), 1)
+        internal_stages = {stage["stage_id"]: stage for stage in task["detail"]["internal_stages"]}
+        train_stage = internal_stages["model_05_option_expression.model_generation.train"]
+        self.assertEqual(train_stage["progress"]["progress_source"], "internal_stage_progress")
+        self.assertEqual(train_stage["progress"]["expected_count"], 12)
+        self.assertEqual(train_stage["progress"]["unit_label"], "dataset months")
+        self.assertEqual(train_stage["runtime_activity"]["activity_summary"], "Generated 5115 M05 option-expression rows")
+        self.assertEqual(train_stage["runtime_activity"]["progress_label"], "0/12 dataset months")
+
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:
             tmp = Path(raw_tmp)
