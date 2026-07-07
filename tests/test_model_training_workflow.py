@@ -477,6 +477,15 @@ class ModelTrainingWorkflowTests(unittest.TestCase):
         self.assertIn("--source-start", command)
         self.assertIn("--source-end", command)
 
+    def test_m03_model_generation_uses_database_backed_event_universe(self) -> None:
+        command = model_script(3, "event_state", "generate")
+
+        self.assertIn("--from-database", command)
+        self.assertIn("--source-start", command)
+        self.assertIn("--source-end", command)
+        self.assertIn("--target-symbol", command)
+        self.assertIn("${SELECTED_TARGET_SYMBOL}", command)
+
     def test_m05_model_generation_resumes_existing_rows(self) -> None:
         command = model_script(5, "option_expression", "generate")
 

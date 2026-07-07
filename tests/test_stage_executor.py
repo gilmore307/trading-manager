@@ -435,6 +435,16 @@ class StageExecutorTests(unittest.TestCase):
 
         self.assertEqual(command, ["runner", "--month", "2016-01", "--path", "summary_2016-02.json"])
 
+    def test_resolves_selected_target_symbol_placeholder_before_execution(self):
+        command = _resolve_command_placeholders(
+            ["runner", "--target-symbol", "${SELECTED_TARGET_SYMBOL}"],
+            start_month="2016-01",
+            end_month="2016-02",
+            selected_target_symbol="aapl",
+        )
+
+        self.assertEqual(command, ["runner", "--target-symbol", "AAPL"])
+
     def test_rejects_deprecated_runtime_model_rows_output(self):
         stage = StageProgress(
             stage_id="model_03_event_state.model_generation.train",

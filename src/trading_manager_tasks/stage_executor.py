@@ -97,12 +97,19 @@ def _month_start(month: str) -> str:
     return f"{month}-01T00:00:00-05:00"
 
 
-def _resolve_command_placeholders(command: list[str], *, start_month: str, end_month: str) -> list[str]:
+def _resolve_command_placeholders(
+    command: list[str],
+    *,
+    start_month: str,
+    end_month: str,
+    selected_target_symbol: str | None = None,
+) -> list[str]:
     replacements = {
         "${START_MONTH}": start_month,
         "${END_MONTH}": end_month,
         "${START_MONTH_START_ET}": _month_start(start_month),
         "${END_MONTH_EXCLUSIVE_START_ET}": _exclusive_month_start(end_month),
+        "${SELECTED_TARGET_SYMBOL}": selected_target_symbol.strip().upper() if selected_target_symbol else "",
     }
     resolved = []
     for token in command:
@@ -684,7 +691,15 @@ def execute_next_ready_stage(
     if write:
         write_workflow_state(state_path, state)
     stage = next(updated_stage for updated_stage in state.stages if updated_stage.stage_id == stage_id)
-    stage = replace(stage, command=_resolve_command_placeholders(stage.command, start_month=start_month, end_month=end_month))
+    stage = replace(
+        stage,
+        command=_resolve_command_placeholders(
+            stage.command,
+            start_month=start_month,
+            end_month=end_month,
+            selected_target_symbol=selected_target_symbol,
+        ),
+    )
     task_uid = f"{start_month if start_month == end_month else f'{start_month}..{end_month}'}:{stage.stage_id}"
     summary = execute_stage_process(
         stage,

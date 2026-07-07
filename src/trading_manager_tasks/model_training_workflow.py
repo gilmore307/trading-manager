@@ -308,7 +308,7 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
         "python3",
         f"/root/projects/trading-model/scripts/models/{physical_model_key}/{script_name}",
     ]
-    if layer in {2, 4, 5, 6} and verb == "generate":
+    if layer in {2, 3, 4, 5, 6} and verb == "generate":
         command.extend([
             "--from-database",
             "--source-start",
@@ -316,6 +316,8 @@ def model_script(layer: int, slug: str, verb: str) -> list[str]:
             "--source-end",
             "${END_MONTH_EXCLUSIVE_START_ET}",
         ])
+        if layer == 3:
+            command.extend(["--target-symbol", "${SELECTED_TARGET_SYMBOL}"])
         if layer == 5:
             command.append("--resume-existing")
     if verb == "evaluate":
@@ -729,13 +731,19 @@ def _rolling_fold_dataset_splits(start_month: str, end_month: str) -> tuple[dict
     return tuple(splits)
 
 
-def _generation_command_for_dataset_split(command: list[str], split: Mapping[str, Any]) -> list[str]:
+def _generation_command_for_dataset_split(
+    command: list[str],
+    split: Mapping[str, Any],
+    *,
+    selected_target_symbol: str | None = None,
+) -> list[str]:
     split_name = str(split["split_name"])
     replacements = {
         "${START_MONTH_START_ET}": str(split["split_start_time"]),
         "${END_MONTH_EXCLUSIVE_START_ET}": str(split["split_end_time"]),
         "${START_MONTH}": f"{split['split_start_month']}_{split_name}",
         "${END_MONTH}": str(split["split_end_month"]),
+        "${SELECTED_TARGET_SYMBOL}": _normalize_selected_target_symbol(selected_target_symbol) or "",
     }
     resolved: list[str] = [f"TRADING_MODEL_DATASET_SPLIT_NAME={split_name}", f"TRADING_MODEL_DATASET_SPLIT_POLICY={split['split_policy']}"]
     for token in command:
@@ -1045,7 +1053,11 @@ def _build_layer_workflow(
                     stage_type="model_generation",
                     description=f"{model_generation_description} Split: {split_name}.",
                     status="blocked",
-                    command=_generation_command_for_dataset_split(generate, split),
+                    command=_generation_command_for_dataset_split(
+                        generate,
+                        split,
+                        selected_target_symbol=selected_target_symbol,
+                    ),
                     dataset_unit=dataset_unit,
                     blockers=_with_target_blocker(
                         split_blockers,
