@@ -3,11 +3,9 @@
 This module builds the fold-scoped event universe consumed by M03 event-impact
 work from already-reviewed local evidence: target-local bar receipts for the
 bounded abnormal-activity detector, reviewed event-feed SQL/artifact coverage,
-and generated market-session calendar context. The current physical
-``trading-data`` data-source module still uses the residual-event-governance
-source name, but the manager-owned stage is pre-replay M03 event impact. It
-performs no provider calls, no model activation, no broker execution, and no
-storage lifecycle mutation.
+and generated market-session calendar context. The manager-owned stage is
+pre-replay M03 event impact. It performs no provider calls, no model activation,
+no broker execution, and no storage lifecycle mutation.
 """
 
 from __future__ import annotations
