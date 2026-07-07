@@ -3874,6 +3874,26 @@ class DashboardReadModelProducerTests(unittest.TestCase):
                         "split_name": "train",
                         "split_policy": "chronological_cumulative_walk_forward_12_3_3",
                     },
+                    "month_progress": {
+                        "completed_months": 1,
+                        "current_month": "2016-02",
+                        "expected_months": 12,
+                        "months": [
+                            "2016-01",
+                            "2016-02",
+                            "2016-03",
+                            "2016-04",
+                            "2016-05",
+                            "2016-06",
+                            "2016-07",
+                            "2016-08",
+                            "2016-09",
+                            "2016-10",
+                            "2016-11",
+                            "2016-12",
+                        ],
+                        "unit_label": "dataset months",
+                    },
                     "progress_basis": "chronological 12+3+3 train/validation/test month coverage required by the walk-forward fold",
                 },
             )
@@ -3897,7 +3917,7 @@ class DashboardReadModelProducerTests(unittest.TestCase):
         self.assertEqual(train_stage["progress"]["expected_count"], 12)
         self.assertEqual(train_stage["progress"]["unit_label"], "dataset months")
         self.assertEqual(train_stage["runtime_activity"]["activity_summary"], "Generated 5115 M05 option-expression rows")
-        self.assertEqual(train_stage["runtime_activity"]["progress_label"], "0/12 dataset months")
+        self.assertEqual(train_stage["runtime_activity"]["progress_label"], "1/12 dataset months")
 
     def test_completed_model_task_ignores_model_row_count_for_progress(self):
         with tempfile.TemporaryDirectory() as raw_tmp:

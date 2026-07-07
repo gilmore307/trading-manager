@@ -2522,6 +2522,32 @@ def _progress_display_label(progress: Mapping[str, Any] | None) -> str | None:
     return f"{display_count}/{expected} {unit_label}"
 
 
+def _active_month_progress_display(active_progress: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(active_progress, Mapping):
+        return None
+    extra = active_progress.get("extra")
+    extra = extra if isinstance(extra, Mapping) else {}
+    month_progress = extra.get("month_progress")
+    if not isinstance(month_progress, Mapping):
+        return None
+    try:
+        completed = max(0, int(month_progress.get("completed_months") or 0))
+        expected = max(0, int(month_progress.get("expected_months") or 0))
+    except (TypeError, ValueError):
+        return None
+    if expected <= 0:
+        return None
+    return {
+        "expected_count": expected,
+        "ready_count": completed,
+        "active_count": completed,
+        "unit_label": str(month_progress.get("unit_label") or "dataset months"),
+        "progress_basis": active_progress.get("progress_basis"),
+        "progress_source": "active_worker_month_progress",
+        "current_month": month_progress.get("current_month"),
+    }
+
+
 def _worker_facing_progress(progress: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
     if not isinstance(progress, Mapping):
         return None
@@ -2621,10 +2647,11 @@ def _task_runtime_activity_from_worker(
     row_count_label = _worker_rows_written_label(extra)
     if row_count_label and row_count_label not in node_label:
         node_label = f"{node_label} · {row_count_label}"
-    display_progress = task_progress
+    display_progress = _active_month_progress_display(active_progress) or task_progress
     parent_task_progress = task_progress.get("parent_task_progress") if isinstance(task_progress, Mapping) else None
     if (
-        str(dashboard_stage.get("stage_type") or "") == "model_task"
+        display_progress is task_progress
+        and str(dashboard_stage.get("stage_type") or "") == "model_task"
         and isinstance(parent_task_progress, Mapping)
     ):
         display_progress = parent_task_progress
