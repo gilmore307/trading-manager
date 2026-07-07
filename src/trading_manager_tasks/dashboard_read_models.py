@@ -2773,7 +2773,6 @@ MODEL_NUMBER_BY_LAYER_KEY = {
     "model_04_unified_decision": 4,
     "model_05_alpha_confidence": 4,
     "model_05_option_expression": 5,
-    "model_03_event_state": 6,
 }
 PUBLIC_LAYER_BY_LAYER_KEY = {
     "model_05_alpha_confidence": 4,

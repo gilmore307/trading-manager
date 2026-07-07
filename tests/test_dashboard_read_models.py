@@ -34,6 +34,9 @@ from trading_manager_tasks.task_progress import write_task_progress_node
 
 
 class DashboardReadModelProducerTests(unittest.TestCase):
+    def test_event_state_public_task_label_uses_current_m03_number(self):
+        self.assertEqual(_model_task_label("model_03_event_state", layer=3), "M03 Event State")
+
     def test_alpha_confidence_checkpoint_rolls_into_unified_decision_public_task(self):
         self.assertEqual(_model_task_label("model_05_alpha_confidence", layer=4), "M04 Unified Decision Model")
         rows = _aggregate_model_task_stages(
