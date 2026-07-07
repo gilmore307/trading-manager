@@ -31,7 +31,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             "rationale": "Fixture review approves the deterministic temporal attention candidate.",
         }
 
-    def _write_replay_dataset(self, storage_root: Path, *, include_event_pool: bool = False) -> Path:
+    def _write_replay_dataset(self, storage_root: Path, *, include_event_effect_rows: bool = False) -> Path:
         dataset_root = storage_root.parent / "05_replay_datasets" / "promotion_replay_candidate_policy"
         replay_run_root = dataset_root / "replay_execution_runs" / "model_group_replay_fixture"
         replay_run_root.mkdir(parents=True)
@@ -40,10 +40,10 @@ class ModelGroupAttributionTests(unittest.TestCase):
             writer.writeheader()
             writer.writerow({"month": "2021-01", "source_id": "okx_crypto_market_data", "coverage_status": "available"})
             writer.writerow({"month": "2021-02", "source_id": "okx_crypto_market_data", "coverage_status": "available"})
-        if include_event_pool:
-            event_pool_path = storage_root / "runtime" / "model_03_event_observation_inputs" / "2021-01_2021-02.json"
-            event_pool_path.parent.mkdir(parents=True, exist_ok=True)
-            event_pool_path.write_text(
+        if include_event_effect_rows:
+            event_effect_path = storage_root / "runtime" / "model_03_event_observation_inputs" / "2021-01_2021-02.json"
+            event_effect_path.parent.mkdir(parents=True, exist_ok=True)
+            event_effect_path.write_text(
                 json.dumps(
                     {
                         "contract_type": "manager_model_03_event_impact_input_materialization",
@@ -79,6 +79,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
                                 "intensity_score": 0.9,
                                 "novelty_score": 0.6,
                                 "evidence_confidence_score": 0.9,
+                                "impact_evidence_status": "no_impact",
                                 "review_status": "accepted",
                                 "standardization_status": "standardized",
                             },
@@ -314,7 +315,7 @@ class ModelGroupAttributionTests(unittest.TestCase):
             tmp = Path(raw_tmp)
             storage_root = tmp / "storage" / "02_control_plane"
             storage_root.mkdir(parents=True)
-            dataset_root = self._write_replay_dataset(storage_root, include_event_pool=True)
+            dataset_root = self._write_replay_dataset(storage_root, include_event_effect_rows=True)
 
             decision = run_model_group_replay_review_if_ready(storage_root=storage_root)
 
@@ -386,8 +387,12 @@ class ModelGroupAttributionTests(unittest.TestCase):
                 2,
             )
             m03_rows = [row for row in layer_review_rows if row["layer_id"] == "model_03_event_state"]
-            self.assertEqual({row["source_row_kind"] for row in m03_rows}, {"model_03_event_pool_event"})
-            self.assertTrue(all(row["candidate_set_scope"] == "point_in_time_event_pool_event" for row in m03_rows))
+            self.assertEqual({row["source_row_kind"] for row in m03_rows}, {"model_03_event_effect_review_row"})
+            self.assertTrue(all(row["candidate_set_scope"] == "point_in_time_event_effect_row" for row in m03_rows))
+            self.assertEqual(
+                {row["layer_diagnostics"]["event_impact_disposition"] for row in m03_rows},
+                {"unresolved_insufficient_evidence", "no_impact"},
+            )
             self.assertEqual(
                 sum(1 for row in layer_review_rows if row["layer_id"] == "model_04_unified_decision"),
                 5,
@@ -430,11 +435,15 @@ class ModelGroupAttributionTests(unittest.TestCase):
             )
             self.assertEqual(
                 performance_summary["layer_differentiation"]["model_03_event_state"]["coverage_basis"],
-                "model_03_event_observation_pool_event_rows",
+                "model_03_interpreted_event_effect_rows",
             )
             self.assertEqual(
-                performance_summary["layer_differentiation"]["model_03_event_state"]["event_pool_row_count"],
+                performance_summary["layer_differentiation"]["model_03_event_state"]["event_effect_row_count"],
                 2,
+            )
+            self.assertEqual(
+                performance_summary["layer_differentiation"]["model_03_event_state"]["event_impact_disposition_counts"],
+                {"no_impact": 1, "unresolved_insufficient_evidence": 1},
             )
             target_performance = performance_summary["summary"]["target_performance"]
             self.assertEqual(target_performance["turnover_gross_pnl_total"], 150.0)

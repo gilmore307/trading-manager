@@ -14,6 +14,7 @@ import json
 import sys
 from collections.abc import Iterable as IterableABC
 from collections.abc import Mapping as MappingABC
+from collections.abc import Sequence as SequenceABC
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -328,7 +329,7 @@ def run_model_group_replay_review_if_ready(
         if model_candidate_selection_trace_path is not None
         else ()
     )
-    m03_event_pool_rows, m03_event_pool_summary = _load_m03_event_pool_rows(
+    m03_event_effect_rows, m03_event_effect_summary = _load_m03_event_effect_rows(
         storage_root=storage_root,
         dataset_root=dataset_root,
         max_rows=max_review_rows,
@@ -337,7 +338,7 @@ def run_model_group_replay_review_if_ready(
         _build_layer_review_rows(
             decision_rows=decision_rows,
             trace_rows=trace_rows,
-            m03_event_pool_rows=m03_event_pool_rows,
+            m03_event_effect_rows=m03_event_effect_rows,
             max_decision_rows=max_review_rows,
         )
     )
@@ -345,7 +346,7 @@ def run_model_group_replay_review_if_ready(
     performance_summary = _replay_review_performance_summary(
         decision_rows=decision_rows,
         trace_rows=trace_rows,
-        m03_event_pool_rows=m03_event_pool_rows,
+        m03_event_effect_rows=m03_event_effect_rows,
         replay_receipt=replay_receipt,
     )
     review_summary = _review_diagnostic_summary(review_rows)
@@ -449,7 +450,7 @@ def run_model_group_replay_review_if_ready(
             "layer_review_excluded_layers": list(EXCLUDED_REPLAY_LAYER_REVIEW_LAYERS),
             "layer_review_row_count": len(layer_review_rows),
             "layer_review_diagnostic_summary": layer_review_summary,
-            "model_03_event_pool_summary": m03_event_pool_summary,
+            "model_03_event_effect_summary": m03_event_effect_summary,
             "cause_family_contract": ["data_insufficiency", "execution_connection_failure", "model_mechanism_defect"],
             "event_attribution": event_attribution_summary,
             "event_attribution_status": event_attribution_summary.get("event_attribution_status"),
@@ -489,7 +490,7 @@ def run_model_group_replay_review_if_ready(
             "layer_review_rows_ref": str(layer_review_rows_path),
             "layer_review_row_count": len(layer_review_rows),
             "layer_review_diagnostic_summary": layer_review_summary,
-            "model_03_event_pool_summary": m03_event_pool_summary,
+            "model_03_event_effect_summary": m03_event_effect_summary,
             "replay_review_performance_summary_ref": str(performance_summary_path),
             "replay_review_performance_summary": performance_summary["summary"],
             "layer_attribution_report_ref": str(layer_attribution_root / "layer_attribution_report.json"),
@@ -967,7 +968,7 @@ def _build_layer_review_rows(
     *,
     decision_rows: Sequence[Mapping[str, Any]],
     trace_rows: Sequence[Mapping[str, Any]],
-    m03_event_pool_rows: Sequence[Mapping[str, Any]],
+    m03_event_effect_rows: Sequence[Mapping[str, Any]],
     max_decision_rows: int | None,
 ) -> Iterable[dict[str, Any]]:
     trace_index = _selected_trace_index(trace_rows)
@@ -1002,13 +1003,13 @@ def _build_layer_review_rows(
                 layer_label=layer_label,
                 trace_row=trace_row,
             )
-    for event_index, event_row in enumerate(m03_event_pool_rows, start=1):
+    for event_index, event_row in enumerate(m03_event_effect_rows, start=1):
         source_id = _m03_event_source_id(event_row, event_index)
         yield _layer_review_row(
             event_row,
             source_index=event_index,
             source_id=source_id,
-            source_row_kind="model_03_event_pool_event",
+            source_row_kind="model_03_event_effect_review_row",
             layer_order=3,
             layer_id=M03_EVENT_STATE_LAYER,
             layer_label="M03 Event State",
@@ -1082,7 +1083,7 @@ def _m01_background_context_time_state_rows(trace_rows: Sequence[Mapping[str, An
     return rows
 
 
-def _load_m03_event_pool_rows(
+def _load_m03_event_effect_rows(
     *,
     storage_root: Path,
     dataset_root: Path,
@@ -1092,8 +1093,8 @@ def _load_m03_event_pool_rows(
         from .model_group_replay_event_attribution import _fold_scope_from_dataset, _load_event_candidates
     except ImportError:
         return (), {
-            "event_pool_status": "unavailable",
-            "event_pool_error": "model_group_replay_event_attribution_import_failed",
+            "event_effect_status": "unavailable",
+            "event_effect_error": "model_group_replay_event_attribution_import_failed",
         }
     fold_scope = _fold_scope_from_dataset(dataset_root)
     event_candidates, source_summary = _load_event_candidates(storage_root=storage_root, fold_scope=fold_scope)
@@ -1101,24 +1102,51 @@ def _load_m03_event_pool_rows(
     for index, candidate in enumerate(event_candidates, start=1):
         if max_rows is not None and index > max_rows:
             break
-        rows.append(_m03_event_pool_row(candidate, index=index))
+        rows.append(_m03_event_effect_row(candidate, index=index))
+    disposition_counts = _count_text(row.get("event_impact_disposition") for row in rows)
     return tuple(rows), {
-        "event_pool_status": "published" if rows else "empty",
+        "event_effect_status": "published" if rows else "empty",
         "fold_scope": fold_scope,
         "source_summary": source_summary,
-        "event_pool_row_count": len(rows),
-        "event_pool_total_candidate_count": len(event_candidates),
-        "row_unit": "one_row_per_event_pool_event",
+        "event_effect_row_count": len(rows),
+        "event_effect_total_candidate_count": len(event_candidates),
+        "event_impact_disposition_counts": disposition_counts,
+        "row_unit": "one_row_per_interpreted_event_effect_row",
     }
 
 
-def _m03_event_pool_row(candidate: Mapping[str, Any], *, index: int) -> dict[str, Any]:
+def _m03_event_effect_row(candidate: Mapping[str, Any], *, index: int) -> dict[str, Any]:
     interpretation = candidate.get("interpretation") if isinstance(candidate.get("interpretation"), MappingABC) else {}
     available_time = str(candidate.get("available_time") or interpretation.get("available_time") or "").strip()
-    event_ref = str(candidate.get("event_ref") or interpretation.get("source_artifact_hash") or f"event_pool_{index}")
+    event_ref = str(candidate.get("event_ref") or interpretation.get("source_artifact_hash") or f"event_effect_{index}")
     affected_entities = interpretation.get("affected_entities")
+    event_impact_disposition = _event_impact_disposition(candidate, interpretation)
+    impact_evidence_status = str(
+        candidate.get("impact_evidence_status")
+        or candidate.get("event_impact_evidence_status")
+        or interpretation.get("impact_evidence_status")
+        or event_impact_disposition
+        or ""
+    ).strip()
+    semantic_node = (
+        candidate.get("semantic_node")
+        or candidate.get("semantic_node_ref")
+        or candidate.get("semantic_taxonomy_node_ref")
+        or interpretation.get("semantic_node")
+        or interpretation.get("semantic_node_ref")
+        or interpretation.get("normalized_event_type")
+    )
+    effect_model_node = (
+        candidate.get("effect_model_node")
+        or candidate.get("effect_model_node_ref")
+        or candidate.get("event_family_key")
+        or interpretation.get("effect_model_node")
+        or interpretation.get("effect_model_node_ref")
+        or interpretation.get("normalized_event_type")
+    )
+    is_no_impact = event_impact_disposition == "no_impact"
     row = {
-        "contract_type": "model_03_event_pool_event_row",
+        "contract_type": "model_03_event_effect_review_row",
         "event_ref": event_ref,
         "event_interpretation_ref": candidate.get("event_interpretation_ref"),
         "timestamp": available_time,
@@ -1126,6 +1154,10 @@ def _m03_event_pool_row(candidate: Mapping[str, Any], *, index: int) -> dict[str
         "event_time": candidate.get("event_time") or available_time,
         "event_month": candidate.get("event_month") or (available_time[:7] if len(available_time) >= 7 else None),
         "normalized_event_type": interpretation.get("normalized_event_type"),
+        "semantic_node": semantic_node,
+        "effect_model_node": effect_model_node,
+        "event_impact_disposition": event_impact_disposition,
+        "impact_evidence_status": impact_evidence_status,
         "event_title": interpretation.get("title"),
         "event_summary": interpretation.get("summary") or interpretation.get("rationale_summary"),
         "affected_scope": interpretation.get("affected_scope"),
@@ -1141,15 +1173,19 @@ def _m03_event_pool_row(candidate: Mapping[str, Any], *, index: int) -> dict[str
                 "event_ref": event_ref,
                 "event_interpretation_ref": candidate.get("event_interpretation_ref"),
                 "normalized_event_type": interpretation.get("normalized_event_type"),
+                "semantic_node": semantic_node,
+                "effect_model_node": effect_model_node,
+                "event_impact_disposition": event_impact_disposition,
+                "impact_evidence_status": impact_evidence_status,
                 "affected_scope": interpretation.get("affected_scope"),
                 "affected_entities": affected_entities if isinstance(affected_entities, list) else [],
-                "event_uncertainty_score_1D": interpretation.get("uncertainty_score"),
-                "event_entry_block_pressure_score_1D": interpretation.get("intensity_score"),
-                "event_strategy_disable_pressure_score_1D": max(
+                "event_uncertainty_score_1D": 0.0 if is_no_impact else interpretation.get("uncertainty_score"),
+                "event_entry_block_pressure_score_1D": 0.0 if is_no_impact else interpretation.get("intensity_score"),
+                "event_strategy_disable_pressure_score_1D": 0.0 if is_no_impact else max(
                     0.0,
                     (_safe_float(interpretation.get("intensity_score")) or 0.0) - 0.8,
                 ),
-                "event_path_risk_score_1D": max(
+                "event_path_risk_score_1D": 0.0 if is_no_impact else max(
                     0.0,
                     min(
                         1.0,
@@ -1162,7 +1198,7 @@ def _m03_event_pool_row(candidate: Mapping[str, Any], *, index: int) -> dict[str
                     ),
                 ),
                 "evidence_confidence_score": interpretation.get("evidence_confidence_score"),
-                "direction_bias_score": interpretation.get("direction_bias_score"),
+                "direction_bias_score": 0.0 if is_no_impact else interpretation.get("direction_bias_score"),
             }
         },
         "diagnostic_only": True,
@@ -1172,6 +1208,55 @@ def _m03_event_pool_row(candidate: Mapping[str, Any], *, index: int) -> dict[str
     if symbol:
         row["symbol"] = symbol
     return row
+
+
+def _event_impact_disposition(candidate: Mapping[str, Any], interpretation: Mapping[str, Any]) -> str:
+    values = (
+        candidate.get("event_impact_disposition"),
+        candidate.get("impact_disposition"),
+        candidate.get("event_effect_disposition"),
+        candidate.get("effect_model_disposition"),
+        candidate.get("impact_evidence_status"),
+        candidate.get("event_impact_evidence_status"),
+        interpretation.get("event_impact_disposition"),
+        interpretation.get("impact_disposition"),
+        interpretation.get("impact_evidence_status"),
+    )
+    aliases = {
+        "no_impact": "no_impact",
+        "no_event_effect": "no_impact",
+        "no_admissible_impact": "no_impact",
+        "context_only": "context_only",
+        "direction_neutral_context_only": "context_only",
+        "risk_shape": "risk_shape",
+        "risk_control_feature_accepted_not_alpha": "risk_shape",
+        "directional_effect": "directional_effect",
+        "impact_function_projection": "directional_effect",
+        "unresolved": "unresolved_insufficient_evidence",
+        "unresolved_insufficient_evidence": "unresolved_insufficient_evidence",
+    }
+    for value in values:
+        normalized = aliases.get(str(value or "").strip().lower())
+        if normalized:
+            return normalized
+    model = candidate.get("event_effect_model") or candidate.get("event_family_effect_model") or interpretation.get("event_effect_model")
+    if isinstance(model, MappingABC):
+        model_values = (
+            model.get("event_effect_model_type"),
+            model.get("projection_mode"),
+            model.get("directional_mean_shift_status"),
+        )
+        for value in model_values:
+            normalized = aliases.get(str(value or "").strip().lower())
+            if normalized:
+                return normalized
+        channels = model.get("distribution_channels")
+        channel_set = {str(channel).strip() for channel in channels} if isinstance(channels, SequenceABC) and not isinstance(channels, (str, bytes, bytearray)) else set()
+        if channel_set & {"mean_shift", "mode_shift", "directional_contribution"}:
+            return "directional_effect"
+        if channel_set & {"variance_multiplier", "left_tail_delta", "right_tail_delta", "skew_delta", "confidence_discount", "gate_pressure"}:
+            return "risk_shape"
+    return "unresolved_insufficient_evidence"
 
 
 def _trace_source_id(row: Mapping[str, Any], index: int) -> str:
@@ -1414,18 +1499,18 @@ def _m02_target_state_classification(
 
 
 def _m03_event_state_classification(row: Mapping[str, Any], *, diagnostics: Mapping[str, Any]) -> dict[str, Any]:
-    if _is_m03_event_pool_row(row):
+    if _is_m03_event_effect_row(row):
         event_ref = str(diagnostics.get("event_ref") or row.get("event_ref") or "not_reported")
         return _missing_independent_factor_label_classification(
-            candidate_set_scope="point_in_time_event_pool_event",
-            chosen_action=f"publish_event_state:{event_ref}",
-            basis="M03 independent review requires joined event outcome labels for each point-in-time event-pool row before M04 can inherit responsibility",
+            candidate_set_scope="point_in_time_event_effect_row",
+            chosen_action=f"publish_event_effect:{event_ref}",
+            basis="M03 independent review requires joined event outcome labels for each point-in-time interpreted event/effect row before M04 can inherit responsibility",
         )
     if _is_model_candidate_trace_row(row):
         return _invalid_layer_trace_classification(
             candidate_set_scope="invalid_m03_target_candidate_trace",
             chosen_action="invalid_target_candidate_event_state_row",
-            basis="M03 must be event-pool driven; candidate trace rows belong to M02 target state",
+            basis="M03 must be interpreted-event/effect driven; candidate trace rows belong to M02 target state",
         )
     uncertainty = _safe_float(diagnostics.get("event_uncertainty_score_1D"))
     block = _safe_float(diagnostics.get("event_entry_block_pressure_score_1D"))
@@ -1522,8 +1607,11 @@ def _is_m01_background_context_time_state_row(row: Mapping[str, Any]) -> bool:
     return str(row.get("contract_type") or "").strip() == "model_01_background_context_time_state_row"
 
 
-def _is_m03_event_pool_row(row: Mapping[str, Any]) -> bool:
-    return str(row.get("contract_type") or "").strip() == "model_03_event_pool_event_row"
+def _is_m03_event_effect_row(row: Mapping[str, Any]) -> bool:
+    return str(row.get("contract_type") or "").strip() in {
+        "model_03_event_effect_review_row",
+        "model_03_event_pool_event_row",
+    }
 
 
 def _missing_independent_factor_label_classification(
@@ -1740,11 +1828,12 @@ def _effective_layer_decision(
             f"same_timestamp_rank={rank}"
         )
     if layer_id == "model_03_event_state":
-        if _is_m03_event_pool_row(row):
+        if _is_m03_event_effect_row(row):
             event_type = diagnostics.get("normalized_event_type") or row.get("normalized_event_type") or "event"
             scope = diagnostics.get("affected_scope") or row.get("affected_scope") or "unknown_scope"
             available_time = row.get("available_time") or row.get("timestamp") or "not_reported"
-            return f"event_pool_event {event_type} scope={scope} available={available_time}"
+            disposition = diagnostics.get("event_impact_disposition") or row.get("event_impact_disposition") or "unresolved"
+            return f"event_effect {event_type} disposition={disposition} scope={scope} available={available_time}"
         if _is_model_candidate_trace_row(row):
             return (
                 f"event_state_available timestamp={row.get('replay_time_pointer') or row.get('timestamp') or 'not_reported'} "
@@ -1777,13 +1866,17 @@ def _layer_trace_evidence(
     row: Mapping[str, Any],
     trace_row: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    if layer_id == "model_03_event_state" and _is_m03_event_pool_row(row):
+    if layer_id == "model_03_event_state" and _is_m03_event_effect_row(row):
         fields = (
             "event_ref",
             "event_interpretation_ref",
             "available_time",
             "event_time",
             "normalized_event_type",
+            "semantic_node",
+            "effect_model_node",
+            "event_impact_disposition",
+            "impact_evidence_status",
             "affected_scope",
             "affected_entities",
             "observation_status",
@@ -1829,9 +1922,9 @@ def _layer_evidence_refs(
         refs.append("model_candidate_selection_trace.jsonl#unique_replay_time_background_context")
     elif layer_id == "model_02_target_state" and trace_row is not None:
         refs.append("model_candidate_selection_trace.jsonl")
-    elif layer_id == "model_03_event_state" and _is_m03_event_pool_row(row):
+    elif layer_id == "model_03_event_state" and _is_m03_event_effect_row(row):
         source_ref = str(row.get("source_artifact_ref") or "").strip()
-        refs.append(source_ref or "model_03_event_observation_pool")
+        refs.append(source_ref or "model_03_event_effect_review_ledger")
     return refs
 
 
@@ -1900,12 +1993,12 @@ def _replay_review_performance_summary(
     *,
     decision_rows: Iterable[Mapping[str, Any]],
     trace_rows: Iterable[Mapping[str, Any]],
-    m03_event_pool_rows: Iterable[Mapping[str, Any]],
+    m03_event_effect_rows: Iterable[Mapping[str, Any]],
     replay_receipt: Mapping[str, Any],
 ) -> dict[str, Any]:
     decisions = list(decision_rows)
     traces = list(trace_rows)
-    m03_events = list(m03_event_pool_rows)
+    m03_events = list(m03_event_effect_rows)
     filled = [row for row in decisions if str(row.get("fill_status") or "") == "simulated_filled"]
     returns = [_safe_float(row.get("realized_return")) for row in filled]
     material_returns = [value for value in returns if value is not None]
@@ -2109,7 +2202,7 @@ def _replay_review_performance_summary(
         "layer_differentiation": _layer_differentiation_summary(
             decisions,
             trace_rows=traces,
-            m03_event_pool_rows=m03_events,
+            m03_event_effect_rows=m03_events,
         ),
         "source_refs": {
             "decision_rows_ref": str(replay_receipt.get("decision_rows_ref") or ""),
@@ -2393,11 +2486,11 @@ def _layer_differentiation_summary(
     rows: Iterable[Mapping[str, Any]],
     *,
     trace_rows: Iterable[Mapping[str, Any]] = (),
-    m03_event_pool_rows: Iterable[Mapping[str, Any]] = (),
+    m03_event_effect_rows: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     decisions = list(rows)
     traces = list(trace_rows)
-    m03_events = list(m03_event_pool_rows)
+    m03_events = list(m03_event_effect_rows)
     diagnostics_by_layer: dict[str, list[Mapping[str, Any]]] = {
         "model_01_background_context": [],
         "model_02_target_state": [],
@@ -2432,9 +2525,10 @@ def _layer_differentiation_summary(
         }
     summaries["model_03_event_state"] = {
         **summaries["model_03_event_state"],
-        "event_pool_row_count": len(m03_events),
+        "event_effect_row_count": len(m03_events),
+        "event_impact_disposition_counts": _count_text(row.get("event_impact_disposition") for row in m03_events),
         "continuous_trigger_count": len(m03_events),
-        "coverage_basis": "model_03_event_observation_pool_event_rows",
+        "coverage_basis": "model_03_interpreted_event_effect_rows",
     }
     return summaries
 
@@ -2951,8 +3045,8 @@ def _path_conditioning_policy(row: Mapping[str, Any]) -> str:
         return value
     if _is_m01_background_context_time_state_row(row):
         return "point_in_time_background_context_state_not_target_expanded"
-    if _is_m03_event_pool_row(row):
-        return "point_in_time_event_pool_not_target_candidate_trace"
+    if _is_m03_event_effect_row(row):
+        return "point_in_time_event_effect_row_not_target_candidate_trace"
     if _is_model_candidate_trace_row(row):
         return "point_in_time_visible_candidate_trace_not_downstream_selected_path"
     return "upstream_selected_path_only"
@@ -2971,10 +3065,10 @@ def _path_scope(row: Mapping[str, Any]) -> str:
         target = str(row.get("target_ref") or row.get("target_symbol") or "").strip()
         if timestamp and target:
             return f"visible_candidate_trace:{timestamp}:{target}"
-    if _is_m03_event_pool_row(row):
+    if _is_m03_event_effect_row(row):
         event_ref = str(row.get("event_ref") or "").strip()
         if event_ref:
-            return f"event_pool_event:{event_ref}"
+            return f"event_effect_row:{event_ref}"
     target = _target_symbol(row)
     if target:
         return f"selected_target:{target}"

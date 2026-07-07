@@ -33,6 +33,11 @@ The resident historical scheduler is the normal path for no-broker historical mo
    - Admit realtime observation families only after review.
    - Let M03 event-state consume only accepted evidence packets and M05 compose optional offline guidance/expression context.
 
+6. **First-fold replay performance diagnosis**
+   - Analyze the first completed fold's replay result before treating later folds as proof.
+   - Separate issues that should improve with more data accumulation from mechanism defects in ranking, fusion, event-effect handling, expression selection, execution simulation, or lifecycle policy.
+   - Use layer-by-layer replay evidence and fixed point-in-time inputs; strong or weak headline PnL must not hide intermediate model or mechanism defects.
+
 ## Standing Gates
 
 - Provider calls require explicit provider-dispatch scope and controls.
