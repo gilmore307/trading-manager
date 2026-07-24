@@ -106,6 +106,48 @@ class AgentRepairClosureTests(unittest.TestCase):
         self.assertIn(("systemctl", "start", "trading-storage-dashboard-read-model-refresh.service"), calls)
         self.assertFalse(receipt["safety"]["broker_account_order_position_mutation_performed"])
 
+    def test_github_https_push_uses_askpass_token_without_command_exposure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            tmp = Path(raw_tmp)
+            repo = tmp / "trading-manager"
+            repo.mkdir()
+            candidate = self._write_candidate(
+                tmp / "agent",
+                stdout_payload={
+                    "diagnosis_status": "repaired_with_runtime_restart_pending",
+                    "files_changed": [str(repo / "src" / "trading_manager_tasks" / "scheduler_daemon.py")],
+                    "retry_recommendation": "service restart required, then retry scheduler selection",
+                    "blockers": [],
+                },
+            )
+            push_envs: list[dict[str, str]] = []
+            calls: list[tuple[str, ...]] = []
+
+            def fake_run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+                calls.append(tuple(argv))
+                if argv[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="main\n", stderr="")
+                if argv[:2] == ["git", "status"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+                if argv[:3] == ["git", "rev-list", "--count"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="1\n", stderr="")
+                if argv[:3] == ["git", "remote", "get-url"]:
+                    return subprocess.CompletedProcess(argv, 0, stdout="https://github.com/gilmore307/trading-manager.git\n", stderr="")
+                if argv[:3] == ["git", "push", "origin"]:
+                    push_envs.append(dict(kwargs.get("env") or {}))
+                return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+            with unittest.mock.patch.dict(os.environ, {"MANAGER_AGENT_REPAIR_GITHUB_TOKEN": "fixture-token"}):
+                receipt = close_agent_repair(candidate, runner=fake_run, repo_roots=(repo,))
+
+        self.assertEqual(receipt["closure_status"], "closed")
+        self.assertIn(("git", "push", "origin", "main"), calls)
+        self.assertEqual(len(push_envs), 1)
+        self.assertEqual(push_envs[0]["GIT_ASKPASS_TOKEN"], "fixture-token")
+        self.assertEqual(push_envs[0]["GIT_TERMINAL_PROMPT"], "0")
+        self.assertTrue(push_envs[0]["GIT_ASKPASS"].endswith("askpass.sh"))
+        self.assertFalse(any("fixture-token" in " ".join(call) for call in calls))
+
     def test_broker_boundary_blocks_automatic_closure(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             candidate = self._write_candidate(

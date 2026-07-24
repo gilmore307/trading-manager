@@ -7,10 +7,14 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
+
+from trading_registry import create_csv_registry_query
+from trading_registry.secret_resolver import SecretResolver
 
 from .agent_error_handler import (
     DEFAULT_AGENT_RUNNER_TIMEOUT_SECONDS,
@@ -35,6 +39,8 @@ DEFAULT_REPO_ROOTS = (
 )
 DEFAULT_DASHBOARD_REFRESH_SERVICE = "trading-storage-dashboard-read-model-refresh.service"
 DEFAULT_HISTORICAL_SCHEDULER_SERVICE = "trading-manager-historical-scheduler.service"
+DEFAULT_REGISTRY_CSV = DEFAULT_MANAGER_REPO_ROOT / "scripts" / "registry" / "current.csv"
+GITHUB_SECRET_CONFIG_ID = "cfg_USHCPJT2"
 FORBIDDEN_AUTOMATION_TERMS = (
     "broker",
     "account",
@@ -476,8 +482,17 @@ def _run(
     *,
     cwd: Path | None = None,
     timeout: float = 60.0,
+    env: Mapping[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    return runner(argv, cwd=str(cwd) if cwd else None, text=True, capture_output=True, timeout=timeout, check=False)
+    return runner(
+        argv,
+        cwd=str(cwd) if cwd else None,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        check=False,
+        env=dict(env) if env is not None else None,
+    )
 
 
 def _git_current_branch(repo_root: Path, *, runner: CommandRunner) -> str | None:
@@ -503,6 +518,56 @@ def _git_ahead_of_origin(repo_root: Path, branch: str, *, runner: CommandRunner)
         return False
 
 
+def _git_origin_url(repo_root: Path, *, runner: CommandRunner) -> str:
+    result = _run(runner, ["git", "remote", "get-url", "origin"], cwd=repo_root)
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
+def _github_pat_for_git_push() -> str | None:
+    for name in ("MANAGER_AGENT_REPAIR_GITHUB_TOKEN", "MANAGER_AGENT_REPAIR_GITHUB_PAT", "GITHUB_TOKEN", "GH_TOKEN"):
+        value = os.environ.get(name)
+        if value and value.strip():
+            return value.strip()
+    try:
+        resolver = SecretResolver(create_csv_registry_query(str(DEFAULT_REGISTRY_CSV)))
+        token = resolver.load_secret_text_by_config_id(GITHUB_SECRET_CONFIG_ID, "pat")
+    except Exception:
+        return None
+    return token.strip() or None
+
+
+def _run_git_push(repo_root: Path, branch: str, *, runner: CommandRunner) -> subprocess.CompletedProcess[str]:
+    origin_url = _git_origin_url(repo_root, runner=runner)
+    token = _github_pat_for_git_push() if origin_url.startswith("https://github.com/") else None
+    if not token:
+        return _run(runner, ["git", "push", "origin", branch], cwd=repo_root, timeout=120.0)
+
+    with tempfile.TemporaryDirectory(prefix="agent-repair-git-askpass-") as raw_tmp:
+        askpass = Path(raw_tmp) / "askpass.sh"
+        askpass.write_text(
+            "#!/bin/sh\n"
+            "case \"$1\" in\n"
+            "*Username*) printf '%s\\n' \"${GIT_ASKPASS_USERNAME:-x-access-token}\" ;;\n"
+            "*Password*) printf '%s\\n' \"$GIT_ASKPASS_TOKEN\" ;;\n"
+            "*) printf '\\n' ;;\n"
+            "esac\n",
+            encoding="utf-8",
+        )
+        askpass.chmod(0o700)
+        env = dict(os.environ)
+        env.update(
+            {
+                "GIT_ASKPASS": str(askpass),
+                "GIT_ASKPASS_TOKEN": token,
+                "GIT_ASKPASS_USERNAME": os.environ.get("MANAGER_AGENT_REPAIR_GIT_USERNAME", "x-access-token"),
+                "GIT_TERMINAL_PROMPT": "0",
+            }
+        )
+        return _run(runner, ["git", "push", "origin", branch], cwd=repo_root, timeout=120.0, env=env)
+
+
 def _push_repaired_repos(
     repos: Iterable[Path],
     *,
@@ -520,7 +585,7 @@ def _push_repaired_repos(
         if not _git_ahead_of_origin(repo_root, branch, runner=runner):
             actions.append({"action": "git_push", "repo": str(repo_root), "status": "not_needed", "branch": branch})
             continue
-        result = _run(runner, ["git", "push", "origin", branch], cwd=repo_root, timeout=120.0)
+        result = _run_git_push(repo_root, branch, runner=runner)
         actions.append(
             {
                 "action": "git_push",
