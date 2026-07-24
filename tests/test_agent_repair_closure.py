@@ -390,6 +390,59 @@ class AgentRepairClosureTests(unittest.TestCase):
             self.assertEqual(receipt["actions"][0]["action"], "retry_receipt_observed")
             self.assertEqual(receipt["blockers"], [])
 
+    def test_manager_stage_evidence_ref_closes_memory_guard_after_retry_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_tmp:
+            control_root = Path(raw_tmp) / "storage" / "02_control_plane"
+            root = control_root / "runtime" / "agent_error_handling"
+            stage_id = "model_05_option_expression.model_generation.train"
+            candidate = self._write_candidate(
+                root,
+                request_overrides={
+                    "error_scope": "server.model_training_stage",
+                    "summary": f"model training stage {stage_id} stage memory guard exceeded max_rss_mb=16384",
+                    "evidence_refs": [f"manager_stage:{stage_id}"],
+                },
+                stdout_payload={
+                    "diagnosis_status": "repaired_verified_push_blocked",
+                    "root_cause": "M05 generation exceeded memory guard before streaming repair.",
+                    "files_changed": ["scripts/models/model_05_option_expression/generate_model_05_option_expression.py"],
+                    "retry_recommendation": "retry original stage command",
+                    "blockers": ["git push failed before closure retry"],
+                },
+            )
+            candidate.receipt_path.write_text(
+                json.dumps(
+                    {
+                        "contract_type": "agent_repair_closure_receipt",
+                        "closure_status": "blocked",
+                        "actions": [{"action": "git_push", "status": "failed"}],
+                        "blockers": ["existing blocked closure requires new successful retry evidence"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            receipt_dir = control_root / "runtime" / "model_training_stage_receipts" / stage_id.replace(".", "__")
+            receipt_dir.mkdir(parents=True)
+            (receipt_dir / "2026-07-07T111516.497372+0000.receipt.json").write_text(
+                json.dumps(
+                    {
+                        "contract_type": "component_completion_receipt",
+                        "manager_stage_id": stage_id,
+                        "status": "succeeded",
+                        "completed_at": "2026-07-07T11:25:51Z",
+                        "runs": [{"status": "succeeded", "return_code": 0}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            receipt = close_agent_repair(candidate)
+
+        self.assertEqual(receipt["closure_status"], "closed")
+        self.assertEqual(receipt["actions"][0]["action"], "retry_receipt_observed")
+        self.assertEqual(receipt["actions"][0]["stage_id"], stage_id)
+        self.assertEqual(receipt["blockers"], [])
+
     def test_blocked_replay_source_error_closes_when_source_requests_succeeded(self) -> None:
         with tempfile.TemporaryDirectory() as raw_tmp:
             control_root = Path(raw_tmp) / "storage" / "02_control_plane"

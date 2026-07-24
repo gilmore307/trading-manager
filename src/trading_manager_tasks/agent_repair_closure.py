@@ -152,6 +152,12 @@ def _control_plane_root(candidate: ClosureCandidate) -> Path:
 
 
 def _stage_id_from_request(request: Mapping[str, Any]) -> str | None:
+    for raw_ref in request.get("evidence_refs") or []:
+        ref = str(raw_ref or "")
+        if ref.startswith("manager_stage:"):
+            stage_id = ref.removeprefix("manager_stage:").strip()
+            if stage_id:
+                return stage_id
     for field in ("summary", "error_scope"):
         text = str(request.get(field) or "")
         match = STAGE_REF_RE.search(text)
